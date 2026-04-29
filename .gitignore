@@ -1,0 +1,35 @@
+# ── Orbi ──
+.env
+.env.*
+!.env.example
+
+# ── Environnement virtuel ──
+.venv/
+venv/
+env/
+
+# ── Python ──
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# ── IDE ──
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Tests ──
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ── Linting ──
+.ruff_cache/
+
+# ── OS ──
+.DS_Store
+Thumbs.db

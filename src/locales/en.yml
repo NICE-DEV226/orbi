@@ -1,0 +1,155 @@
+# ─────────────────────────────────────────
+# Orbi — Translations English (EN)
+# ─────────────────────────────────────────
+
+# ── General ──
+common:
+  back: "← Back"
+  home: "🏠 Home"
+  confirm: "✅ Confirm"
+  cancel: "❌ Cancel"
+  save: "💾 Save"
+  delete: "🗑️ Delete"
+  edit: "✏️ Edit"
+  close: "✖ Close"
+  next: "Next →"
+  previous: "← Previous"
+  yes: "Yes"
+  no: "No"
+  loading: "⏳ Loading..."
+  error: "❌ An error occurred. Please try again later."
+  session_expired: "⏰ Your session expired after 30 minutes of inactivity. Use the main menu to restart."
+  banned: "🚫 Your account has been suspended. Reason: {reason}"
+  banned_contact: "📧 Contact Support"
+  rate_limited: "⏳ Too many requests. Please wait a few moments before trying again."
+
+# ── Onboarding ──
+onboarding:
+  language_select: "🌍 Choisissez votre langue / Choose your language / اختر لغتك"
+  welcome: "👋 Welcome to **Orbi**, {name}!\n\nI am your universal assistant. Here is what I can do for you:"
+  welcome_back: "👋 Great to see you again, {name}! How can I help you?"
+
+# ── Main Menu ──
+menu:
+  main:
+    title: "📋 **Main Menu**\n\nChoose a module:"
+    support: "🎧 Support"
+    shop: "🛍️ Shop"
+    community: "👥 Community"
+    productivity: "⚡ Productivity"
+    developers: "👨‍💻 Developers"
+    profile: "👤 My Profile"
+
+# ── Profile ──
+profile:
+  title: "👤 **My Profile**"
+  info: "📝 **Name**: {name}\n🌐 **Language**: {lang}\n👑 **Role**: {role}\n📅 **Joined**: {joined}\n📊 **Orders**: {orders}\n🎧 **Tickets**: {tickets}\n⭐ **Karma**: {karma}"
+  change_language: "✏️ Change Language"
+  notifications: "🔔 Notifications"
+  timezone: "🕐 Timezone"
+  stats: "📊 My Stats"
+  morning_brief: "🌅 Morning Brief"
+  language_changed: "✅ Language changed to **English**."
+
+# ── Support ──
+support:
+  menu_title: "🎧 **Support**\n\nHow can I help you?"
+  new_ticket: "🎫 New Ticket"
+  my_tickets: "📋 My Tickets"
+  ticket_created: "✅ Ticket **{ticket_id}** created successfully!\n\n📋 **Category**: {category}\n📝 **Subject**: {subject}\n⏰ **Priority**: {priority} — Reply within {sla}"
+  ticket_limit: "⚠️ You already have {count} open tickets (maximum 3). Please close an existing ticket before opening a new one."
+  category_select: "📂 Choose a category:"
+  category_billing: "💳 Billing"
+  category_technical: "🔧 Technical"
+  category_general: "💬 General"
+  category_complaint: "⚠️ Complaint"
+  category_other: "📋 Other"
+  subject_prompt: "✏️ Enter the subject of your ticket (5-100 characters):"
+  description_prompt: "📝 Describe your problem in detail (minimum 20 characters):"
+  review_ticket: "📋 **Ticket Summary**\n\n📂 **Category**: {category}\n📝 **Subject**: {subject}\n📄 **Description**: {description}\n\nConfirm creation?"
+  subject_too_short: "⚠️ Subject must be between 5 and 100 characters. Try again:"
+  description_too_short: "⚠️ Description must be at least 20 characters. Try again:"
+  ticket_closed: "✅ Ticket **{ticket_id}** has been closed."
+  agent_reply: "💬 **Agent reply** on ticket **{ticket_id}**:\n\n{message}"
+  reply: "💬 Reply"
+  mark_resolved: "✅ Mark as Resolved"
+  view_full: "📋 View full ticket"
+  escalation: "🤔 I didn't quite understand your request. Would you like to be connected with an agent?"
+  escalation_create: "🎧 Create a ticket now"
+  escalation_continue: "← Continue alone"
+
+# ── Commerce ──
+commerce:
+  menu_title: "🛍️ **Shop**\n\nDiscover our products:"
+  catalog: "📦 Catalog"
+  my_orders: "📦 My Orders"
+  cart: "🛒 My Cart"
+  search: "🔍 Search"
+  add_to_cart: "🛒 Add to Cart"
+  add_favorite: "❤️ Add to Favorites"
+  notify_available: "🔔 Notify when available"
+  out_of_stock: "Out of Stock"
+  product_unavailable: "⚠️ This product is no longer available."
+  cart_empty: "🛒 Your cart is empty."
+  cart_title: "🛒 **My Cart**\n\n{items}\n\n💰 **Total**: {total}"
+  checkout: "🛒 Checkout"
+  clear_cart: "🗑️ Clear Cart"
+  promo_code: "🎟️ I have a promo code"
+  promo_invalid: "❌ Invalid or expired promo code."
+  promo_applied: "✅ Promo code applied! Discount: -{discount}"
+  payment_select: "💳 Choose your payment method:"
+  payment_stripe: "💳 Pay by Card"
+  payment_orange: "📱 Orange Money"
+  payment_wave: "🌊 Wave"
+  order_confirmed: "✅ Order **{order_id}** confirmed!\n\n📦 **Items**: {items}\n💰 **Total**: {total}\n💳 **Payment**: {provider}"
+  order_cancelled: "❌ Order **{order_id}** has been cancelled. Refund will be processed within {delay}."
+  track_order: "📦 Track My Order"
+
+# ── Community ──
+community:
+  menu_title: "👥 **Community**\n\nInteract with other members:"
+  polls: "📊 Polls"
+  karma: "⭐ Karma"
+  rules: "📋 Group Rules"
+  create_poll: "📊 Create a Poll"
+  view_results: "📊 View Full Results"
+
+# ── Productivity ──
+productivity:
+  menu_title: "⚡ **Productivity**\n\nYour personal tools:"
+  new_task: "✅ New Task"
+  my_tasks: "📋 My Tasks"
+  new_reminder: "⏰ New Reminder"
+  new_note: "📝 New Note"
+  my_notes: "📋 My Notes"
+  search_notes: "🔍 Search My Notes"
+  translate: "🌐 Translate"
+  currency: "💱 Convert Currency"
+  calculator: "🧮 Calculator"
+  world_time: "🌍 World Time"
+
+# ── Developers ──
+developers:
+  menu_title: "👨‍💻 **Developers**\n\nManage your API integrations:"
+  api_keys: "🔑 My API Keys"
+  webhooks: "🔗 My Webhooks"
+  sandbox: "🧪 Sandbox"
+  logs: "📊 API Logs"
+  stats: "📈 Statistics"
+  docs: "📖 API Documentation"
+
+# ── Notifications ──
+notifications:
+  order_status: "📦 **Order Update {order_id}**\n\nNew Status: {status}"
+  ticket_status: "🎧 **Ticket Update {ticket_id}**\n\nNew Status: {status}"
+  csat_request: "⭐ **Rate Your Experience**\n\nTicket **{ticket_id}** has been resolved. How would you rate the support received?"
+  csat_thanks: "🙏 Thank you for your feedback!"
+
+# ── Errors ──
+errors:
+  network: "🌐 Connection error. Please check your connection and try again."
+  service_unavailable: "⚙️ Service is temporarily unavailable. Please try again in a few moments."
+  invalid_input: "⚠️ Invalid input. {details}"
+  not_found: "🔍 Item not found."
+  forbidden: "🚫 You do not have the required permissions."
+  double_action: "⚠️ This action has already been performed."

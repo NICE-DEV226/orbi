@@ -1,0 +1,109 @@
+"""
+Orbi — Modèles Productivité (Beanie Documents).
+Tâches, rappels et notes personnelles.
+"""
+
+from datetime import datetime, timezone
+from enum import StrEnum
+from typing import Optional
+
+from beanie import Document, Indexed
+from pydantic import Field
+
+
+# ─────────────────────────────────────
+# Tâche
+# ─────────────────────────────────────
+
+class TaskStatus(StrEnum):
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    OVERDUE = "overdue"
+
+
+class TaskPriority(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    URGENT = "urgent"
+
+
+class Task(Document):
+    """Document MongoDB représentant une tâche personnelle."""
+
+    user_telegram_id: Indexed(int)  # type: ignore[valid-type]
+
+    title: str
+    description: Optional[str] = None
+    status: TaskStatus = TaskStatus.ACTIVE
+    priority: TaskPriority = TaskPriority.MEDIUM
+    due_date: Optional[datetime] = None
+
+    # ── Rappels ──
+    reminder_eve_sent: bool = False   # Rappel veille envoyé
+    reminder_day_sent: bool = False   # Rappel jour J envoyé
+
+    # ── Timestamps ──
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    completed_at: Optional[datetime] = None
+
+    class Settings:
+        name = "tasks"
+
+    @property
+    def is_overdue(self) -> bool:
+        if self.due_date and self.status == TaskStatus.ACTIVE:
+            return datetime.now(timezone.utc) > self.due_date
+        return False
+
+
+# ─────────────────────────────────────
+# Rappel ponctuel
+# ─────────────────────────────────────
+
+class Reminder(Document):
+    """Document MongoDB représentant un rappel one-shot."""
+
+    user_telegram_id: Indexed(int)  # type: ignore[valid-type]
+
+    message: str
+    remind_at: datetime
+    is_sent: bool = False
+
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    class Settings:
+        name = "reminders"
+
+
+# ─────────────────────────────────────
+# Note
+# ─────────────────────────────────────
+
+class Note(Document):
+    """Document MongoDB représentant une note personnelle."""
+
+    user_telegram_id: Indexed(int)  # type: ignore[valid-type]
+
+    title: str
+    content: str = ""
+    tags: list[str] = Field(default_factory=list)  # Extraits automatiquement des #hashtags
+
+    # ── Transcription vocale ──
+    is_voice_note: bool = False
+    voice_file_id: Optional[str] = None
+    voice_duration_seconds: Optional[int] = None
+
+    # ── Timestamps ──
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    class Settings:
+        name = "notes"
+
+    @staticmethod
+    def extract_tags(text: str) -> list[str]:
+        """Extrait les hashtags d'un texte."""
+        import re
+        return list(set(re.findall(r"#(\w+)", text)))

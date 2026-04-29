@@ -1,0 +1,155 @@
+# ─────────────────────────────────────────
+# Orbi — Traductions Français (FR)
+# ─────────────────────────────────────────
+
+# ── Général ──
+common:
+  back: "← Retour"
+  home: "🏠 Accueil"
+  confirm: "✅ Confirmer"
+  cancel: "❌ Annuler"
+  save: "💾 Sauvegarder"
+  delete: "🗑️ Supprimer"
+  edit: "✏️ Modifier"
+  close: "✖ Fermer"
+  next: "Suivant →"
+  previous: "← Précédent"
+  yes: "Oui"
+  no: "Non"
+  loading: "⏳ Chargement..."
+  error: "❌ Une erreur est survenue. Veuillez réessayer plus tard."
+  session_expired: "⏰ Votre session a expiré suite à 30 minutes d'inactivité. Utilisez le menu principal pour recommencer."
+  banned: "🚫 Votre compte a été suspendu. Raison : {reason}"
+  banned_contact: "📧 Contacter le support"
+  rate_limited: "⏳ Trop de requêtes. Veuillez patienter quelques instants avant de réessayer."
+
+# ── Onboarding ──
+onboarding:
+  language_select: "🌍 Choisissez votre langue / Choose your language / اختر لغتك"
+  welcome: "👋 Bienvenue sur **Orbi**, {name} !\n\nJe suis votre assistant universel. Voici ce que je peux faire pour vous :"
+  welcome_back: "👋 Ravi de vous revoir, {name} ! Comment puis-je vous aider ?"
+
+# ── Menu Principal ──
+menu:
+  main:
+    title: "📋 **Menu Principal**\n\nChoisissez un module :"
+    support: "🎧 Support"
+    shop: "🛍️ Boutique"
+    community: "👥 Communauté"
+    productivity: "⚡ Productivité"
+    developers: "👨‍💻 Développeurs"
+    profile: "👤 Mon Profil"
+
+# ── Profil ──
+profile:
+  title: "👤 **Mon Profil**"
+  info: "📝 **Prénom** : {name}\n🌐 **Langue** : {lang}\n👑 **Rôle** : {role}\n📅 **Inscrit depuis** : {joined}\n📊 **Commandes** : {orders}\n🎧 **Tickets** : {tickets}\n⭐ **Karma** : {karma}"
+  change_language: "✏️ Changer de langue"
+  notifications: "🔔 Notifications"
+  timezone: "🕐 Fuseau horaire"
+  stats: "📊 Mes statistiques"
+  morning_brief: "🌅 Morning Brief"
+  language_changed: "✅ Langue changée en **Français**."
+
+# ── Support ──
+support:
+  menu_title: "🎧 **Support**\n\nComment puis-je vous aider ?"
+  new_ticket: "🎫 Nouveau ticket"
+  my_tickets: "📋 Mes tickets"
+  ticket_created: "✅ Ticket **{ticket_id}** créé avec succès !\n\n📋 **Catégorie** : {category}\n📝 **Sujet** : {subject}\n⏰ **Priorité** : {priority} — Réponse sous {sla}"
+  ticket_limit: "⚠️ Vous avez déjà {count} tickets ouverts (maximum 3). Veuillez fermer un ticket existant avant d'en ouvrir un nouveau."
+  category_select: "📂 Choisissez une catégorie :"
+  category_billing: "💳 Facturation"
+  category_technical: "🔧 Technique"
+  category_general: "💬 Général"
+  category_complaint: "⚠️ Réclamation"
+  category_other: "📋 Autre"
+  subject_prompt: "✏️ Entrez le sujet de votre ticket (5-100 caractères) :"
+  description_prompt: "📝 Décrivez votre problème en détail (minimum 20 caractères) :"
+  review_ticket: "📋 **Récapitulatif du ticket**\n\n📂 **Catégorie** : {category}\n📝 **Sujet** : {subject}\n📄 **Description** : {description}\n\nConfirmez-vous la création ?"
+  subject_too_short: "⚠️ Le sujet doit contenir entre 5 et 100 caractères. Réessayez :"
+  description_too_short: "⚠️ La description doit contenir au minimum 20 caractères. Réessayez :"
+  ticket_closed: "✅ Le ticket **{ticket_id}** a été fermé."
+  agent_reply: "💬 **Réponse de l'agent** sur le ticket **{ticket_id}** :\n\n{message}"
+  reply: "💬 Répondre"
+  mark_resolved: "✅ Marquer comme résolu"
+  view_full: "📋 Voir le ticket complet"
+  escalation: "🤔 Je n'ai pas bien compris votre demande. Souhaitez-vous être mis en contact avec un agent ?"
+  escalation_create: "🎧 Créer un ticket maintenant"
+  escalation_continue: "← Continuer seul"
+
+# ── Commerce ──
+commerce:
+  menu_title: "🛍️ **Boutique**\n\nDécouvrez nos produits :"
+  catalog: "📦 Catalogue"
+  my_orders: "📦 Mes commandes"
+  cart: "🛒 Mon panier"
+  search: "🔍 Rechercher"
+  add_to_cart: "🛒 Ajouter au panier"
+  add_favorite: "❤️ Mettre en favori"
+  notify_available: "🔔 Me notifier quand disponible"
+  out_of_stock: "Indisponible"
+  product_unavailable: "⚠️ Ce produit n'est plus disponible."
+  cart_empty: "🛒 Votre panier est vide."
+  cart_title: "🛒 **Mon Panier**\n\n{items}\n\n💰 **Total** : {total}"
+  checkout: "🛒 Commander"
+  clear_cart: "🗑️ Vider le panier"
+  promo_code: "🎟️ J'ai un code promo"
+  promo_invalid: "❌ Code promo invalide ou expiré."
+  promo_applied: "✅ Code promo appliqué ! Remise : -{discount}"
+  payment_select: "💳 Choisissez votre mode de paiement :"
+  payment_stripe: "💳 Payer par carte"
+  payment_orange: "📱 Orange Money"
+  payment_wave: "🌊 Wave"
+  order_confirmed: "✅ Commande **{order_id}** confirmée !\n\n📦 **Articles** : {items}\n💰 **Total** : {total}\n💳 **Paiement** : {provider}"
+  order_cancelled: "❌ La commande **{order_id}** a été annulée. Le remboursement sera traité sous {delay}."
+  track_order: "📦 Suivre ma commande"
+
+# ── Communauté ──
+community:
+  menu_title: "👥 **Communauté**\n\nInteragissez avec les autres membres :"
+  polls: "📊 Sondages"
+  karma: "⭐ Karma"
+  rules: "📋 Règles du groupe"
+  create_poll: "📊 Créer un sondage"
+  view_results: "📊 Voir les résultats complets"
+
+# ── Productivité ──
+productivity:
+  menu_title: "⚡ **Productivité**\n\nVos outils personnels :"
+  new_task: "✅ Nouvelle tâche"
+  my_tasks: "📋 Mes tâches"
+  new_reminder: "⏰ Nouveau rappel"
+  new_note: "📝 Nouvelle note"
+  my_notes: "📋 Mes notes"
+  search_notes: "🔍 Rechercher dans mes notes"
+  translate: "🌐 Traduire"
+  currency: "💱 Convertir des devises"
+  calculator: "🧮 Calculatrice"
+  world_time: "🌍 Heure dans le monde"
+
+# ── Développeurs ──
+developers:
+  menu_title: "👨‍💻 **Développeurs**\n\nGérez vos intégrations API :"
+  api_keys: "🔑 Mes API Keys"
+  webhooks: "🔗 Mes Webhooks"
+  sandbox: "🧪 Sandbox"
+  logs: "📊 Logs API"
+  stats: "📈 Statistiques"
+  docs: "📖 Documentation API"
+
+# ── Notifications ──
+notifications:
+  order_status: "📦 **Mise à jour commande {order_id}**\n\nNouveau statut : {status}"
+  ticket_status: "🎧 **Mise à jour ticket {ticket_id}**\n\nNouveau statut : {status}"
+  csat_request: "⭐ **Évaluez votre expérience**\n\nLe ticket **{ticket_id}** a été résolu. Comment évaluez-vous le support reçu ?"
+  csat_thanks: "🙏 Merci pour votre évaluation !"
+
+# ── Erreurs ──
+errors:
+  network: "🌐 Erreur de connexion. Veuillez vérifier votre connexion et réessayer."
+  service_unavailable: "⚙️ Le service est temporairement indisponible. Veuillez réessayer dans quelques instants."
+  invalid_input: "⚠️ Entrée invalide. {details}"
+  not_found: "🔍 Élément introuvable."
+  forbidden: "🚫 Vous n'avez pas les permissions nécessaires."
+  double_action: "⚠️ Cette action a déjà été effectuée."

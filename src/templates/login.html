@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container d-flex flex-column justify-content-center align-items-center" style="min-height: 100vh;">
+    
+    <div class="text-center mb-4">
+        <h1 class="display-5 text-primary fw-bold"><i class="bi bi-globe"></i> Orbi Admin</h1>
+        <p class="lead text-muted">Console de gestion sécurisée</p>
+    </div>
+
+    <div class="card bg-dark border-secondary shadow-lg p-4" style="max-width: 500px; width: 100%;">
+        <div class="card-body text-center">
+            
+            {% if error %}
+            <div class="alert alert-danger" role="alert">
+                <i class="bi bi-exclamation-triangle-fill"></i> {{ error }}
+            </div>
+            {% endif %}
+
+            <div class="mb-4">
+                <i class="bi bi-shield-lock display-1 text-secondary"></i>
+            </div>
+            
+            <h4 class="card-title mb-3">Authentification Requise</h4>
+            <p class="card-text text-muted mb-4">
+                L'accès à ce dashboard s'effectue via un <strong>Magic Link</strong> sécurisé lié à votre compte Telegram. 
+                Aucun mot de passe n'est nécessaire.
+            </p>
+
+            <div class="alert alert-info text-start">
+                <strong>Comment se connecter ?</strong>
+                <ol class="mt-2 mb-0">
+                    <li>Ouvrez le Bot Telegram Orbi</li>
+                    <li>Tapez la commande <code>/web</code></li>
+                    <li>Cliquez sur le lien unique qui vous sera généré !</li>
+                </ol>
+            </div>
+
+            <div class="mt-4 text-muted small">
+                Ce lien à usage unique expire au bout de 5 minutes.<br>
+                (Réservé aux profils <span class="badge bg-primary">admin</span> ou <span class="badge bg-danger">superadmin</span>)
+            </div>
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}

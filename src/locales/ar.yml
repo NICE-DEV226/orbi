@@ -1,0 +1,155 @@
+# ─────────────────────────────────────────
+# Orbi — Translations Arabic (AR)
+# ─────────────────────────────────────────
+
+# ── General ──
+common:
+  back: "← رجوع"
+  home: "🏠 الرئيسية"
+  confirm: "✅ تأكيد"
+  cancel: "❌ إلغاء"
+  save: "💾 حفظ"
+  delete: "🗑️ حذف"
+  edit: "✏️ تعديل"
+  close: "✖ إغلاق"
+  next: "التالي →"
+  previous: "← السابق"
+  yes: "نعم"
+  no: "لا"
+  loading: "⏳ جاري التحميل..."
+  error: "❌ حدث خطأ. يرجى المحاولة مرة أخرى لاحقًا."
+  session_expired: "⏰ انتهت صلاحية جلستك بعد 30 دقيقة من عدم النشاط. استخدم القائمة الرئيسية للبدء من جديد."
+  banned: "🚫 تم تعليق حسابك. السبب: {reason}"
+  banned_contact: "📧 اتصل بالدعم"
+  rate_limited: "⏳ طلبات كثيرة جدًا. يرجى الانتظار بضع لحظات قبل المحاولة مرة أخرى."
+
+# ── Onboarding ──
+onboarding:
+  language_select: "🌍 Choisissez votre langue / Choose your language / اختر لغتك"
+  welcome: "👋 مرحبًا بك في **Orbi**، {name}!\n\nأنا مساعدك الشامل. إليك ما يمكنني فعله من أجلك:"
+  welcome_back: "👋 سعيد برؤيتك مرة أخرى يا {name}! كيف يمكنني مساعدتك؟"
+
+# ── Main Menu ──
+menu:
+  main:
+    title: "📋 **القائمة الرئيسية**\n\nاختر وحدة:"
+    support: "🎧 الدعم"
+    shop: "🛍️ المتجر"
+    community: "👥 المجتمع"
+    productivity: "⚡ الإنتاجية"
+    developers: "👨‍💻 المطورون"
+    profile: "👤 ملفي الشخصي"
+
+# ── Profile ──
+profile:
+  title: "👤 **ملفي الشخصي**"
+  info: "📝 **الاسم**: {name}\n🌐 **اللغة**: {lang}\n👑 **الدور**: {role}\n📅 **تاريخ الانضمام**: {joined}\n📊 **الطلبات**: {orders}\n🎧 **التذاكر**: {tickets}\n⭐ **الكارما**: {karma}"
+  change_language: "✏️ تغيير اللغة"
+  notifications: "🔔 الإشعارات"
+  timezone: "🕐 المنطقة الزمنية"
+  stats: "📊 إحصائياتي"
+  morning_brief: "🌅 ملخص الصباح"
+  language_changed: "✅ تم تغيير اللغة إلى **العربية**."
+
+# ── Support ──
+support:
+  menu_title: "🎧 **الدعم**\n\nكيف يمكنني مساعدتك؟"
+  new_ticket: "🎫 تذكرة جديدة"
+  my_tickets: "📋 تذاكري"
+  ticket_created: "✅ تم إنشاء التذكرة **{ticket_id}** بنجاح!\n\n📋 **الفئة**: {category}\n📝 **الموضوع**: {subject}\n⏰ **الأولوية**: {priority} — الرد خلال {sla}"
+  ticket_limit: "⚠️ لديك بالفعل {count} تذاكر مفتوحة (الحد الأقصى 3). يرجى إغلاق تذكرة حالية قبل فتح تذكرة جديدة."
+  category_select: "📂 اختر فئة:"
+  category_billing: "💳 الفواتير"
+  category_technical: "🔧 تقني"
+  category_general: "💬 عام"
+  category_complaint: "⚠️ شكوى"
+  category_other: "📋 آخر"
+  subject_prompt: "✏️ أدخل موضوع التذكرة الخاص بك (5-100 حرف):"
+  description_prompt: "📝 صف مشكلتك بالتفصيل (20 حرفًا كحد أدنى):"
+  review_ticket: "📋 **ملخص التذكرة**\n\n📂 **الفئة**: {category}\n📝 **الموضوع**: {subject}\n📄 **الوصف**: {description}\n\nتأكيد الإنشاء؟"
+  subject_too_short: "⚠️ يجب أن يكون الموضوع بين 5 و 100 حرف. أعد المحاولة:"
+  description_too_short: "⚠️ يجب أن يتكون الوصف من 20 حرفًا على الأقل. أعد المحاولة:"
+  ticket_closed: "✅ تم إغلاق التذكرة **{ticket_id}**."
+  agent_reply: "💬 **رد الوكيل** على التذكرة **{ticket_id}**:\n\n{message}"
+  reply: "💬 رد"
+  mark_resolved: "✅ وضع علامة كتم الحل"
+  view_full: "📋 عرض التذكرة كاملة"
+  escalation: "🤔 لم أفهم طلبك تمامًا. هل ترغب في التحدث مع وكيل؟"
+  escalation_create: "🎧 إنشاء تذكرة الآن"
+  escalation_continue: "← المتابعة بمفردي"
+
+# ── Commerce ──
+commerce:
+  menu_title: "🛍️ **المتجر**\n\nاكتشف منتجاتنا:"
+  catalog: "📦 الكتالوج"
+  my_orders: "📦 طلباتي"
+  cart: "🛒 عربتي"
+  search: "🔍 بحث"
+  add_to_cart: "🛒 أضف إلى السلة"
+  add_favorite: "❤️ أضف إلى المفضلة"
+  notify_available: "🔔 أعلمني عند توفر المنتَج"
+  out_of_stock: "نفذت الكمية"
+  product_unavailable: "⚠️ هذا المنتج لم يعد متوفرًا."
+  cart_empty: "🛒 عربة التسوق فارغة."
+  cart_title: "🛒 **عربة التسوق**\n\n{items}\n\n💰 **الإجمالي**: {total}"
+  checkout: "🛒 الدفع"
+  clear_cart: "🗑️ إفراغ العربة"
+  promo_code: "🎟️ لدي رمز ترويجي"
+  promo_invalid: "❌ رمز ترويجي غير صالح أو منتهي الصلاحية."
+  promo_applied: "✅ تم تطبيق الرمز الترويجي! الخصم: -{discount}"
+  payment_select: "💳 اختر طريقة الدفع الخاصة بك:"
+  payment_stripe: "💳 الدفع بالبطاقة"
+  payment_orange: "📱 أورنج موني"
+  payment_wave: "🌊 ويف"
+  order_confirmed: "✅ تم تأكيد الطلب **{order_id}**!\n\n📦 **العناصر**: {items}\n💰 **الإجمالي**: {total}\n💳 **الدفع**: {provider}"
+  order_cancelled: "❌ تم إلغاء الطلب **{order_id}**. ستتم معالجة الاسترداد خلال {delay}."
+  track_order: "📦 تتبع طلبي"
+
+# ── Community ──
+community:
+  menu_title: "👥 **المجتمع**\n\nتفاعل مع الأعضاء الآخرين:"
+  polls: "📊 استطلاعات الرأي"
+  karma: "⭐ الكارما"
+  rules: "📋 قواعد المجموعة"
+  create_poll: "📊 إنشاء استطلاع رأي"
+  view_results: "📊 عرض النتائج الكاملة"
+
+# ── Productivity ──
+productivity:
+  menu_title: "⚡ **الإنتاجية**\n\nأدواتك الشخصية:"
+  new_task: "✅ مهمة جديدة"
+  my_tasks: "📋 مهامي"
+  new_reminder: "⏰ تذكير جديد"
+  new_note: "📝 ملاحظة جديدة"
+  my_notes: "📋 ملاحظاتي"
+  search_notes: "🔍 البحث في ملاحظاتي"
+  translate: "🌐 الترجمة"
+  currency: "💱 تحويل العملات"
+  calculator: "🧮 حاسبة"
+  world_time: "🌍 الوقت في العالم"
+
+# ── Developers ──
+developers:
+  menu_title: "👨‍💻 **المطورون**\n\nإدارة تكاملات API الخاصة بك:"
+  api_keys: "🔑 مفاتيح API الخاصة بي"
+  webhooks: "🔗 الـ Webhooks الخاصة بي"
+  sandbox: "🧪 بيئة الاختبار"
+  logs: "📊 سجلات API"
+  stats: "📈 الإحصائيات"
+  docs: "📖 وثائق API"
+
+# ── Notifications ──
+notifications:
+  order_status: "📦 **تحديث الطلب {order_id}**\n\nالحالة الجديدة: {status}"
+  ticket_status: "🎧 **تحديث التذكرة {ticket_id}**\n\nالحالة الجديدة: {status}"
+  csat_request: "⭐ **قيم تجربتك**\n\nتم حل التذكرة **{ticket_id}**. كيف تقيم الدعم الذي تلقيته؟"
+  csat_thanks: "🙏 شكرًا لتقييمك!"
+
+# ── Errors ──
+errors:
+  network: "🌐 خطأ في الاتصال. يرجى التحقق من اتصالك والمحاولة مرة أخرى."
+  service_unavailable: "⚙️ الخدمة غير متاحة مؤقتًا. يرجى المحاولة مرة أخرى بعد لحظات."
+  invalid_input: "⚠️ إدخال غير صالح. {details}"
+  not_found: "🔍 لم يتم العثور على العنصر."
+  forbidden: "🚫 ليس لديك الصلاحيات المطلوبة."
+  double_action: "⚠️ تم تنفيذ هذا الإجراء من قبل."

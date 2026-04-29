@@ -1,0 +1,72 @@
+version: "3.8"
+
+services:
+  bot:
+    build: .
+    container_name: orbi_bot
+    restart: always
+    environment:
+      # L'application lira ces variables, ou elles peuvent être fournillées via un .env externe
+      - ENVIRONMENT=production
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - MONGODB_URI=mongodb://mongodb:27017/orbi
+      - REDIS_URL=redis://redis:6379/1
+    ports:
+      - "8000:8000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - orbi_network
+
+  mongodb:
+    image: mongo:7.0
+    container_name: orbi_mongo
+    restart: always
+    volumes:
+      - orbi_mongo_data:/data/db
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - orbi_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: orbi_redis
+    restart: always
+    volumes:
+      - orbi_redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - orbi_network
+
+  # LibreTranslate en local si souhaité (Optionnel pour Productivité)
+  libretranslate:
+    image: libretranslate/libretranslate:latest
+    container_name: orbi_translate
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    networks:
+      - orbi_network
+
+volumes:
+  orbi_mongo_data:
+  orbi_redis_data:
+
+networks:
+  orbi_network:
+    driver: bridge

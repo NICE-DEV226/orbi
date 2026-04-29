@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom border-secondary">
+    <h1 class="h2">Gestion des Utilisateurs</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <form class="d-flex" method="GET" action="/admin/users">
+            <div class="input-group input-group-sm me-2">
+                <input type="text" class="form-control bg-dark text-light border-secondary" placeholder="Rechercher..." name="q" value="{{ query | default('') }}">
+                <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary">Exporter CSV</button>
+        </form>
+    </div>
+</div>
+
+<div class="card bg-dark border-secondary">
+    <div class="table-responsive">
+        <table class="table table-dark table-hover mb-0 align-middle">
+            <thead class="table-active">
+                <tr>
+                    <th scope="col">ID Telegram</th>
+                    <th scope="col">Nom & Username</th>
+                    <th scope="col">Rôle</th>
+                    <th scope="col">Langue</th>
+                    <th scope="col">Statut</th>
+                    <th scope="col">Date Inscription</th>
+                    <th scope="col" class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td><code>{{ user.telegram_id }}</code></td>
+                    <td>
+                        <div class="fw-bold">{{ user.first_name }} {{ user.last_name | default('') }}</div>
+                        <div class="text-muted small">@{{ user.username | default('Inconnu') }}</div>
+                    </td>
+                    <td>
+                        <span class="badge bg-{{ 'danger' if user.role == 'superadmin' else 'primary' if user.role == 'admin' else 'secondary' }}">
+                            {{ user.role }}
+                        </span>
+                    </td>
+                    <td>{{ user.language | upper }}</td>
+                    <td>
+                        {% if user.is_banned %}
+                            <span class="badge bg-danger">Banni</span>
+                        {% else %}
+                            <span class="badge bg-success">Actif</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ user.created_at.strftime('%d/%m/%Y') }}</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-light"><i class="bi bi-eye"></i></button>
+                        <button class="btn btn-sm btn-outline-warning mx-1"><i class="bi bi-pencil"></i></button>
+                        {% if user.is_banned %}
+                        <button class="btn btn-sm btn-outline-success"><i class="bi bi-check-circle"></i></button>
+                        {% else %}
+                        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-slash-circle"></i></button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">
+                        Aucun utilisateur trouvé.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer border-secondary d-flex justify-content-between align-items-center">
+        <span class="text-muted small">Affichage : {{ users|length }} utilisateurs</span>
+        
+        <nav aria-label="Pagination">
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item disabled"><a class="page-link bg-dark text-muted border-secondary" href="#">Précédent</a></li>
+                <li class="page-item active" aria-current="page"><a class="page-link bg-primary border-primary" href="#">1</a></li>
+                <li class="page-item"><a class="page-link bg-dark text-light border-secondary" href="#">2</a></li>
+                <li class="page-item"><a class="page-link bg-dark text-light border-secondary" href="#">3</a></li>
+                <li class="page-item"><a class="page-link bg-dark text-light border-secondary" href="#">Suivant</a></li>
+            </ul>
+        </nav>
+    </div>
+</div>
+{% endblock %}
