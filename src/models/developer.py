@@ -3,13 +3,11 @@ Orbi — Modèles Développeurs (Beanie Documents).
 API Keys, Webhooks sortants, et logs.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Optional
 
 from beanie import Document, Indexed
 from pydantic import Field
-
 
 # ─────────────────────────────────────
 # API Key
@@ -51,14 +49,14 @@ class ApiKey(Document):
 
     # ── État ──
     is_active: bool = True
-    revoked_at: Optional[datetime] = None
+    revoked_at: datetime | None = None
 
     # ── Statistiques ──
     total_requests: int = 0
-    last_used_at: Optional[datetime] = None
+    last_used_at: datetime | None = None
 
     # ── Timestamps ──
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "api_keys"
@@ -107,9 +105,9 @@ class WebhookConfig(Document):
     consecutive_failures: int = 0  # 10 → désactivation auto
 
     # ── Timestamps ──
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    last_triggered_at: Optional[datetime] = None
-    disabled_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    last_triggered_at: datetime | None = None
+    disabled_at: datetime | None = None
 
     class Settings:
         name = "webhook_configs"
@@ -128,17 +126,17 @@ class WebhookDelivery(Document):
     payload: dict = Field(default_factory=dict)
 
     # ── Résultat ──
-    http_status: Optional[int] = None
-    response_time_ms: Optional[float] = None
+    http_status: int | None = None
+    response_time_ms: float | None = None
     is_success: bool = False
     is_test: bool = False
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
     # ── Retry ──
     attempt_number: int = 1  # 1 à 5
-    next_retry_at: Optional[datetime] = None
+    next_retry_at: datetime | None = None
 
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "webhook_deliveries"
@@ -158,7 +156,7 @@ class ApiRequestLog(Document):
     response_time_ms: float
     is_sandbox: bool = False
 
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "api_request_logs"
@@ -169,9 +167,9 @@ class ApiLog(Document):
     endpoint: str
     method: str
     status_code: int
-    user_id: Optional[int] = None
-    ip_address: Optional[str] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    user_id: int | None = None
+    ip_address: str | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "api_logs"
@@ -181,14 +179,14 @@ class ErrorLog(Document):
     """Log d'erreur applicative."""
     service: str
     error_message: str
-    traceback: Optional[str] = None
-    user_id: Optional[int] = None
+    traceback: str | None = None
+    user_id: int | None = None
     metadata: dict = Field(default_factory=dict)
-    
+
     is_resolved: bool = False
-    occurred_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    resolved_at: Optional[datetime] = None
-    resolved_by_telegram_id: Optional[int] = None
+    occurred_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    resolved_at: datetime | None = None
+    resolved_by_telegram_id: int | None = None
 
     class Settings:
         name = "error_logs"
@@ -202,7 +200,7 @@ class GithubWebhookLog(Document):
     sender: str
     payload_details: dict = Field(default_factory=dict)
     delivery_id: str
-    received_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    received_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "github_webhook_logs"

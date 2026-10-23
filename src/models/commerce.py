@@ -3,13 +3,11 @@ Orbi — Modèles Product et Order (Beanie Documents).
 Catalogue produits, panier et commandes avec suivi.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Optional
 
 from beanie import Document, Indexed
 from pydantic import BaseModel, Field
-
 
 # ─────────────────────────────────────
 # Produit
@@ -33,7 +31,7 @@ class Product(Document):
     category: str = ""
 
     # ── Médias ──
-    image_file_id: Optional[str] = None  # file_id Telegram permanent
+    image_file_id: str | None = None  # file_id Telegram permanent
 
     # ── État ──
     is_active: bool = True
@@ -42,8 +40,8 @@ class Product(Document):
     notify_users: list[int] = Field(default_factory=list)  # telegram_ids à notifier
 
     # ── Timestamps ──
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "products"
@@ -109,32 +107,32 @@ class Order(Document):
     discount: float = 0.0
     total: float = 0.0
     currency: str = "XOF"
-    payment_provider: Optional[PaymentProvider] = None
-    payment_session_id: Optional[str] = None  # ID session Stripe / référence OM/Wave
-    promo_code: Optional[str] = None
+    payment_provider: PaymentProvider | None = None
+    payment_session_id: str | None = None  # ID session Stripe / référence OM/Wave
+    promo_code: str | None = None
 
     # ── Livraison ──
-    shipping_address: Optional[str] = None
-    tracking_number: Optional[str] = None
+    shipping_address: str | None = None
+    tracking_number: str | None = None
 
     # ── État ──
     status: OrderStatus = OrderStatus.PENDING_PAYMENT
     is_sandbox: bool = False
 
     # ── Idempotence ──
-    idempotency_key: Optional[str] = None
+    idempotency_key: str | None = None
 
     # ── Historique des statuts ──
     status_history: list[dict] = Field(default_factory=list)
     # Chaque entrée : {"status": str, "timestamp": datetime, "note": str}
 
     # ── Timestamps ──
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    paid_at: Optional[datetime] = None
-    shipped_at: Optional[datetime] = None
-    delivered_at: Optional[datetime] = None
-    cancelled_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    paid_at: datetime | None = None
+    shipped_at: datetime | None = None
+    delivered_at: datetime | None = None
+    cancelled_at: datetime | None = None
 
     class Settings:
         name = "orders"
@@ -145,10 +143,10 @@ class Order(Document):
         self.status = new_status
         self.status_history.append({
             "status": new_status.value,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "note": note,
         })
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
 
 # ─────────────────────────────────────
@@ -170,10 +168,10 @@ class PromoCode(Document):
     min_order_amount: float = 0.0
     max_uses: int = 0  # 0 = illimité
     current_uses: int = 0
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
     is_active: bool = True
 
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "promo_codes"
@@ -184,6 +182,6 @@ class PromoCode(Document):
             return False
         if self.max_uses > 0 and self.current_uses >= self.max_uses:
             return False
-        if self.expires_at and datetime.now(timezone.utc) > self.expires_at:
+        if self.expires_at and datetime.now(UTC) > self.expires_at:
             return False
         return True

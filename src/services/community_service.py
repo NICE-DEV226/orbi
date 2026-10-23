@@ -4,8 +4,7 @@ Sondages, Karma, Modération.
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from src.models.community import (
     KarmaLog,
@@ -26,9 +25,9 @@ async def create_poll(
     question: str,
     options: list[str],
     creator_id: int,
-    group_id: Optional[int] = None,
+    group_id: int | None = None,
     allow_multiple_answers: bool = False,
-    end_date: Optional[datetime] = None,
+    end_date: datetime | None = None,
 ) -> Poll:
     """Crée un nouveau sondage."""
     poll = Poll(
@@ -44,7 +43,7 @@ async def create_poll(
     return poll
 
 
-async def get_poll(poll_id: str) -> Optional[Poll]:
+async def get_poll(poll_id: str) -> Poll | None:
     """Récupère un sondage par son ID."""
     from beanie import PydanticObjectId
     try:
@@ -53,9 +52,9 @@ async def get_poll(poll_id: str) -> Optional[Poll]:
         return None
 
 
-async def get_active_polls(group_id: Optional[int] = None, limit: int = 10) -> list[Poll]:
+async def get_active_polls(group_id: int | None = None, limit: int = 10) -> list[Poll]:
     """Récupère les sondages actifs."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     query = Poll.find(
         Poll.is_active == True,  # noqa: E712
         {"$or": [{"end_date": None}, {"end_date": {"$gt": now}}]}
@@ -73,7 +72,7 @@ async def vote_poll(poll: Poll, user_id: int, option_indices: list[int]) -> tupl
     if not poll.is_active:
         return False, "Sondage clôturé."
 
-    if poll.end_date and poll.end_date < datetime.now(timezone.utc):
+    if poll.end_date and poll.end_date < datetime.now(UTC):
         poll.is_active = False
         await poll.save()
         return False, "Le sondage a expiré."
@@ -97,7 +96,7 @@ async def vote_poll(poll: Poll, user_id: int, option_indices: list[int]) -> tupl
 async def close_poll(poll: Poll) -> None:
     """Clôture un sondage manuellement."""
     poll.is_active = False
-    poll.updated_at = datetime.now(timezone.utc)
+    poll.updated_at = datetime.now(UTC)
     await poll.save()
 
 
@@ -108,9 +107,9 @@ async def close_poll(poll: Poll) -> None:
 async def add_karma(
     target_user: User,
     amount: int,
-    source_user_id: Optional[int] = None,
-    group_id: Optional[int] = None,
-    reason: Optional[str] = None,
+    source_user_id: int | None = None,
+    group_id: int | None = None,
+    reason: str | None = None,
 ) -> None:
     """Ajoute (ou retire) des points de Karma à un utilisateur."""
     target_user.karma += amount
@@ -142,9 +141,9 @@ async def log_moderation_action(
     target_telegram_id: int,
     action: ModerationAction,
     moderator_telegram_id: int,
-    group_id: Optional[int] = None,
-    reason: Optional[str] = None,
-    expires_at: Optional[datetime] = None,
+    group_id: int | None = None,
+    reason: str | None = None,
+    expires_at: datetime | None = None,
 ) -> ModerationLog:
     """Enregistre une action de modération (mute, ban, warn)."""
     log = ModerationLog(
@@ -164,12 +163,12 @@ async def log_moderation_action(
     return log
 
 
-async def is_user_banned(telegram_id: int, group_id: Optional[int] = None) -> bool:
+async def is_user_banned(telegram_id: int, group_id: int | None = None) -> bool:
     """
     Vérifie si un utilisateur a un ban actif.
     (Utilisé potentiellement par middlewares de groupe, non requis pour Phase 1 mais préparé).
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     query = ModerationLog.find(
         ModerationLog.target_telegram_id == telegram_id,
         ModerationLog.action == ModerationAction.BAN,

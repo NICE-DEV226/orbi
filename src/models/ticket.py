@@ -3,12 +3,12 @@ Orbi — Modèle Ticket (Beanie Document).
 Système de support avec SLA, priorités, et CSAT.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Optional
 
 from beanie import Document, Indexed
 from pydantic import BaseModel, Field
+
 
 class TicketStatus(StrEnum):
     OPEN = "open"
@@ -75,10 +75,10 @@ class Ticket(Document):
     # ── État ──
     status: TicketStatus = TicketStatus.OPEN
     priority: TicketPriority = TicketPriority.MEDIUM
-    assigned_to: Optional[int] = None  # telegram_id de l'agent
+    assigned_to: int | None = None  # telegram_id de l'agent
 
     # ── SLA ──
-    sla_deadline: Optional[datetime] = None
+    sla_deadline: datetime | None = None
     sla_breached: bool = False
 
     # ── Historique des messages ──
@@ -86,19 +86,19 @@ class Ticket(Document):
     # Chaque message : {"role": "user"|"agent", "text": str, "timestamp": datetime, "attachments": []}
 
     # ── CSAT ──
-    csat_rating: Optional[int] = None  # 1-5
-    csat_sent_at: Optional[datetime] = None
+    csat_rating: int | None = None  # 1-5
+    csat_sent_at: datetime | None = None
     csat_reminder_sent: bool = False
 
     # ── Escalade ──
     is_escalated: bool = False
-    escalation_context: Optional[str] = None
+    escalation_context: str | None = None
 
     # ── Timestamps ──
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    resolved_at: Optional[datetime] = None
-    closed_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    resolved_at: datetime | None = None
+    closed_at: datetime | None = None
 
     class Settings:
         name = "tickets"

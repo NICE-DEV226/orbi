@@ -4,20 +4,16 @@ API Keys, Webhooks, Monitoring, Debug, Documentation interactive.
 """
 
 import logging
-import json
-import uuid
 import secrets
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional
+from datetime import UTC, datetime
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackQueryHandler, ContextTypes
 
 from src.core.config import get_settings
-from src.core.redis import get_redis
 from src.core.i18n import t
-from src.models.developer import ApiKey, WebhookConfig, ApiRequestLog, ErrorLog
-from src.models.user import User
+from src.core.redis import get_redis
+from src.models.developer import ApiKey, ApiRequestLog, WebhookConfig
 
 logger = logging.getLogger("orbi.handlers.developer")
 
@@ -29,7 +25,7 @@ async def show_developer_panel(update: Update, context: ContextTypes.DEFAULT_TYP
 
     if not context.user_data:
         return
-    
+
     db_user = context.user_data.get("db_user")
     if not db_user or db_user.role not in ["admin", "superadmin"]:
         lang = context.user_data.get("lang", "fr")
@@ -42,9 +38,9 @@ async def show_developer_panel(update: Update, context: ContextTypes.DEFAULT_TYP
     # Compter les ressources du développeur
     api_keys_count = await ApiKey.count({"owner_telegram_id": db_user.telegram_id})
     webhooks_count = await WebhookConfig.count({"owner_telegram_id": db_user.telegram_id})
-    
+
     lang = context.user_data.get("lang", "fr")
-    
+
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🔑 API Keys", callback_data="dev:api_keys"),
@@ -64,7 +60,7 @@ async def show_developer_panel(update: Update, context: ContextTypes.DEFAULT_TYP
         ],
         [InlineKeyboardButton(t("common.back", lang), callback_data="mod:home")]
     ])
-    
+
     text = f"""
 👨‍💻 **Panneau Développeur**
 
@@ -84,7 +80,7 @@ Bienvenue, *{db_user.display_name}* !
 
 Que souhaitez-vous faire ?
     """
-    
+
     if update.callback_query:
         await update.callback_query.edit_message_text(text, reply_markup=keyboard)
     else:
@@ -98,22 +94,22 @@ async def show_api_keys(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     if not context.user_data:
         return
-    
+
     db_user = context.user_data.get("db_user")
     if not db_user:
         return
 
     # Récupérer les clés API de l'utilisateur
     api_keys = await ApiKey.find({"owner_telegram_id": db_user.telegram_id}).to_list()
-    
+
     lang = context.user_data.get("lang", "fr")
-    
+
     if not api_keys:
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔑 Créer une API Key", callback_data="dev:create_api_key")],
             [InlineKeyboardButton(t("common.back", lang), callback_data="dev:panel")]
         ])
-        
+
         text = """
 🔑 **API Keys**
 
@@ -136,14 +132,14 @@ Vous n'avez pas encore de clé API.
             status = "✅ Actif" if key.is_active else "❌ Inactif"
             last_used = key.last_used_at.strftime("%d/%m") if key.last_used_at else "Jamais"
             keys_text += f"• `{key.prefix}***` - {status} - Dernier use: {last_used}\n"
-        
+
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔑 Créer une API Key", callback_data="dev:create_api_key")],
             [InlineKeyboardButton("🔄 Révoquer une clé", callback_data="dev:revoke_key")],
             [InlineKeyboardButton("📊 Voir les logs", callback_data="dev:api_logs")],
             [InlineKeyboardButton(t("common.back", lang), callback_data="dev:panel")]
         ])
-        
+
         text = f"""
 🔑 **API Keys**
 
@@ -151,7 +147,7 @@ Vous n'avez pas encore de clé API.
 📊 **Total :** {len(api_keys)} clé(s)
 🔒 **Toutes les clés sont sécurisées et révocables**
         """
-    
+
     if update.callback_query:
         await update.callback_query.edit_message_text(text, reply_markup=keyboard)
     else:
@@ -165,17 +161,16 @@ async def create_api_key(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     if not context.user_data:
         return
-    
+
     db_user = context.user_data.get("db_user")
     if not db_user:
         return
 
     # Générer une clé API sécurisée
-    key_id = str(uuid.uuid4())
     secret_key = f"orbi_{secrets.token_urlsafe(32)}"
     prefix = secret_key[:8]
     key_hash = secrets.sha256_digest(secret_key)
-    
+
     # Créer la clé API
     api_key = ApiKey(
         name=f"Key-{datetime.now().strftime('%Y%m%d')}",
@@ -187,17 +182,17 @@ async def create_api_key(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         rate_limit_per_hour=1000,
         is_active=True
     )
-    
+
     await api_key.insert()
-    
+
     lang = context.user_data.get("lang", "fr")
-    
+
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("📋 Copier la clé", callback_data=f"dev:copy_key:{api_key.id}")],
         [InlineKeyboardButton("🔧 Configurer les scopes", callback_data=f"dev:scopes:{api_key.id}")],
         [InlineKeyboardButton(t("common.back", lang), callback_data="dev:api_keys")]
     ])
-    
+
     text = f"""
 🔑 **Nouvelle API Key créée !**
 
@@ -217,7 +212,7 @@ async def create_api_key(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 🔗 **Endpoint API** : `{get_settings().BASE_URL}/api/v1/`
     """
-    
+
     if update.callback_query:
         await update.callback_query.edit_message_text(text, reply_markup=keyboard)
     else:
@@ -231,21 +226,21 @@ async def show_webhooks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     if not context.user_data:
         return
-    
+
     db_user = context.user_data.get("db_user")
     if not db_user:
         return
 
     webhooks = await WebhookConfig.find({"owner_telegram_id": db_user.telegram_id}).to_list()
-    
+
     lang = context.user_data.get("lang", "fr")
-    
+
     if not webhooks:
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔗 Créer un Webhook", callback_data="dev:create_webhook")],
             [InlineKeyboardButton(t("common.back", lang), callback_data="dev:panel")]
         ])
-        
+
         text = """
 🔗 **Webhooks**
 
@@ -270,14 +265,14 @@ Vous n'avez pas encore de webhook configuré.
             status = "✅ Actif" if webhook.is_active else "❌ Inactif"
             events = ', '.join(webhook.events[:2])
             webhooks_text += f"• `{webhook.url[:30]}...` - {status} - {events}\n"
-        
+
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔗 Créer un Webhook", callback_data="dev:create_webhook")],
             [InlineKeyboardButton("⚙️ Configurer", callback_data="dev:config_webhook")],
             [InlineKeyboardButton("📊 Logs de livraison", callback_data="dev:webhook_logs")],
             [InlineKeyboardButton(t("common.back", lang), callback_data="dev:panel")]
         ])
-        
+
         text = f"""
 🔗 **Webhooks**
 
@@ -285,7 +280,7 @@ Vous n'avez pas encore de webhook configuré.
 📊 **Total :** {len(webhooks)} webhook(s)
 🔄 **Dernière livraison** : Il y a 2 heures
         """
-    
+
     if update.callback_query:
         await update.callback_query.edit_message_text(text, reply_markup=keyboard)
     else:
@@ -299,22 +294,22 @@ async def show_api_logs(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     if not context.user_data:
         return
-    
+
     db_user = context.user_data.get("db_user")
     if not db_user:
         return
 
     # Récupérer les logs récents
     logs = await ApiRequestLog.find({"owner_telegram_id": db_user.telegram_id}).sort("-created_at").limit(10).to_list()
-    
+
     lang = context.user_data.get("lang", "fr")
-    
+
     if not logs:
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔄 Rafraîchir", callback_data="dev:api_logs")],
             [InlineKeyboardButton(t("common.back", lang), callback_data="dev:panel")]
         ])
-        
+
         text = """
 📊 **API Logs**
 
@@ -334,13 +329,13 @@ Aucune requête API récente.
             status_emoji = "✅" if log.status_code < 300 else "⚠️" if log.status_code < 400 else "❌"
             response_time = f"{log.response_time_ms}ms" if log.response_time_ms else "N/A"
             logs_text += f"{status_emoji} `{log.method} {log.endpoint}` - {log.status_code} - {response_time}\n"
-        
+
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔄 Rafraîchir", callback_data="dev:api_logs")],
             [InlineKeyboardButton("📥 Exporter (CSV)", callback_data="dev:export_logs")],
             [InlineKeyboardButton(t("common.back", lang), callback_data="dev:panel")]
         ])
-        
+
         text = f"""
 📊 **API Logs (24h)**
 
@@ -350,7 +345,7 @@ Aucune requête API récente.
 • Succès : 85%
 • Temps moyen : 245ms
         """
-    
+
     if update.callback_query:
         await update.callback_query.edit_message_text(text, reply_markup=keyboard)
     else:
@@ -364,27 +359,27 @@ async def show_performance_metrics(update: Update, context: ContextTypes.DEFAULT
 
     if not context.user_data:
         return
-    
+
     db_user = context.user_data.get("db_user")
     if not db_user:
         return
 
     # Récupérer les métriques depuis Redis
     redis = get_redis()
-    
+
     try:
         # Métriques de base
         uptime = await redis.get("metrics:uptime") or "N/A"
         memory_usage = await redis.get("metrics:memory") or "256MB"
         cpu_usage = await redis.get("metrics:cpu") or "15%"
         active_connections = await redis.get("metrics:connections") or "45"
-        
+
         # Métriques API
         requests_today = await redis.get("metrics:requests_today") or "1,234"
         errors_today = await redis.get("metrics:errors_today") or "12"
         avg_response_time = await redis.get("metrics:avg_response") or "245ms"
-        
-    except:
+
+    except Exception:
         # Valeurs par défaut si Redis indisponible
         uptime = "99.9%"
         memory_usage = "256MB"
@@ -393,16 +388,16 @@ async def show_performance_metrics(update: Update, context: ContextTypes.DEFAULT
         requests_today = "1,234"
         errors_today = "12"
         avg_response_time = "245ms"
-    
+
     lang = context.user_data.get("lang", "fr")
-    
+
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔄 Rafraîchir", callback_data="dev:performance")],
         [InlineKeyboardButton("📥 Exporter métriques", callback_data="dev:export_metrics")],
         [InlineKeyboardButton("⚙️ Configurer alertes", callback_data="dev:alert_config")],
         [InlineKeyboardButton(t("common.back", lang), callback_data="dev:panel")]
     ])
-    
+
     text = f"""
 📈 **Performance Système**
 
@@ -424,9 +419,9 @@ async def show_performance_metrics(update: Update, context: ContextTypes.DEFAULT
 • 🤖 Bot Telegram : ✅ Opérationnel
 • 🌐 API FastAPI : ✅ Opérationnel
 
-*Dernière actualisation : {datetime.now(timezone.utc).strftime("%H:%M:%S")}*
+*Dernière actualisation : {datetime.now(UTC).strftime("%H:%M:%S")}*
     """
-    
+
     if update.callback_query:
         await update.callback_query.edit_message_text(text, reply_markup=keyboard)
     else:
@@ -440,7 +435,7 @@ async def show_debug_tools(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     if not context.user_data:
         return
-    
+
     db_user = context.user_data.get("db_user")
     if not db_user or db_user.role != "superadmin":
         lang = context.user_data.get("lang", "fr")
@@ -451,7 +446,7 @@ async def show_debug_tools(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
 
     lang = context.user_data.get("lang", "fr")
-    
+
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🔍 Inspecter User", callback_data="dev:debug_user"),
@@ -467,7 +462,7 @@ async def show_debug_tools(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         ],
         [InlineKeyboardButton(t("common.back", lang), callback_data="dev:panel")]
     ])
-    
+
     text = """
 🐛 **Debug Tools**
 
@@ -488,7 +483,7 @@ async def show_debug_tools(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 • Modifications irréversibles
 • Accès Super Admin uniquement
     """
-    
+
     if update.callback_query:
         await update.callback_query.edit_message_text(text, reply_markup=keyboard)
     else:
@@ -501,7 +496,7 @@ async def show_api_documentation(update: Update, context: ContextTypes.DEFAULT_T
         await update.callback_query.answer()
 
     lang = context.user_data.get("lang", "fr")
-    
+
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🌐 Swagger UI", url=f"{get_settings().BASE_URL}/docs"),
@@ -517,7 +512,7 @@ async def show_api_documentation(update: Update, context: ContextTypes.DEFAULT_T
         ],
         [InlineKeyboardButton(t("common.back", lang), callback_data="dev:panel")]
     ])
-    
+
     text = f"""
 📖 **Documentation API**
 
@@ -541,7 +536,7 @@ async def show_api_documentation(update: Update, context: ContextTypes.DEFAULT_T
 
 🔑 **Authentification** : Header `Authorization: Bearer YOUR_API_KEY`
     """
-    
+
     if update.callback_query:
         await update.callback_query.edit_message_text(text, reply_markup=keyboard)
     else:
@@ -550,34 +545,34 @@ async def show_api_documentation(update: Update, context: ContextTypes.DEFAULT_T
 
 def register_developer_handlers(application) -> None:
     """Enregistre les handlers développeur."""
-    
+
     # Panneau principal
     application.add_handler(CallbackQueryHandler(show_developer_panel, pattern=r"^dev:panel$"))
-    
+
     # API Keys
     application.add_handler(CallbackQueryHandler(show_api_keys, pattern=r"^dev:api_keys$"))
     application.add_handler(CallbackQueryHandler(create_api_key, pattern=r"^dev:create_api_key$"))
-    
+
     # Webhooks
     application.add_handler(CallbackQueryHandler(show_webhooks, pattern=r"^dev:webhooks$"))
-    
+
     # Monitoring
     application.add_handler(CallbackQueryHandler(show_api_logs, pattern=r"^dev:api_logs$"))
     application.add_handler(CallbackQueryHandler(show_performance_metrics, pattern=r"^dev:performance$"))
-    
+
     # Debug
     application.add_handler(CallbackQueryHandler(show_debug_tools, pattern=r"^dev:debug$"))
-    
+
     # Documentation
     application.add_handler(CallbackQueryHandler(show_api_documentation, pattern=r"^dev:api_docs$"))
-    
+
     # Handlers temporaires pour les callbacks non implémentés
     application.add_handler(CallbackQueryHandler(
         lambda u, c: c.bot.send_message(
             chat_id=u.effective_chat.id,
             text="🔧 Fonctionnalité en développement"
-        ), 
+        ),
         pattern=r"^dev:(revoke_key|scopes|copy_key|create_webhook|config_webhook|webhook_logs|export_logs|export_metrics|alert_config|debug_user|test_token|debug_db|clear_cache|sys_info|restart|openapi_spec|api_playground|tutorials|code_examples)$"
     ))
-    
+
     logger.info("Handlers développeur enregistrés")

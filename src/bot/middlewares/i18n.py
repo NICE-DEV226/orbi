@@ -7,9 +7,9 @@ import logging
 from typing import Any
 
 from telegram import Update
-from telegram.ext import BaseHandler, ContextTypes
+from telegram.ext import ContextTypes
 
-from src.core.i18n import detect_language, t as translate
+from src.core.i18n import t as translate
 
 logger = logging.getLogger("orbi.middleware.i18n")
 

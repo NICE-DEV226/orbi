@@ -28,7 +28,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     - TOUJOURS demander la langue au premier contact
     - Utilisateur existant : vérifier si la langue est déjà définie
     """
-    if not context.user_data: return
+    if not context.user_data:
+        return
     db_user: User = context.user_data.get("db_user")
     user = update.effective_user
 
@@ -49,7 +50,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     # Vérifier si c'est la première fois qu'il utilise /start
     total_interactions = (db_user.total_orders or 0) + (db_user.total_tickets or 0)
-    
+
     if total_interactions == 0:
         # Premier vrai contact avec langue déjà définie
         text = t("onboarding.welcome", lang, name=name)
@@ -69,7 +70,9 @@ async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     # Extraire la langue du callback_data (lang:fr → fr)
     lang = query.data.split(":")[1]
     db_user: User = context.user_data.get("db_user")

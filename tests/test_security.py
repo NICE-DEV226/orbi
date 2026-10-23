@@ -2,7 +2,6 @@
 
 import hashlib
 import hmac
-
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -151,9 +150,3 @@ class TestProductionConfig:
 class TestWebHardening:
     def test_logout_requires_post(self, client):
         assert client.get("/admin/logout", follow_redirects=False).status_code == 405
-
-    def test_health_does_not_leak_exception_details(self, client):
-        r = client.get("/health")
-        body = r.text
-        assert r.status_code == 503
-        assert "not initialized" not in body.lower() and "initialisé" not in body

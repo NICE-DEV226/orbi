@@ -47,13 +47,13 @@ def _get_document_models() -> list:
     from src.models.commerce import Order, Product, PromoCode
     from src.models.community import GroupConfig, KarmaLog, ModerationLog, Poll
     from src.models.developer import (
-        ApiKey, 
-        ApiRequestLog, 
-        WebhookConfig, 
-        WebhookDelivery,
+        ApiKey,
         ApiLog,
+        ApiRequestLog,
         ErrorLog,
-        GithubWebhookLog
+        GithubWebhookLog,
+        WebhookConfig,
+        WebhookDelivery,
     )
     from src.models.productivity import Note, Reminder, Task
     from src.models.ticket import Ticket

@@ -6,7 +6,6 @@ Conforme au CdC §11.3 : gestion RetryAfter sans crash.
 
 import asyncio
 import logging
-from typing import Optional
 
 from telegram import Bot, InlineKeyboardMarkup
 from telegram.error import Forbidden, RetryAfter, TelegramError
@@ -20,7 +19,7 @@ async def send_notification(
     bot: Bot,
     chat_id: int,
     text: str,
-    reply_markup: Optional[InlineKeyboardMarkup] = None,
+    reply_markup: InlineKeyboardMarkup | None = None,
     parse_mode: str = "HTML",
     max_retries: int = MAX_RETRIES,
 ) -> bool:

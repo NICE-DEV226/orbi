@@ -4,10 +4,9 @@ SLA alerts, CSAT reminders, morning brief, task reminders.
 """
 
 import logging
-from datetime import datetime, timezone
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.memory import MemoryJobStore
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 logger = logging.getLogger("orbi.services.scheduler")
 
@@ -73,9 +72,9 @@ async def stop_scheduler() -> None:
 async def _task_reminders_job() -> None:
     """Job : envoie les rappels pour les tâches dont l'échéance est passée ou imminente."""
     try:
-        from src.services.productivity_service import get_pending_reminders
         from src.services.notification_service import send_notification
-        
+        from src.services.productivity_service import get_pending_reminders
+
         pending_tasks = await get_pending_reminders()
         scheduler = get_scheduler()
         bot = getattr(scheduler, "bot", None)
@@ -85,7 +84,7 @@ async def _task_reminders_job() -> None:
 
         for task in pending_tasks:
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-            
+
             # On marque le rappel comme envoyé pour ne pas spammer
             task.has_reminder = False
             await task.save()
@@ -96,7 +95,7 @@ async def _task_reminders_job() -> None:
             ])
 
             text = f"⏰ <b>Rappel de tâche</b>\n\nLa tâche <b>{task.title}</b> est arrivée à échéance."
-            
+
             await send_notification(bot, task.user_telegram_id, text, reply_markup=keyboard)
 
         logger.info("Rappels de tâches envoyés: %d", len(pending_tasks))

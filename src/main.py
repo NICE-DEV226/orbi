@@ -14,8 +14,8 @@ from src.core.config import get_settings
 from src.core.database import close_db, init_db
 from src.core.i18n import load_translations
 from src.core.logging import setup_logging
+from src.core.performance import cleanup_performance_optimizations, init_performance_optimizations
 from src.core.redis import close_redis, get_redis, init_redis
-from src.core.performance import init_performance_optimizations, cleanup_performance_optimizations
 
 logger = logging.getLogger("orbi.main")
 
@@ -131,15 +131,14 @@ def create_app() -> FastAPI:
     # ── Enregistrement des routers API (Phase 9) ──
     from src.api.admin import admin_router
     from src.api.dev import dev_router
-    
+
     app.include_router(admin_router, prefix="/api/v1/admin")
     app.include_router(dev_router, prefix="/api/v1/dev")
 
     # ── Enregistrement du Dashboard Web (Phase 10) ──
-    from fastapi.staticfiles import StaticFiles
     from src.web.auth import router as web_auth_router
     from src.web.router import router as web_dashboard_router
-    
+
     # Montage optionnel de statiques si nécessaires un jour
     # app.mount("/static", StaticFiles(directory="src/static"), name="static")
 
@@ -178,7 +177,7 @@ def create_app() -> FastAPI:
         delivery_id = request.headers.get("x-github-delivery", "")
 
         payload_bytes = await request.body()
-        
+
         if not verify_github_signature(payload_bytes, sig_header):
             raise HTTPException(status_code=401, detail="Signature invalide")
 
@@ -189,7 +188,7 @@ def create_app() -> FastAPI:
 
         # Traiter l'événement en arrière-plan
         background_tasks.add_task(process_github_webhook, event_type, payload, delivery_id)
-        
+
         return {"status": "accepted"}
 
     return app

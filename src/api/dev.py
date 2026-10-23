@@ -3,8 +3,9 @@ Orbi — API Dev Router (Phase 9).
 Points d'accès pour les développeurs (logs, monitoring, webhooks).
 """
 
-from fastapi import APIRouter, Depends, Header
 from typing import Any
+
+from fastapi import APIRouter, Depends, Header
 
 from src.core.config import get_settings
 from src.core.security import check_bearer
@@ -32,11 +33,11 @@ async def infra_stats(dev: dict = Depends(verify_dev_token)) -> dict[str, Any]:
         get_api_logs_stats(),
         get_redis_stats()
     )
-    
+
     return {
         "api_mongodb": api_stats,
         "redis_cache": redis_stats,
-        "status": "ok" if not "error" in redis_stats else "degraded"
+        "status": "ok" if "error" not in redis_stats else "degraded"
     }
 
 
@@ -44,7 +45,7 @@ async def infra_stats(dev: dict = Depends(verify_dev_token)) -> dict[str, Any]:
 async def unresolved_errors(dev: dict = Depends(verify_dev_token)) -> dict[str, Any]:
     """Liste les exceptions critiques non résolues du système."""
     errors = await get_unresolved_errors(limit=20)
-    
+
     return {
         "count": len(errors),
         "errors": [e.model_dump() for e in errors]
@@ -53,17 +54,17 @@ async def unresolved_errors(dev: dict = Depends(verify_dev_token)) -> dict[str, 
 
 @dev_router.post("/test-log")
 async def test_error_log(
-    service: str, 
-    message: str, 
+    service: str,
+    message: str,
     dev: dict = Depends(verify_dev_token)
 ) -> dict[str, str]:
     """Force la création d'une erreur dans les logs (utile pour tester le dashboard)."""
     from src.services.developer_service import log_error
-    
+
     err = await log_error(
         service=service,
         error_message=message,
         metadata={"source": "api_test"}
     )
-    
+
     return {"status": "created", "error_id": str(err.id)}

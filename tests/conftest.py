@@ -3,11 +3,10 @@ Configuration de pytest pour les tests Orbi.
 Définit les fixtures, marqueurs et configuration globale.
 """
 
-import pytest
-import asyncio
 import sys
-import os
 from pathlib import Path
+
+import pytest
 
 # Ajouter le répertoire src au Python path
 project_root = Path(__file__).parent.parent
@@ -37,43 +36,32 @@ def pytest_configure(config):
     )
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """Crée une boucle d'événements pour les tests async."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-
 @pytest.fixture(autouse=True)
-async def setup_test_environment():
-    """Configuration automatique de l'environnement de test."""
-    # Variables d'environnement pour les tests
-    os.environ["ENVIRONMENT"] = "development"
-    os.environ["MONGODB_DB"] = "orbi_test"
-    os.environ["REDIS_URL"] = "redis://localhost:6379/15"  # DB différente pour les tests
-    
+async def setup_test_environment(monkeypatch):
+    """Environnement isolé : variables de test, MongoDB simulé (Beanie) et Redis simulé."""
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test-token")
+    monkeypatch.setenv("MONGODB_DB", "orbi_test")
+
+    import fakeredis
+    from beanie import init_beanie
+    from mongomock_motor import AsyncMongoMockClient
+
+    import src.core.database as database
+    import src.core.redis as redis_module
+    from src.core.config import get_settings
+
+    get_settings.cache_clear()
+
+    client = AsyncMongoMockClient()
+    database._database = client["orbi_test"]
+    await init_beanie(database=database._database, document_models=database._get_document_models())
+
+    redis_module._redis = fakeredis.FakeAsyncRedis(decode_responses=True)
+
     yield
-    
-    # Nettoyage après les tests
-    # Ici on pourrait nettoyer la base de données de test
 
-
-@pytest.fixture
-def mock_env_vars():
-    """Fixture pour les variables d'environnement de test."""
-    return {
-        "ENVIRONMENT": "test",
-        "MONGODB_DB": "orbi_test",
-        "REDIS_URL": "redis://localhost:6379/15",
-        "TELEGRAM_BOT_TOKEN": "test_token",
-        "ADMIN_CHAT_ID": "123456789",
-        "JWT_SECRET": "test_secret"
-    }
-
-
-# Configuration des collections de tests
-collect_ignore_glob = [
-    "*/__pycache__/*",
-    "*/migrations/*"
-]
+    await redis_module._redis.aclose()
+    redis_module._redis = None
+    database._database = None
+    get_settings.cache_clear()
