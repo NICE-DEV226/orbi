@@ -5,7 +5,7 @@ description = "Orbi — Assistant Universel Telegram @OrbiBot"
 requires-python = ">=3.12"
 dependencies = [
     # Telegram Bot
-    "python-telegram-bot[ext]>=21.0,<22.0",
+    "python-telegram-bot[ext]>=21.0,<23.0",
 
     # Web Framework
     "fastapi>=0.115.0,<1.0.0",
