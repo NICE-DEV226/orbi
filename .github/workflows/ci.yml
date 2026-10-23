@@ -25,6 +25,11 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
 
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Lockfile is up to date
+        run: uv lock --check
+
       - name: Install dependencies
         run: pip install -e ".[dev]"
 
@@ -50,3 +55,18 @@ jobs:
         run: |
           pip install -e . pip-audit
           pip-audit --skip-editable
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t orbi:ci .
+
+      - name: Compose file is valid
+        env:
+          TELEGRAM_BOT_TOKEN: ci
+          JWT_SECRET: ci-secret-ci-secret-ci-secret-ci-secret
+        run: docker compose config --quiet

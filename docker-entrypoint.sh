@@ -1,13 +1,9 @@
-#!/bin/bash
-set -e
+#!/bin/sh
+set -eu
 
 echo "Démarrage du conteneur Orbi..."
 
-# Possibilité d'attendre la base de données ici (MongoDB)
-# par exemple en utilisant un script python de ping.
-
-echo "Initialisation de la base de données..."
+# Amorçage du premier admin (avec nouvelles tentatives si MongoDB démarre encore)
 python -m src.scripts.init_db
 
-echo "Lancement de l'application..."
-exec uvicorn src.main:app --host 0.0.0.0 --port 8000
+exec uvicorn src.main:app --host 0.0.0.0 --port 8000 --proxy-headers

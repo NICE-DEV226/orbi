@@ -1,50 +1,39 @@
-# ── Build ──
-FROM python:3.12-slim AS builder
+# ── Build : dépendances figées par uv.lock ──
+FROM python:3.12.15-slim AS builder
 
-WORKDIR /build
+COPY --from=ghcr.io/astral-sh/uv:0.12.5 /uv /usr/local/bin/uv
 
-# Installer les dépendances système pour la compilation
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never
 
-COPY pyproject.toml .
-RUN pip install --no-cache-dir --prefix=/install .
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
 
 # ── Runtime ──
-FROM python:3.12-slim
+FROM python:3.12.15-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    PATH="/app/.venv/bin:$PATH"
 
 WORKDIR /app
 
-# Copier les dépendances installées
-COPY --from=builder /install /usr/local
-
-# Copier le code source
-COPY src/ ./src/
-
-# Variables d'environnement Python
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app
-
 # Utilisateur non-root
-RUN useradd --create-home --shell /bin/bash orbi
+RUN useradd --system --create-home --uid 10001 --shell /usr/sbin/nologin orbi
+
+COPY --from=builder --chown=orbi:orbi /app/.venv /app/.venv
+COPY --chown=orbi:orbi src/ ./src/
+COPY --chown=orbi:orbi --chmod=755 docker-entrypoint.sh ./
+
 USER orbi
 
-# Copier le script de démarrage
-COPY docker-entrypoint.sh .
-# Le script doit appartenir à root pour le chmod et ensuite étre exécuté
-USER root
-RUN chmod +x docker-entrypoint.sh
-
-# Revenir à l'utilisateur non-root
-USER orbi
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+# Liveness uniquement : une panne MongoDB/Redis ne doit pas marquer le conteneur défaillant
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/livez', timeout=5)" || exit 1
 
 EXPOSE 8000
 
-# Démarrage avec le script d'initialisation
 CMD ["./docker-entrypoint.sh"]

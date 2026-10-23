@@ -1,21 +1,23 @@
 """
 Orbi — Point d'entrée FastAPI.
 Lifespan : init DB, Redis, i18n au démarrage. Fermeture propre à l'arrêt.
-Endpoints : /health, /metrics, /docs, /redoc.
+Endpoints : /livez, /health (readiness), /metrics (token), /docs, /redoc.
 """
 
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, Response
 from fastapi.responses import JSONResponse
 
 from src.core.config import get_settings
 from src.core.database import close_db, init_db
 from src.core.i18n import load_translations
 from src.core.logging import setup_logging
+from src.core.metrics import metrics_middleware, render_metrics
 from src.core.performance import cleanup_performance_optimizations, init_performance_optimizations
 from src.core.redis import close_redis, get_redis, init_redis
+from src.core.security import check_bearer
 
 logger = logging.getLogger("orbi.main")
 
@@ -97,10 +99,24 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
     )
 
-    # ── Health check ──
+    app.middleware("http")(metrics_middleware)
+
+    # ── Liveness : le process répond (aucune dépendance externe) ──
+    @app.get("/livez", tags=["Infrastructure"], include_in_schema=False)
+    async def liveness() -> dict:
+        return {"status": "alive"}
+
+    # ── Métriques Prometheus (token Bearer, fail-closed) ──
+    @app.get("/metrics", tags=["Infrastructure"], include_in_schema=False)
+    async def metrics(authorization: str | None = Header(default=None)) -> Response:
+        check_bearer(authorization, get_settings().METRICS_API_TOKEN)
+        body, content_type = render_metrics()
+        return Response(content=body, media_type=content_type)
+
+    # ── Readiness : dépendances (MongoDB, Redis) ──
     @app.get("/health", tags=["Infrastructure"])
     async def health_check():
-        """Health check : DB, Redis, Bot. HTTP 200 si OK, 503 sinon."""
+        """Readiness : MongoDB et Redis. HTTP 200 si OK, 503 sinon."""
         from typing import Any
         health: dict[str, Any] = {"status": "ok", "services": {}}
 

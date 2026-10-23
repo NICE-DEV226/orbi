@@ -1,49 +1,68 @@
-version: "3.8"
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
   bot:
     build: .
     container_name: orbi_bot
-    restart: always
+    restart: unless-stopped
     environment:
-      # L'application lira ces variables, ou elles peuvent être fournillées via un .env externe
       - ENVIRONMENT=production
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - BASE_URL=${BASE_URL:-http://localhost:8000}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN requis}
+      - TELEGRAM_WEBHOOK_URL=${TELEGRAM_WEBHOOK_URL:-}
+      - TELEGRAM_WEBHOOK_SECRET=${TELEGRAM_WEBHOOK_SECRET:-}
       - MONGODB_URI=mongodb://mongodb:27017/orbi
+      - MONGODB_DB=${MONGODB_DB:-orbi}
       - REDIS_URL=redis://redis:6379/1
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET requis}
       - ADMIN_API_TOKEN=${ADMIN_API_TOKEN:-}
       - DEV_API_TOKEN=${DEV_API_TOKEN:-}
+      - METRICS_API_TOKEN=${METRICS_API_TOKEN:-}
       - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET:-}
       - ADMIN_CHAT_ID=${ADMIN_CHAT_ID:-0}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - EXCHANGE_RATES_API_KEY=${EXCHANGE_RATES_API_KEY:-}
+      - LIBRETRANSLATE_URL=${LIBRETRANSLATE_URL:-http://libretranslate:5000}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    # Exposé sur la boucle locale par défaut : placer un reverse proxy HTTPS devant.
     ports:
-      - "8000:8000"
+      - "${BIND_ADDR:-127.0.0.1}:8000:8000"
     depends_on:
       mongodb:
         condition: service_healthy
       redis:
         condition: service_healthy
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
     networks:
       - orbi_network
 
   mongodb:
-    image: mongo:7.0
+    image: mongo:7.0.45
     container_name: orbi_mongo
-    restart: always
+    restart: unless-stopped
     volumes:
       - orbi_mongo_data:/data/db
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.runCommand({ping:1}).ok' | grep -q 1"]
       interval: 10s
       timeout: 5s
       retries: 5
+    logging: *default-logging
     networks:
       - orbi_network
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine
     container_name: orbi_redis
-    restart: always
+    restart: unless-stopped
     volumes:
       - orbi_redis_data:/data
     healthcheck:
@@ -51,14 +70,23 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging: *default-logging
     networks:
       - orbi_network
 
-  # LibreTranslate en local si souhaité (Optionnel pour Productivité)
+  # Traduction locale, optionnelle : `docker compose --profile translate up`
   libretranslate:
-    image: libretranslate/libretranslate:latest
+    image: libretranslate/libretranslate:v1.9.6
     container_name: orbi_translate
+    profiles: ["translate"]
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/languages', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+    logging: *default-logging
     networks:
       - orbi_network
 
