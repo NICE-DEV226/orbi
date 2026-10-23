@@ -6,7 +6,7 @@ Charge toutes les variables d'environnement requises (section 10.2 du CdC).
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, MongoDsn, RedisDsn
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -49,19 +49,6 @@ class Settings(BaseSettings):
     # ── GitHub ──
     GITHUB_WEBHOOK_SECRET: str = ""
 
-    # ── Stripe ──
-    STRIPE_SECRET_KEY: str = ""
-    STRIPE_WEBHOOK_SECRET: str = ""
-
-    # ── Orange Money ──
-    ORANGE_MONEY_API_KEY: str = ""
-    ORANGE_MONEY_API_SECRET: str = ""
-    ORANGE_MONEY_MERCHANT_ID: str = ""
-
-    # ── Wave ──
-    WAVE_API_KEY: str = ""
-    WAVE_WEBHOOK_SECRET: str = ""
-
     # ── OpenAI (Whisper) ──
     OPENAI_API_KEY: str = ""
 
@@ -71,6 +58,21 @@ class Settings(BaseSettings):
 
     # ── Logging ──
     LOG_LEVEL: str = "INFO"
+
+    @model_validator(mode="after")
+    def _validate_production(self) -> "Settings":
+        """Fail-closed : une configuration de production invalide empêche le démarrage."""
+        if self.is_production:
+            if self.JWT_SECRET == "change-me-in-production" or len(self.JWT_SECRET) < 32:
+                raise ValueError("JWT_SECRET doit être défini (32 caractères minimum) en production")
+            if self.TELEGRAM_WEBHOOK_URL and not self.TELEGRAM_WEBHOOK_SECRET:
+                raise ValueError("TELEGRAM_WEBHOOK_SECRET est requis quand TELEGRAM_WEBHOOK_URL est défini")
+        return self
+
+    @property
+    def cookie_secure(self) -> bool:
+        """Cookies `Secure` partout sauf en développement local (HTTP)."""
+        return not self.is_development
 
     @property
     def is_production(self) -> bool:

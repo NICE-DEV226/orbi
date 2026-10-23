@@ -65,6 +65,8 @@ Le code inspecté dans `src/api/admin.py` contient une dépendance `verify_admin
 ### ORBI-SEC-05 — Webhooks et paiement
 **Priorité : P0 — Bloquante avant paiement réel**
 
+> **Mise à jour :** les intégrations de paiement (Stripe, Orange Money, Wave) ont été retirées du code. Ce ticket ne concerne plus que le webhook GitHub (fait) et devra être rouvert si les paiements sont réintroduits.
+
 - Vérifier les signatures selon la documentation officielle actuelle de chaque fournisseur.
 - Pour GitHub, refuser les webhooks si le secret n'est pas configuré dans un environnement où ils sont activés ; ne pas traiter l'absence de secret comme une signature valide.
 - Vérifier les montants, devises, identifiants de commande et transitions d'état.

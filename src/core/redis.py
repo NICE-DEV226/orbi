@@ -19,7 +19,7 @@ async def init_redis() -> None:
     global _redis
 
     settings = get_settings()
-    logger.info("Connexion à Redis: %s", settings.REDIS_URL)
+    logger.info("Connexion à Redis")
 
     _redis = aioredis.from_url(
         settings.REDIS_URL,

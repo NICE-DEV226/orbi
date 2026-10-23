@@ -101,13 +101,13 @@ async def auth_magic_link(token: str, request: Request):
         value=session_id,
         max_age=86400,
         httponly=True,  # Protège contre XSS
-        secure=False,   # En production HTTPS, passer à True
+        secure=get_settings().cookie_secure,
         samesite="lax",
     )
     return response
 
 
-@router.get("/logout", include_in_schema=False)
+@router.post("/logout", include_in_schema=False)
 async def logout(request: Request):
     """Déconnecte l'administrateur et supprime sa session Redis."""
     session_id = request.cookies.get(COOKIE_NAME)

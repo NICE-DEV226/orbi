@@ -3,13 +3,13 @@ Orbi — Service Commerce (Phase 5).
 Catalogue paginé, commandes, codes promo.
 """
 
+import hashlib
 import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from src.models.commerce import Order, OrderStatus, PaymentProvider, Product, PromoCode
+from src.models.commerce import Order, OrderStatus, Product, PromoCode
 from src.models.user import User
-from src.services.payment_service import generate_idempotency_key
 
 logger = logging.getLogger("orbi.services.commerce")
 
@@ -110,6 +110,11 @@ async def get_user_orders(telegram_id: int, limit: int = 10) -> list[Order]:
     return await Order.find(
         Order.user_telegram_id == telegram_id,
     ).sort(-Order.created_at).limit(limit).to_list()
+
+
+def generate_idempotency_key(user_id: int, order_id: str) -> str:
+    """Clé d'idempotence stable : dérivée uniquement de l'identité de la commande."""
+    return hashlib.sha256(f"{user_id}:{order_id}".encode()).hexdigest()[:32]
 
 
 async def get_order(order_id: str) -> Optional[Order]:

@@ -20,7 +20,7 @@ async def init_db() -> None:
     global _client, _database
 
     settings = get_settings()
-    logger.info("Connexion à MongoDB: %s / %s", settings.MONGODB_URI, settings.MONGODB_DB)
+    logger.info("Connexion à MongoDB (db=%s)", settings.MONGODB_DB)
 
     _client = AsyncIOMotorClient(
         settings.MONGODB_URI,

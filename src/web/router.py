@@ -3,6 +3,7 @@ Orbi — Routeur principal du Dashboard Web (Phase 10 Admin Dashboard).
 Connecte les requêtes HTTP (Navigateur) aux vues HTML (Jinja2).
 """
 
+import re
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
@@ -23,7 +24,6 @@ async def dashboard_home(request: Request, admin: User = Depends(require_admin))
     
     now = datetime.now(timezone.utc)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    last_week = now - timedelta(days=7)
 
     # Calcul des KPIs
     active_users = await User.find(User.is_banned == False).count()
@@ -59,10 +59,11 @@ async def users_manager(request: Request, admin: User = Depends(require_admin), 
             tid = int(q)
             query = {"telegram_id": tid}
         except ValueError:
+            pattern = re.escape(q[:64])
             query = {
                 "$or": [
-                    {"username": {"$regex": q, "$options": "i"}},
-                    {"first_name": {"$regex": q, "$options": "i"}}
+                    {"username": {"$regex": pattern, "$options": "i"}},
+                    {"first_name": {"$regex": pattern, "$options": "i"}}
                 ]
             }
             
