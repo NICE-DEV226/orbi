@@ -1,0 +1,22 @@
+{% extends "dev_base.html" %}
+{% block title %}Projets · Orbi Dev{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Projets</h1>
+{% if error %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endif %}
+{% for p in projects %}
+    <div class="card bg-dark border-secondary mb-2"><div class="card-body py-3">
+        <div class="fw-semibold">{{ p.name }}</div>
+        <div class="small text-secondary text-break">{{ p.repo_url }} · {{ p.default_branch }}</div>
+    </div></div>
+{% else %}
+    <p class="text-secondary">Aucun projet.</p>
+{% endfor %}
+<h2 class="h6 mt-4">Ajouter un projet</h2>
+<form method="post" action="/dev/projects">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="mb-2"><input class="form-control" name="name" placeholder="Nom" maxlength="100" required></div>
+    <div class="mb-2"><input class="form-control" name="repo_url" placeholder="https://github.com/org/depot" inputmode="url" required></div>
+    <div class="mb-3"><input class="form-control" name="default_branch" value="main" maxlength="100"></div>
+    <button class="btn btn-outline-primary w-100" type="submit">Ajouter</button>
+</form>
+{% endblock %}
