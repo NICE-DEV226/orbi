@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     # ── Tokens API (Bearer) — vides = routes correspondantes refusées ──
     ADMIN_API_TOKEN: str = ""
     DEV_API_TOKEN: str = ""
+    METRICS_API_TOKEN: str = ""
 
     # ── GitHub ──
     GITHUB_WEBHOOK_SECRET: str = ""

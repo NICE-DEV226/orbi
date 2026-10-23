@@ -72,6 +72,16 @@ docker compose up --build -d
 docker compose logs -f bot
 ```
 
+Points d'exploitation :
+- `TELEGRAM_BOT_TOKEN` et `JWT_SECRET` (32 caractères minimum) sont obligatoires ; Compose refuse de démarrer sans eux.
+- Le port 8000 n'écoute que sur `127.0.0.1` par défaut (`BIND_ADDR`) : placez un reverse proxy HTTPS devant.
+- `GET /livez` (process vivant, utilisé par le HEALTHCHECK Docker) et `GET /health` (readiness MongoDB + Redis).
+- `GET /metrics` (Prometheus) exige `Authorization: Bearer $METRICS_API_TOKEN` ; sans token configuré, il répond 503.
+- Le premier superadmin est créé depuis `ADMIN_CHAT_ID` uniquement s'il n'existe aucun superadmin ; un redémarrage ne modifie jamais les rôles.
+- LibreTranslate est optionnel : `docker compose --profile translate up -d`.
+- MongoDB et Redis ne sont pas authentifiés et restent sur le réseau Docker interne : ne publiez pas leurs ports.
+- Dépendances figées par `uv.lock` : après avoir modifié `pyproject.toml`, lancez `uv lock` et commitez le résultat.
+
 ### En développement local :
 ```bash
 # 1. Installez les dépendances

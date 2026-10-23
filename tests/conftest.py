@@ -57,11 +57,12 @@ async def setup_test_environment(monkeypatch):
     database._database = client["orbi_test"]
     await init_beanie(database=database._database, document_models=database._get_document_models())
 
-    redis_module._redis = fakeredis.FakeAsyncRedis(decode_responses=True)
+    fake_redis = fakeredis.FakeAsyncRedis(decode_responses=True)
+    redis_module._redis = fake_redis
 
     yield
 
-    await redis_module._redis.aclose()
+    await fake_redis.aclose()
     redis_module._redis = None
     database._database = None
     get_settings.cache_clear()
