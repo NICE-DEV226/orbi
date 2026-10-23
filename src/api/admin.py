@@ -3,21 +3,19 @@ Orbi — API Admin Router (Phase 9).
 Points d'accès pour un panel web d'administration.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from typing import Any, List
+from fastapi import APIRouter, Depends, Header, HTTPException
+from typing import Any
 
-# En conditions réelles, intégrer un système d'authentification robuste (JWT)
-# Ici, nous mettons en place le squelette pour illustrer l'architecture.
+from src.core.config import get_settings
+from src.core.security import check_bearer
 
 admin_router = APIRouter(tags=["Admin"])
 
-# Mock de dépendance d'authentification pour le moment
-async def verify_admin_token(token: str = "Bearer placeholder") -> dict:
-    """Vérifie que la requête vient d'un admin authentifié."""
-    if not token or token != "Bearer ORBI_ADMIN_SECRET":
-        # En dev, on laisse passer pour faciliter les tests si besoin
-        pass
-    return {"user_id": 1, "role": "admin"}
+
+async def verify_admin_token(authorization: str | None = Header(default=None)) -> dict:
+    """Vérifie le token Bearer admin (refus par défaut)."""
+    check_bearer(authorization, get_settings().ADMIN_API_TOKEN)
+    return {"role": "admin"}
 
 
 @admin_router.get("/users")

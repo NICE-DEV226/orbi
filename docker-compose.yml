@@ -11,6 +11,13 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - MONGODB_URI=mongodb://mongodb:27017/orbi
       - REDIS_URL=redis://redis:6379/1
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET requis}
+      - ADMIN_API_TOKEN=${ADMIN_API_TOKEN:-}
+      - DEV_API_TOKEN=${DEV_API_TOKEN:-}
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET:-}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - ADMIN_CHAT_ID=${ADMIN_CHAT_ID:-0}
     ports:
       - "8000:8000"
     depends_on:
@@ -27,8 +34,6 @@ services:
     restart: always
     volumes:
       - orbi_mongo_data:/data/db
-    ports:
-      - "27017:27017"
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
       interval: 10s
@@ -43,8 +48,6 @@ services:
     restart: always
     volumes:
       - orbi_redis_data:/data
-    ports:
-      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -58,8 +61,6 @@ services:
     image: libretranslate/libretranslate:latest
     container_name: orbi_translate
     restart: unless-stopped
-    ports:
-      - "5000:5000"
     networks:
       - orbi_network
 

@@ -120,32 +120,5 @@ async def logout(request: Request):
     return response
 
 
-@router.get("/dev-login", include_in_schema=False)
-async def dev_login(request: Request):
-    """(DEMO UNIQUEMENT) Connecte automatiquement un Superadmin factice."""
-    # Créer un user s'il n'existe pas
-    user = await User.find_one(User.telegram_id == 999999)
-    if not user:
-        user = User(
-            telegram_id=999999,
-            first_name="Admin",
-            last_name="Demo",
-            role="superadmin",
-            language="fr"
-        )
-        await user.insert()
-    
-    session_id = await create_web_session(user)
-    
-    response = RedirectResponse(url="/admin/", status_code=303)
-    response.set_cookie(
-        key=COOKIE_NAME,
-        value=session_id,
-        max_age=86400,
-        httponly=True,
-        samesite="lax",
-    )
-    return response
-
 # ── Endpoints du Dashboard (Protégés) ──
 

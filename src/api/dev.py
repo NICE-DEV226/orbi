@@ -3,9 +3,11 @@ Orbi — API Dev Router (Phase 9).
 Points d'accès pour les développeurs (logs, monitoring, webhooks).
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 from typing import Any
 
+from src.core.config import get_settings
+from src.core.security import check_bearer
 from src.services.developer_service import (
     get_api_logs_stats,
     get_redis_stats,
@@ -14,9 +16,11 @@ from src.services.developer_service import (
 
 dev_router = APIRouter(tags=["Developer"])
 
-# Même logique que pour l'admin, on masque derrière un token dev
-async def verify_dev_token(token: str = "Bearer placeholder") -> dict:
-    """Vérifie que la requête vient d'un dev authentifié."""
+
+
+async def verify_dev_token(authorization: str | None = Header(default=None)) -> dict:
+    """Vérifie le token Bearer développeur (refus par défaut)."""
+    check_bearer(authorization, get_settings().DEV_API_TOKEN)
     return {"role": "developer"}
 
 

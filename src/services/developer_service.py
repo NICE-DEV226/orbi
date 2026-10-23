@@ -23,8 +23,8 @@ def verify_github_signature(payload_body: bytes, signature_header: str) -> bool:
     """Vérifie la signature webhooks GitHub."""
     settings = get_settings()
     if not settings.GITHUB_WEBHOOK_SECRET:
-        logger.warning("GITHUB_WEBHOOK_SECRET non défini. Signature ignorée.")
-        return True
+        logger.error("GITHUB_WEBHOOK_SECRET non défini : webhook GitHub refusé.")
+        return False
 
     if not signature_header:
         return False
