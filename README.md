@@ -109,7 +109,6 @@ Orbi/
 │   │   ├── ticket_service.py
 │   │   ├── commerce_service.py
 │   │   ├── cart_service.py
-│   │   ├── payment_service.py     # Stripe, Orange Money, Wave
 │   │   ├── community_service.py
 │   │   ├── productivity_service.py
 │   │   ├── developer_service.py
@@ -250,10 +249,6 @@ uvicorn src.main:app --reload
 | `JWT_SECRET` | Clé secrète JWT dashboard | ✅ |
 | `TELEGRAM_WEBHOOK_URL` | URL publique pour les webhooks (prod) | — |
 | `TELEGRAM_WEBHOOK_SECRET` | Secret de validation webhook | — |
-| `STRIPE_SECRET_KEY` | Clé secrète Stripe | — |
-| `STRIPE_WEBHOOK_SECRET` | Secret webhook Stripe | — |
-| `ORANGE_MONEY_API_KEY` | Clé API Orange Money | — |
-| `WAVE_API_KEY` | Clé API Wave | — |
 | `OPENAI_API_KEY` | Clé OpenAI (transcription vocale Whisper) | — |
 | `EXCHANGE_RATES_API_KEY` | Clé API taux de change | — |
 | `LIBRETRANSLATE_URL` | URL LibreTranslate | — |
@@ -274,9 +269,6 @@ Voir `.env.example` pour la liste complète.
 | `GET` | `/api/v1/admin/users` | Liste paginée des utilisateurs |
 | `GET` | `/api/v1/admin/tickets` | File de tickets (filtrable) |
 | `POST` | `/api/v1/admin/broadcast` | Diffusion de message |
-| `POST` | `/webhook/stripe` | Webhook paiement Stripe |
-| `POST` | `/webhook/orange-money` | Webhook Orange Money |
-| `POST` | `/webhook/wave` | Webhook Wave |
 | `POST` | `/webhook/github` | Webhook événements GitHub |
 | `GET` | `/admin/` | Dashboard (authentification requise) |
 | `GET` | `/admin/users` | Gestion utilisateurs |

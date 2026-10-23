@@ -17,7 +17,7 @@ from telegram.ext import (
 
 from src.bot.keyboards import CB_HOME, CB_MODULE_SHOP
 from src.core.i18n import t
-from src.models.commerce import OrderStatus, PaymentProvider
+from src.models.commerce import OrderStatus
 from src.models.user import User
 from src.services.cart_service import (
     add_to_cart,
@@ -37,11 +37,6 @@ from src.services.commerce_service import (
     get_product,
     get_user_orders,
     validate_promo_code,
-)
-from src.services.payment_service import (
-    create_stripe_session,
-    initiate_orange_money_payment,
-    initiate_wave_payment,
 )
 
 logger = logging.getLogger("orbi.handlers.commerce")
@@ -300,7 +295,7 @@ async def skip_promo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 
 async def show_payment_methods(update: Update, context: ContextTypes.DEFAULT_TYPE, from_query: bool = False) -> int:
-    """Affiche le récapitulatif final et les méthodes de paiement."""
+    """Affiche le récapitulatif final et la confirmation de commande."""
     if not context.user_data: return
     lang = context.user_data.get("lang", "fr")
     db_user: User = context.user_data.get("db_user")
@@ -325,13 +320,11 @@ async def show_payment_methods(update: Update, context: ContextTypes.DEFAULT_TYP
     text += f"\nSous-total: {subtotal:,.0f} XOF\n"
     if discount > 0:
         text += f"Remise ({promo_code}): -{discount:,.0f} XOF\n"
-    text += f"\n💰 <b>TOTAL À PAYER: {total:,.0f} XOF</b>\n\n"
-    text += "Sélectionnez votre moyen de paiement :"
+    text += f"\n💰 <b>TOTAL: {total:,.0f} XOF</b>\n\n"
+    text += "Le paiement en ligne n'est pas encore disponible : la commande sera enregistrée en attente."
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔶 Orange Money", callback_data="pay:orange_money")],
-        [InlineKeyboardButton("🌊 Wave", callback_data="pay:wave")],
-        [InlineKeyboardButton("💳 Carte Bancaire (Stripe)", callback_data="pay:stripe")],
+        [InlineKeyboardButton("✅ Confirmer la commande", callback_data="pay:confirm")],
         [InlineKeyboardButton(t("common.cancel", lang), callback_data="checkout_cancel")],
     ])
 
@@ -344,14 +337,13 @@ async def show_payment_methods(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 async def process_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Crée la commande et initie le paiement auprès du provider choisi."""
+    """Crée la commande (en attente de paiement : aucun fournisseur de paiement n'est branché)."""
     query = update.callback_query
     await query.answer("Création de la commande...")
 
     if not context.user_data: return
     lang = context.user_data.get("lang", "fr")
     db_user: User = context.user_data.get("db_user")
-    method = query.data.split(":")[1]
 
     cart = await get_cart(db_user.telegram_id)
     if not cart:
@@ -383,29 +375,16 @@ async def process_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         # 3. Vider le panier
         await clear_cart(db_user.telegram_id)
 
-        # 4. Initier le paiement
-        payment_url = None
-        if method == "orange_money":
-            payment_url = await initiate_orange_money_payment(order)
-        elif method == "wave":
-            payment_url = await initiate_wave_payment(order)
-        elif method == "stripe":
-            payment_url = await create_stripe_session(order)
-
-        if not payment_url:
-            raise Exception(f"Échec de création session de paiement ({method})")
-
-        # 5. Envoyer le lien de paiement
+        # 4. Confirmer à l'utilisateur
         msg = {
-            "fr": f"✅ Commande <b>{order.order_id}</b> créée !\n\nCliquez ci-dessous pour payer via {method.title()}.\n\n⚠️ Ce lien expire bientôt.",
-            "en": f"✅ Order <b>{order.order_id}</b> created!\n\nClick below to pay via {method.title()}.\n\n⚠️ This link expires soon.",
-            "ar": f"✅ تم إنشاء الطلب <b>{order.order_id}</b>!\n\nانقر أدناه للدفع عبر {method.title()}.\n\n⚠️ تنتهي صلاحية هذا الرابط قريبًا.",
+            "fr": f"✅ Commande <b>{order.order_id}</b> enregistrée.\n\nLe paiement en ligne n'est pas encore disponible ; la commande reste en attente de paiement.",
+            "en": f"✅ Order <b>{order.order_id}</b> recorded.\n\nOnline payment is not available yet; the order stays pending payment.",
+            "ar": f"✅ تم تسجيل الطلب <b>{order.order_id}</b>.\n\nالدفع عبر الإنترنت غير متاح بعد؛ يبقى الطلب قيد انتظار الدفع.",
         }
 
         await query.edit_message_text(
             msg.get(lang, msg["fr"]),
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("💸 Payer maintenant", url=payment_url)],
                 [InlineKeyboardButton(t("common.home", lang), callback_data=CB_HOME)],
             ]),
             parse_mode="HTML"

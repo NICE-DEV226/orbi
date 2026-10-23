@@ -43,6 +43,8 @@ async def lifespan(app: FastAPI):
     await init_performance_optimizations()
     logger.info("⚡ Optimisations de performance initialisées")
 
+    bot_app = None
+    scheduler_started = False
     try:
         # Démarrage du bot Telegram
         from src.bot.app import create_bot_application, start_bot, stop_bot
@@ -54,6 +56,7 @@ async def lifespan(app: FastAPI):
         # Démarrage APScheduler (SLA alerts, CSAT reminders)
         from src.services.scheduler import start_scheduler, stop_scheduler
         await start_scheduler(bot_app.bot)
+        scheduler_started = True
         logger.info("⏰ APScheduler démarré")
     except Exception as e:
         logger.error(f"⚠️ Impossible de démarrer le bot (Le Web UI reste dispo) : {e}")
@@ -65,11 +68,19 @@ async def lifespan(app: FastAPI):
 
     # ── Arrêt ──
     logger.info("🛑 Orbi s'arrête...")
-    await stop_scheduler()
-    await stop_bot(bot_app)
-    await cleanup_performance_optimizations()
-    await close_redis()
-    await close_db()
+    try:
+        if scheduler_started:
+            from src.services.scheduler import stop_scheduler
+            await stop_scheduler()
+        if bot_app is not None:
+            from src.bot.app import stop_bot
+            await stop_bot(bot_app)
+    except Exception:
+        logger.exception("Erreur à l'arrêt du bot/scheduler")
+    finally:
+        await cleanup_performance_optimizations()
+        await close_redis()
+        await close_db()
     logger.info("👋 Orbi arrêté proprement")
 
 
@@ -100,7 +111,8 @@ def create_app() -> FastAPI:
             await db.command("ping")
             health["services"]["mongodb"] = "ok"
         except Exception as e:
-            health["services"]["mongodb"] = f"error: {e}"
+            logger.error("Health check MongoDB en échec: %s", e)
+            health["services"]["mongodb"] = "error"
             health["status"] = "degraded"
 
         # Check Redis
@@ -109,7 +121,8 @@ def create_app() -> FastAPI:
             await redis.ping()
             health["services"]["redis"] = "ok"
         except Exception as e:
-            health["services"]["redis"] = f"error: {e}"
+            logger.error("Health check Redis en échec: %s", e)
+            health["services"]["redis"] = "error"
             health["status"] = "degraded"
 
         status_code = 200 if health["status"] == "ok" else 503
@@ -133,67 +146,27 @@ def create_app() -> FastAPI:
     app.include_router(web_auth_router, prefix="/admin")
     app.include_router(web_dashboard_router)
 
-    # ── Webhooks de Paiement (Phase 5) ──
-    from fastapi import Request, BackgroundTasks
+    from fastapi import BackgroundTasks, HTTPException, Request
 
-    @app.post("/webhook/stripe")
-    async def stripe_webhook(request: Request, background_tasks: BackgroundTasks) -> dict:
-        from src.services.payment_service import verify_stripe_webhook, handle_payment_success
-        from src.services.commerce_service import get_order
+    # ── Webhook Telegram (mode production) ──
+    @app.post("/webhook/telegram", include_in_schema=False)
+    async def telegram_webhook(request: Request) -> dict:
+        import hmac
 
-        payload = await request.body()
-        sig_header = request.headers.get("stripe-signature", "")
+        from telegram import Update
 
-        event = await verify_stripe_webhook(payload, sig_header)
-        if not event:
-            return {"status": "ignored", "reason": "invalid_signature"}
+        expected = get_settings().TELEGRAM_WEBHOOK_SECRET
+        bot_app = getattr(request.app.state, "bot_app", None)
+        if not expected or bot_app is None:
+            raise HTTPException(status_code=503, detail="Webhook Telegram indisponible")
 
-        if event["type"] == "checkout.session.completed":
-            session = event["data"]["object"]
-            order_id = session.get("metadata", {}).get("order_id")
-            if order_id:
-                order = await get_order(order_id)
-                if order:
-                    background_tasks.add_task(handle_payment_success, order)
+        received = request.headers.get("x-telegram-bot-api-secret-token", "")
+        if not hmac.compare_digest(received.encode(), expected.encode()):
+            raise HTTPException(status_code=401, detail="Secret invalide")
 
-        return {"status": "success"}
-
-    @app.post("/webhook/orange-money")
-    async def orange_money_webhook(request: Request, background_tasks: BackgroundTasks) -> dict:
-        from src.services.payment_service import handle_payment_success, handle_payment_cancelled
-        from src.services.commerce_service import get_order
-
-        data = await request.json()
-        order_id = data.get("order_id")
-        status = data.get("status")
-
-        if order_id:
-            order = await get_order(order_id)
-            if order:
-                if status == "SUCCESS":
-                    background_tasks.add_task(handle_payment_success, order)
-                elif status == "FAILED":
-                    background_tasks.add_task(handle_payment_cancelled, order)
-
-        return {"status": "success"}
-
-    @app.post("/webhook/wave")
-    async def wave_webhook(request: Request, background_tasks: BackgroundTasks) -> dict:
-        from src.services.payment_service import handle_payment_success
-        from src.services.commerce_service import get_order
-
-        # En production, vérifier la signature Wave ici
-        data = await request.json()
-        event = data.get("type")
-
-        if event == "checkout.session.completed":
-            order_id = data.get("data", {}).get("client_reference")
-            if order_id:
-                order = await get_order(order_id)
-                if order:
-                    background_tasks.add_task(handle_payment_success, order)
-
-        return {"status": "success"}
+        update = Update.de_json(await request.json(), bot_app.bot)
+        await bot_app.process_update(update)
+        return {"status": "ok"}
 
     # ── Webhooks GitHub (Phase 8) ──
     @app.post("/webhook/github")
@@ -207,7 +180,7 @@ def create_app() -> FastAPI:
         payload_bytes = await request.body()
         
         if not verify_github_signature(payload_bytes, sig_header):
-            return {"status": "ignored", "reason": "invalid_signature"}
+            raise HTTPException(status_code=401, detail="Signature invalide")
 
         try:
             payload = await request.json()

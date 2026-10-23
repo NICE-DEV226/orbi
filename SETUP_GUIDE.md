@@ -41,37 +41,9 @@ MONGODB_DB=orbi
 REDIS_URL=redis://redis:6379/0
 ```
 
-### 4. Configuration Paiements (Optionnel)
+### 4. Paiements
 
-#### Stripe :
-1. Créez un compte sur [stripe.com](https://stripe.com)
-2. Allez dans Developers > API keys
-3. Copiez la clé secrète de test
-4. Activez les webhooks pour votre endpoint
-
-```env
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-```
-
-#### Orange Money :
-1. Contactez Orange pour obtenir les clés API
-2. Configurez votre marchand ID
-
-```env
-ORANGE_MONEY_API_KEY=votre_cle_api
-ORANGE_MONEY_API_SECRET=votre_secret_api
-ORANGE_MONEY_MERCHANT_ID=votre_id_marchand
-```
-
-#### Wave :
-1. Créez un compte développeur Wave
-2. Obtenez vos clés API
-
-```env
-WAVE_API_KEY=votre_cle_wave
-WAVE_WEBHOOK_SECRET=votre_secret_wave
-```
+Les paiements en ligne (Stripe, Orange Money, Wave) sont retirés pour le moment : les commandes restent « en attente de paiement ».
 
 ### 5. Configuration Services Optionnels
 
