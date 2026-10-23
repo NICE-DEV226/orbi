@@ -11,10 +11,11 @@ Documentation de cadrage pour la reprise progressive du dépôt. Les documents d
 - [ADR-0001 : monolithe modulaire](adr/0001-modular-monolith.md) — proposition d'architecture.
 - [ADR-0002 : intégration d'agents existants](adr/0002-integrate-existing-agents.md) — stratégie des connecteurs.
 - [ADR-0003 : modèle durable d'exécution](adr/0003-durable-execution-model.md) — tâches, exécutions et événements.
+- [ADR-0004 : premier fournisseur d'agent](adr/0004-first-agent-provider.md) — comparaison sourcée et choix proposé.
 
 ## Statut
 
-Les décisions d'architecture sont des propositions tant que leur statut ne précise pas qu'elles sont approuvées. Le choix du premier fournisseur d'agents et les choix définitifs de stockage/queue restent ouverts. L'audit est préliminaire et doit être complété par l'exécution des tests et la vérification des routes sensibles.
+Les décisions d'architecture sont des propositions tant que leur statut ne précise pas qu'elles sont approuvées. Le premier fournisseur d'agents est proposé dans l'ADR-0004 (à valider) ; les choix définitifs de stockage/queue restent ouverts. L'audit est préliminaire et doit être complété par l'exécution des tests et la vérification des routes sensibles.
 
 ## Ordre de lecture
 
