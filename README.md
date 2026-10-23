@@ -174,7 +174,7 @@ Message entrant
 | Langage | Python | 3.12 |
 | Framework Web | FastAPI + Uvicorn | 0.115 / 0.30 |
 | Bot Telegram | python-telegram-bot | 21.x |
-| ODM MongoDB | Beanie + Motor | 1.26 / 3.6 |
+| ODM MongoDB | Beanie + PyMongo (API asynchrone) | 2.2 / 4.13 |
 | Cache | Redis (aioredis + hiredis) | 5.x |
 | Scheduler | APScheduler | 3.10 |
 | Paiements | Stripe | 10-11.x |

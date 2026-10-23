@@ -52,7 +52,8 @@ class TestConnect:
     async def test_valid_key_stores_capabilities_and_encrypted_secret(self):
         integration = await runner.connect_integration(ALICE, "fake", SECRET)
         assert set(integration.capabilities) >= {"launch", "status", "cancel"}
-        assert integration.secret_ciphertext and SECRET not in integration.secret_ciphertext
+        ciphertext = await service.get_secret_ciphertext(ALICE, str(integration.id))
+        assert ciphertext and SECRET not in ciphertext
 
 
 class TestLaunchAndFollow:
@@ -227,7 +228,7 @@ class TestDeadline:
         _, _, execution = await make_execution()
         await runner.launch_execution(ALICE, str(execution.id))
         await service.set_execution_fields(execution)
-        await Execution.get_motor_collection().update_one(
+        await Execution.get_pymongo_collection().update_one(
             {"_id": execution.id}, {"$set": {"deadline_at": datetime.now(UTC) - timedelta(minutes=1)}}
         )
 
@@ -301,7 +302,8 @@ class TestRevocation:
 
         assert await status_of(execution) == S.NEEDS_ATTENTION
         refreshed = await service.get_integration(ALICE, str(integration.id))
-        assert refreshed.secret_ciphertext is None
+        assert await service.get_secret_ciphertext(ALICE, str(integration.id)) is None
+        assert refreshed.status == IntegrationStatus.REVOKED
         # le suivi ne plante pas et ne contacte plus le fournisseur
         assert (await runner.refresh_execution(ALICE, str(execution.id))).status == S.NEEDS_ATTENTION
 
@@ -321,7 +323,7 @@ class TestWorker:
         _, _, running = await make_execution()
         await runner.launch_execution(ALICE, str(running.id))
         _, _, stuck = await make_execution()
-        await Execution.get_motor_collection().update_one(
+        await Execution.get_pymongo_collection().update_one(
             {"_id": stuck.id}, {"$set": {"updated_at": datetime.now(UTC) - timedelta(minutes=5)}}
         )
 

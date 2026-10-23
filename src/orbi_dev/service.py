@@ -25,6 +25,7 @@ from src.orbi_dev.models import (
     Execution,
     ExecutionEvent,
     Integration,
+    IntegrationSecret,
     IntegrationStatus,
     Project,
     Task,
@@ -104,10 +105,17 @@ async def create_integration(
         label=label,
         capabilities=capabilities or [],
         scopes=scopes or [],
-        secret_ciphertext=encrypt_secret(secret),
         last_verified_at=datetime.now(UTC),
     )
+    ciphertext = encrypt_secret(secret)  # échoue avant toute écriture si le chiffrement n'est pas configuré
     await integration.insert()
+    try:
+        await IntegrationSecret(
+            integration_id=str(integration.id), owner_id=owner_id, ciphertext=ciphertext
+        ).insert()
+    except Exception:
+        await integration.delete()  # jamais d'intégration « active » sans son secret
+        raise
     await record_audit(owner_id, "integration.connect", "integration", str(integration.id), detail=provider)
     return integration
 
@@ -123,6 +131,14 @@ async def get_integration(owner_id: int, integration_id: str) -> Integration:
     return integration
 
 
+async def get_secret_ciphertext(owner_id: int, integration_id: str) -> str | None:
+    """Texte chiffré de la clé (usage interne de l'orchestrateur ; jamais renvoyé à l'interface)."""
+    secret = await IntegrationSecret.find_one(
+        IntegrationSecret.integration_id == integration_id, IntegrationSecret.owner_id == owner_id
+    )
+    return secret.ciphertext if secret else None
+
+
 async def mark_integration_invalid(integration: Integration) -> None:
     integration.status = IntegrationStatus.INVALID
     await integration.save()
@@ -133,7 +149,7 @@ async def revoke_integration(owner_id: int, integration_id: str) -> Integration:
     """Révocation locale : le secret est effacé. La révocation côté fournisseur relève du connecteur."""
     integration = await get_integration(owner_id, integration_id)
     integration.status = IntegrationStatus.REVOKED
-    integration.secret_ciphertext = None
+    await IntegrationSecret.find(IntegrationSecret.integration_id == str(integration.id)).delete()
     integration.revoked_at = datetime.now(UTC)
     await integration.save()
     await record_audit(owner_id, "integration.revoke", "integration", str(integration.id))
@@ -258,7 +274,7 @@ async def _append_event(
     data: dict[str, Any] | None = None,
 ) -> ExecutionEvent:
     """Ajoute un événement avec un numéro de séquence attribué atomiquement."""
-    updated = await Execution.get_motor_collection().find_one_and_update(
+    updated = await Execution.get_pymongo_collection().find_one_and_update(
         {"_id": execution.id}, {"$inc": {"event_seq": 1}}, return_document=ReturnDocument.AFTER
     )
     event = ExecutionEvent(
@@ -309,7 +325,7 @@ async def transition_execution(
     if is_terminal(target):
         update_fields.setdefault("finished_at", now)
 
-    document = await Execution.get_motor_collection().find_one_and_update(
+    document = await Execution.get_pymongo_collection().find_one_and_update(
         {"_id": _oid(execution_id), "owner_id": owner_id, "status": expected.value},
         {"$set": update_fields, "$inc": {"version": 1}},
         return_document=ReturnDocument.AFTER,
@@ -353,6 +369,6 @@ async def set_execution_fields(execution: Execution, **fields: Any) -> None:
     if unknown:
         raise ValueError(f"Champs non autorisés : {sorted(unknown)}")
     fields["updated_at"] = datetime.now(UTC)
-    await Execution.get_motor_collection().update_one({"_id": execution.id}, {"$set": fields})
+    await Execution.get_pymongo_collection().update_one({"_id": execution.id}, {"$set": fields})
     for key, value in fields.items():
         setattr(execution, key, value)

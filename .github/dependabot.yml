@@ -8,6 +8,10 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # Beanie 2.x exige Python < 3.14 : ne pas proposer d'image 3.14 tant que Beanie ne la supporte pas.
+      - dependency-name: python
+        versions: [">=3.14"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
