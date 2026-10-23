@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     DEV_API_TOKEN: str = ""
     METRICS_API_TOKEN: str = ""
 
+    # ── Chiffrement des secrets d'intégration (clés Fernet, séparées par des virgules) ──
+    SECRETS_ENCRYPTION_KEY: str = ""
+    ORBI_DEV_REFRESH_INTERVAL: int = 30  # secondes ; 0 = suivi désactivé
+
     # ── GitHub ──
     GITHUB_WEBHOOK_SECRET: str = ""
 

@@ -157,6 +157,8 @@ Ne créer que les modèles et services nécessaires au premier parcours.
 
 **Gate de sortie :** un parcours bout-en-bout prouvé avec un dépôt de test et un fournisseur réel ou sandbox, sans exposer de secrets.
 
+> **État (2026-10-23) :** DEV-01 à DEV-04 sont implémentés (ADR-0004, `src/orbi_dev/`, `src/web/dev.py`). Le parcours est prouvé de bout en bout contre une vraie pile MongoDB/Redis avec le **fournisseur factice** uniquement. Le gate n'est **pas** atteint : aucun essai n'a été fait avec un compte fournisseur réel (voir `docs/connectors/cursor.md`).
+
 ## Phase 4 — Workflow sécurisé de revue
 
 - Afficher diff et tests.
