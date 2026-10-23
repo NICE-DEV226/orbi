@@ -14,14 +14,29 @@ concurrency:
 
 jobs:
   test:
+    # Le job « test » (3.12) garde son nom : c'est celui d'une éventuelle protection de branche.
+    name: ${{ matrix.python == '3.12' && 'test' || format('test (py{0})', matrix.python) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.12 = minimum supporté ; 3.13 = version de l'image Docker (Beanie 2 exige Python < 3.14)
+        python: ["3.12", "3.13"]
+    services:
+      mongodb:
+        image: mongo:7.0.45
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1}).ok'"
+          --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python }}
           cache: pip
           cache-dependency-path: pyproject.toml
 
@@ -39,6 +54,7 @@ jobs:
       - name: Tests (pytest)
         env:
           TELEGRAM_BOT_TOKEN: ci-test-token
+          MONGODB_TEST_URI: mongodb://127.0.0.1:27017
         run: pytest --cov=src --cov-report=term-missing
 
   audit:

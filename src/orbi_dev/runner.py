@@ -61,10 +61,13 @@ class _Session:
         self.connector: AgentConnectorType | None = None
 
     async def __aenter__(self) -> AgentConnectorType:
-        if self.integration.status != IntegrationStatus.ACTIVE or not self.integration.secret_ciphertext:
+        ciphertext = None
+        if self.integration.status == IntegrationStatus.ACTIVE:
+            ciphertext = await service.get_secret_ciphertext(self.integration.owner_id, str(self.integration.id))
+        if not ciphertext:
             raise ConnectorError(ErrorCategory.AUTH_INVALID, "Intégration inactive ou révoquée")
         try:
-            secret = decrypt_secret(self.integration.secret_ciphertext)
+            secret = decrypt_secret(ciphertext)
         except (SecretDecryptionError, SecretsNotConfiguredError) as e:
             raise ConnectorError(ErrorCategory.AUTH_INVALID, "Secret d'intégration illisible") from e
         self.connector = build_connector(self.integration.provider, secret)

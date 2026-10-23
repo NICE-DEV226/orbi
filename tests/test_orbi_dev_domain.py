@@ -13,7 +13,7 @@ from src.orbi_dev.crypto import (
     decrypt_secret,
     encrypt_secret,
 )
-from src.orbi_dev.models import Execution, Integration, IntegrationStatus, TaskStatus
+from src.orbi_dev.models import Execution, Integration, IntegrationSecret, IntegrationStatus, TaskStatus
 from src.orbi_dev.state import (
     ALLOWED_TRANSITIONS,
     TERMINAL_STATUSES,
@@ -96,24 +96,44 @@ class TestSecrets:
         with pytest.raises(SecretDecryptionError):
             decrypt_secret(token)
 
-    async def test_secret_never_stored_in_clear_nor_serialized(self):
+    async def test_secret_is_stored_encrypted_in_its_own_collection(self):
         _, integration, _ = await _setup()
 
-        raw = await Integration.get_motor_collection().find_one({"_id": integration.id})
-        assert SECRET not in str(raw)
-        assert raw["secret_ciphertext"]
-        assert "secret_ciphertext" not in integration.model_dump()
-        assert "secret_ciphertext" not in integration.model_dump_json()
+        raw = await Integration.get_pymongo_collection().find_one({"_id": integration.id})
+        assert "ciphertext" not in str(raw) and SECRET not in str(raw)
+        stored = await IntegrationSecret.get_pymongo_collection().find_one({"integration_id": str(integration.id)})
+        assert stored["ciphertext"] and SECRET not in str(stored)
+        assert decrypt_secret(stored["ciphertext"]) == SECRET
+
+    async def test_integration_model_cannot_leak_the_secret(self):
+        _, integration, _ = await _setup()
+
+        assert "ciphertext" not in integration.model_dump()
+        assert "ciphertext" not in integration.model_dump_json()
         assert SECRET not in repr(integration)
+        assert not hasattr(integration, "secret_ciphertext")
 
     async def test_revoke_erases_the_secret(self):
         _, integration, _ = await _setup()
 
         revoked = await service.revoke_integration(ALICE, str(integration.id))
 
-        raw = await Integration.get_motor_collection().find_one({"_id": integration.id})
-        assert raw["secret_ciphertext"] is None
+        assert await IntegrationSecret.get_pymongo_collection().find_one({"integration_id": str(integration.id)}) is None
+        assert await service.get_secret_ciphertext(ALICE, str(integration.id)) is None
         assert revoked.status == IntegrationStatus.REVOKED
+
+    async def test_secret_is_only_readable_by_its_owner(self):
+        _, integration, _ = await _setup(ALICE)
+        assert await service.get_secret_ciphertext(BOB, str(integration.id)) is None
+
+    async def test_no_active_integration_is_left_without_a_secret_when_storing_fails(self, monkeypatch):
+        async def boom(self, *a, **k):
+            raise RuntimeError("db down")
+
+        monkeypatch.setattr(IntegrationSecret, "insert", boom)
+        with pytest.raises(RuntimeError):
+            await service.create_integration(ALICE, "fake", SECRET)
+        assert await service.list_integrations(ALICE) == []
 
 
 class TestOwnershipIsolation:

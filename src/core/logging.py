@@ -65,6 +65,6 @@ def setup_logging() -> None:
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("telegram").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-    logging.getLogger("motor").setLevel(logging.WARNING)
+    logging.getLogger("pymongo").setLevel(logging.WARNING)
 
     logging.getLogger("orbi").info("Logging configuré (level=%s, env=%s)", settings.LOG_LEVEL, settings.ENVIRONMENT)

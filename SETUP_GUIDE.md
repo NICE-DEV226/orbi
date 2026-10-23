@@ -82,6 +82,18 @@ Points d'exploitation :
 - MongoDB et Redis ne sont pas authentifiés et restent sur le réseau Docker interne : ne publiez pas leurs ports.
 - Dépendances figées par `uv.lock` : après avoir modifié `pyproject.toml`, lancez `uv lock` et commitez le résultat.
 
+### Lancer les tests
+
+Les tests utilisent un **vrai MongoDB** (Redis est simulé). Démarrez une instance jetable puis lancez pytest :
+
+```bash
+docker run -d --rm --name orbi_test_mongo -p 127.0.0.1:27017:27017 mongo:7.0.45
+pip install -e ".[dev]"
+TELEGRAM_BOT_TOKEN=test pytest
+```
+
+Pour une autre instance, définissez `MONGODB_TEST_URI` (une base jetable y est créée puis supprimée). Python 3.12 ou 3.13 : Beanie 2 ne supporte pas encore 3.14.
+
 ### En développement local :
 ```bash
 # 1. Installez les dépendances

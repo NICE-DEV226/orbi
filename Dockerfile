@@ -1,5 +1,5 @@
 # ── Build : dépendances figées par uv.lock ──
-FROM python:3.14.7-slim AS builder
+FROM python:3.13.17-slim AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:0.12.5 /uv /usr/local/bin/uv
 
@@ -12,7 +12,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 # ── Runtime ──
-FROM python:3.14.7-slim
+FROM python:3.13.17-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

@@ -1,30 +1,23 @@
 """
-Tests d'intégration de l'API FastAPI (MongoDB et Redis simulés, voir conftest).
+Tests d'intégration de l'API FastAPI (MongoDB réel et Redis simulé, voir conftest).
 Health check, docs, API protégées, authentification web et gestion d'erreurs.
 """
 
 import httpx
-import pytest
-from fastapi.testclient import TestClient
 
 from src.core.config import get_settings
 from src.main import create_app
 from src.models.user import User
 
 
-@pytest.fixture
-def client():
-    return TestClient(create_app(), follow_redirects=False)
-
-
 class TestHealthEndpoint:
-    def test_health_ok(self, client):
-        response = client.get("/health")
+    async def test_health_ok(self, aclient):
+        response = await aclient.get("/health")
 
         assert response.status_code == 200
         assert response.json() == {"status": "ok", "services": {"mongodb": "ok", "redis": "ok"}}
 
-    def test_health_degraded_without_leaking_details(self, client, monkeypatch):
+    async def test_health_degraded_without_leaking_details(self, aclient, monkeypatch):
         import src.core.redis as redis_module
 
         async def boom():
@@ -32,7 +25,7 @@ class TestHealthEndpoint:
 
         monkeypatch.setattr(redis_module._redis, "ping", boom)
 
-        response = client.get("/health")
+        response = await aclient.get("/health")
 
         assert response.status_code == 503
         assert response.json()["services"] == {"mongodb": "ok", "redis": "error"}
@@ -40,56 +33,50 @@ class TestHealthEndpoint:
 
 
 class TestDocs:
-    def test_docs_available_in_development(self, client):
-        response = client.get("/docs")
+    async def test_docs_available_in_development(self, aclient):
+        response = await aclient.get("/docs")
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
-    def test_redoc_available(self, client):
-        assert client.get("/redoc").status_code == 200
+    async def test_redoc_available(self, aclient):
+        assert (await aclient.get("/redoc")).status_code == 200
 
-    def test_docs_disabled_in_production(self, monkeypatch):
+    async def test_docs_disabled_in_production(self, monkeypatch):
         monkeypatch.setenv("ENVIRONMENT", "production")
         monkeypatch.setenv("JWT_SECRET", "x" * 40)
         get_settings.cache_clear()
 
-        assert TestClient(create_app()).get("/docs").status_code == 404
+        transport = httpx.ASGITransport(app=create_app())
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as prod_client:
+            assert (await prod_client.get("/docs")).status_code == 404
 
 
 class TestProtectedApi:
-    def test_admin_users_with_valid_token(self, client, monkeypatch):
+    async def test_admin_users_with_valid_token(self, aclient, monkeypatch):
         monkeypatch.setenv("ADMIN_API_TOKEN", "admin-token")
         get_settings.cache_clear()
 
-        response = client.get("/api/v1/admin/users", headers={"Authorization": "Bearer admin-token"})
+        response = await aclient.get("/api/v1/admin/users", headers={"Authorization": "Bearer admin-token"})
 
         assert response.status_code == 200
         assert response.json()["total"] == 0
 
-    def test_dev_token_does_not_open_admin_api(self, client, monkeypatch):
+    async def test_dev_token_does_not_open_admin_api(self, aclient, monkeypatch):
         monkeypatch.setenv("ADMIN_API_TOKEN", "admin-token")
         monkeypatch.setenv("DEV_API_TOKEN", "dev-token")
         get_settings.cache_clear()
 
-        response = client.get("/api/v1/admin/users", headers={"Authorization": "Bearer dev-token"})
+        response = await aclient.get("/api/v1/admin/users", headers={"Authorization": "Bearer dev-token"})
 
         assert response.status_code == 401
 
-    def test_dev_stats_with_valid_token(self, client, monkeypatch):
+    async def test_dev_stats_with_valid_token(self, aclient, monkeypatch):
         monkeypatch.setenv("DEV_API_TOKEN", "dev-token")
         get_settings.cache_clear()
 
-        response = client.get("/api/v1/dev/health/stats", headers={"Authorization": "Bearer dev-token"})
+        response = await aclient.get("/api/v1/dev/health/stats", headers={"Authorization": "Bearer dev-token"})
 
         assert response.status_code == 200
-
-
-@pytest.fixture
-async def aclient():
-    """Client asynchrone sur la même boucle d'événements que les fixtures Redis/Mongo simulées."""
-    transport = httpx.ASGITransport(app=create_app())
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
-        yield c
 
 
 class TestWebAuth:
@@ -145,11 +132,11 @@ class TestWebAuth:
 
 
 class TestErrorHandling:
-    def test_404(self, client):
-        assert client.get("/nonexistent").status_code == 404
+    async def test_404(self, aclient):
+        assert (await aclient.get("/nonexistent")).status_code == 404
 
-    def test_method_not_allowed(self, client):
-        assert client.delete("/health").status_code == 405
+    async def test_method_not_allowed(self, aclient):
+        assert (await aclient.delete("/health")).status_code == 405
 
 
 class TestBotToDashboardLogin:

@@ -53,13 +53,29 @@ class Integration(Document):
     status: IntegrationStatus = IntegrationStatus.ACTIVE
     capabilities: list[str] = Field(default_factory=list)  # capacités réellement vérifiées
     scopes: list[str] = Field(default_factory=list)  # portées accordées, si le fournisseur les expose
-    secret_ciphertext: str | None = Field(default=None, exclude=True, repr=False)
     connected_at: datetime = Field(default_factory=_now)
     last_verified_at: datetime | None = None
     revoked_at: datetime | None = None
 
     class Settings:
         name = "orbi_dev_integrations"
+
+
+class IntegrationSecret(Document):
+    """
+    Texte chiffré de la clé d'une intégration, isolé dans sa propre collection.
+
+    Il ne fait volontairement pas partie du document `Integration` : aucun modèle renvoyé à l'interface ou
+    sérialisé ne peut donc le contenir. (Un champ `exclude=True` n'est de toute façon pas persisté par Beanie 2.)
+    """
+
+    integration_id: Indexed(str, unique=True)  # type: ignore[valid-type]
+    owner_id: Indexed(int)  # type: ignore[valid-type]
+    ciphertext: str = Field(repr=False)
+    created_at: datetime = Field(default_factory=_now)
+
+    class Settings:
+        name = "orbi_dev_integration_secrets"
 
 
 class TaskStatus(StrEnum):

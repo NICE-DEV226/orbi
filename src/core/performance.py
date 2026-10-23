@@ -7,7 +7,6 @@ import asyncio
 from datetime import UTC, datetime
 
 import redis.asyncio as aioredis
-from motor.motor_asyncio import AsyncIOMotorClient
 
 from src.core.config import get_settings
 from src.core.redis import get_redis
@@ -86,20 +85,8 @@ class PerformanceOptimizer:
         await db.error_logs.create_index([("occurred_at", -1)])
 
     async def optimize_connection_pooling(self) -> None:
-        """Optimise les connection pools MongoDB et Redis."""
+        """Optimise le connection pool Redis (le pool MongoDB est géré par src/core/database.py)."""
         settings = get_settings()
-
-        # MongoDB connection pooling optimisé
-        self.mongo_client = AsyncIOMotorClient(
-            settings.MONGODB_URI,
-            maxPoolSize=50,  # Augmenté pour plus de concurrence
-            minPoolSize=5,
-            maxIdleTimeMS=30000,
-            serverSelectionTimeoutMS=5000,
-            connectTimeoutMS=5000,
-            retryWrites=True,
-            w="majority"
-        )
 
         # Redis connection pooling optimisé
         self.redis_pool = aioredis.ConnectionPool.from_url(

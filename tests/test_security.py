@@ -6,21 +6,10 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi import HTTPException
-from fastapi.testclient import TestClient
 
 from src.core.config import get_settings
 from src.core.security import check_bearer
 from src.services.developer_service import verify_github_signature
-
-
-@pytest.fixture
-def client(monkeypatch):
-    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test-token")
-    get_settings.cache_clear()
-    from src.main import create_app
-
-    yield TestClient(create_app())
-    get_settings.cache_clear()
 
 
 class TestCheckBearer:
@@ -41,19 +30,19 @@ class TestCheckBearer:
 
 class TestApiRoutesFailClosed:
     @pytest.mark.parametrize("path", ["/api/v1/admin/users", "/api/v1/admin/tickets", "/api/v1/dev/health/stats"])
-    def test_anonymous_is_refused(self, client, path):
-        assert client.get(path).status_code in (401, 503)
+    async def test_anonymous_is_refused(self, aclient, path):
+        assert (await aclient.get(path)).status_code in (401, 503)
 
-    def test_wrong_token_is_refused(self, client, monkeypatch):
+    async def test_wrong_token_is_refused(self, aclient, monkeypatch):
         monkeypatch.setenv("ADMIN_API_TOKEN", "good")
         get_settings.cache_clear()
-        r = client.get("/api/v1/admin/users", headers={"Authorization": "Bearer bad"})
+        r = await aclient.get("/api/v1/admin/users", headers={"Authorization": "Bearer bad"})
         assert r.status_code == 401
 
 
 class TestDevLoginRemoved:
-    def test_dev_login_route_is_gone(self, client):
-        r = client.get("/admin/dev-login", follow_redirects=False)
+    async def test_dev_login_route_is_gone(self, aclient):
+        r = await aclient.get("/admin/dev-login", follow_redirects=False)
         assert r.status_code == 404
         assert "admsession" not in r.cookies
 
@@ -80,20 +69,20 @@ class TestGithubWebhookRoute:
     def _sign(self, body: bytes, secret: str) -> str:
         return "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
 
-    def test_bad_signature_is_401_and_not_processed(self, client, monkeypatch):
+    async def test_bad_signature_is_401_and_not_processed(self, aclient, monkeypatch):
         monkeypatch.setenv("GITHUB_WEBHOOK_SECRET", "s3cret")
         get_settings.cache_clear()
         with patch("src.services.developer_service.process_github_webhook", new=AsyncMock()) as proc:
-            r = client.post("/webhook/github", content=b"{}", headers={"x-hub-signature-256": "sha256=bad"})
+            r = await aclient.post("/webhook/github", content=b"{}", headers={"x-hub-signature-256": "sha256=bad"})
         assert r.status_code == 401
         proc.assert_not_called()
 
-    def test_good_signature_is_processed(self, client, monkeypatch):
+    async def test_good_signature_is_processed(self, aclient, monkeypatch):
         monkeypatch.setenv("GITHUB_WEBHOOK_SECRET", "s3cret")
         get_settings.cache_clear()
         body = b'{"action":"opened"}'
         with patch("src.services.developer_service.process_github_webhook", new=AsyncMock()) as proc:
-            r = client.post(
+            r = await aclient.post(
                 "/webhook/github",
                 content=body,
                 headers={"x-hub-signature-256": self._sign(body, "s3cret"), "x-github-event": "ping"},
@@ -103,16 +92,16 @@ class TestGithubWebhookRoute:
 
 
 class TestTelegramWebhook:
-    def test_unavailable_without_secret_or_bot(self, client):
-        assert client.post("/webhook/telegram", json={}).status_code == 503
+    async def test_unavailable_without_secret_or_bot(self, aclient):
+        assert (await aclient.post("/webhook/telegram", json={})).status_code == 503
 
-    def test_wrong_secret_is_401(self, client, monkeypatch):
+    async def test_wrong_secret_is_401(self, aclient, monkeypatch):
         monkeypatch.setenv("TELEGRAM_WEBHOOK_SECRET", "tg-secret")
         get_settings.cache_clear()
-        client.app.state.bot_app = AsyncMock()
-        r = client.post("/webhook/telegram", json={}, headers={"x-telegram-bot-api-secret-token": "nope"})
+        aclient.app.state.bot_app = AsyncMock()
+        r = await aclient.post("/webhook/telegram", json={}, headers={"x-telegram-bot-api-secret-token": "nope"})
         assert r.status_code == 401
-        client.app.state.bot_app.process_update.assert_not_called()
+        aclient.app.state.bot_app.process_update.assert_not_called()
 
 
 class TestProductionConfig:
@@ -148,5 +137,5 @@ class TestProductionConfig:
 
 
 class TestWebHardening:
-    def test_logout_requires_post(self, client):
-        assert client.get("/admin/logout", follow_redirects=False).status_code == 405
+    async def test_logout_requires_post(self, aclient):
+        assert (await aclient.get("/admin/logout", follow_redirects=False)).status_code == 405
