@@ -4,14 +4,12 @@ Logique métier : création, mise à jour, SLA, compteur, CSAT.
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 from src.models.ticket import (
     SLA_SECONDS,
     Ticket,
     TicketCategory,
-    TicketPriority,
     TicketStatus,
 )
 from src.models.user import User
@@ -24,7 +22,7 @@ MAX_OPEN_TICKETS = 3
 
 async def generate_ticket_id() -> str:
     """Génère un ID de ticket unique : TKT-YYYY-NNNNN."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     year = now.strftime("%Y")
 
     # Compte les tickets de cette année
@@ -58,13 +56,13 @@ async def create_ticket(
     # Vérification de la limite
     open_count = await count_open_tickets(user.telegram_id)
     if open_count >= MAX_OPEN_TICKETS:
-        raise TicketLimitExceeded(open_count)
+        raise TicketLimitExceededError(open_count)
 
     # Génération ID et détection priorité
     ticket_id = await generate_ticket_id()
     priority = Ticket.detect_priority(category, description, lang)
     sla_seconds = SLA_SECONDS[priority]
-    sla_deadline = datetime.now(timezone.utc) + timedelta(seconds=sla_seconds)
+    sla_deadline = datetime.now(UTC) + timedelta(seconds=sla_seconds)
 
     ticket = Ticket(
         ticket_id=ticket_id,
@@ -78,7 +76,7 @@ async def create_ticket(
         messages=[{
             "role": "user",
             "text": description,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "attachments": [],
         }],
     )
@@ -100,7 +98,7 @@ async def create_ticket(
 
 async def get_user_tickets(
     telegram_id: int,
-    status_filter: Optional[list[TicketStatus]] = None,
+    status_filter: list[TicketStatus] | None = None,
     limit: int = 10,
 ) -> list[Ticket]:
     """Récupère les tickets d'un utilisateur, triés par date de création."""
@@ -115,7 +113,7 @@ async def get_user_tickets(
     return await query.sort(-Ticket.created_at).limit(limit).to_list()
 
 
-async def get_ticket(ticket_id: str) -> Optional[Ticket]:
+async def get_ticket(ticket_id: str) -> Ticket | None:
     """Récupère un ticket par son ID."""
     return await Ticket.find_one(Ticket.ticket_id == ticket_id)
 
@@ -124,16 +122,16 @@ async def add_message(
     ticket: Ticket,
     role: str,
     text: str,
-    attachments: Optional[list] = None,
+    attachments: list | None = None,
 ) -> Ticket:
     """Ajoute un message à l'historique du ticket."""
     ticket.messages.append({
         "role": role,
         "text": text,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "attachments": attachments or [],
     })
-    ticket.updated_at = datetime.now(timezone.utc)
+    ticket.updated_at = datetime.now(UTC)
 
     if role == "agent":
         ticket.status = TicketStatus.WAITING_USER
@@ -147,8 +145,8 @@ async def add_message(
 async def resolve_ticket(ticket: Ticket) -> Ticket:
     """Marque un ticket comme résolu et programme l'envoi du CSAT."""
     ticket.status = TicketStatus.RESOLVED
-    ticket.resolved_at = datetime.now(timezone.utc)
-    ticket.updated_at = datetime.now(timezone.utc)
+    ticket.resolved_at = datetime.now(UTC)
+    ticket.updated_at = datetime.now(UTC)
     await ticket.save()
 
     logger.info("Ticket résolu: %s", ticket.ticket_id)
@@ -158,8 +156,8 @@ async def resolve_ticket(ticket: Ticket) -> Ticket:
 async def close_ticket(ticket: Ticket) -> Ticket:
     """Ferme définitivement un ticket."""
     ticket.status = TicketStatus.CLOSED
-    ticket.closed_at = datetime.now(timezone.utc)
-    ticket.updated_at = datetime.now(timezone.utc)
+    ticket.closed_at = datetime.now(UTC)
+    ticket.updated_at = datetime.now(UTC)
     await ticket.save()
 
     logger.info("Ticket fermé: %s", ticket.ticket_id)
@@ -169,7 +167,7 @@ async def close_ticket(ticket: Ticket) -> Ticket:
 async def save_csat_rating(ticket: Ticket, rating: int) -> Ticket:
     """Enregistre la note CSAT (1-5) pour un ticket résolu."""
     ticket.csat_rating = max(1, min(5, rating))
-    ticket.updated_at = datetime.now(timezone.utc)
+    ticket.updated_at = datetime.now(UTC)
     await ticket.save()
 
     logger.info("CSAT reçu: ticket=%s, rating=%d", ticket.ticket_id, rating)
@@ -178,7 +176,7 @@ async def save_csat_rating(ticket: Ticket, rating: int) -> Ticket:
 
 async def check_sla_breaches() -> list[Ticket]:
     """Vérifie les tickets dont le SLA est dépassé (pour APScheduler)."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     breached = await Ticket.find(
         Ticket.status.is_in([TicketStatus.OPEN, TicketStatus.IN_PROGRESS]),  # type: ignore
         Ticket.sla_breached == False,  # noqa: E712
@@ -196,7 +194,7 @@ async def check_sla_breaches() -> list[Ticket]:
 
 async def get_pending_csat_tickets() -> list[Ticket]:
     """Récupère les tickets résolus sans CSAT (pour rappel APScheduler)."""
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+    cutoff = datetime.now(UTC) - timedelta(hours=24)
     return await Ticket.find(
         Ticket.status == TicketStatus.RESOLVED,
         Ticket.csat_rating == None,  # noqa: E711
@@ -208,7 +206,7 @@ async def get_pending_csat_tickets() -> list[Ticket]:
 
 # ── Exceptions ──
 
-class TicketLimitExceeded(Exception):
+class TicketLimitExceededError(Exception):
     """L'utilisateur a atteint la limite de tickets ouverts."""
     def __init__(self, count: int):
         self.count = count

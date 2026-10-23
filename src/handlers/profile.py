@@ -10,21 +10,16 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackQueryHandler, ContextTypes, MessageHandler, filters
 
 from src.bot.keyboards import (
-    CB_HOME,
-    CB_LANG_AR,
-    CB_LANG_EN,
-    CB_LANG_FR,
     CB_MODULE_PROFILE,
-    CB_NOTIF_SAVE,
     CB_NOTIF_TOGGLE_PREFIX,
     CB_PROFILE_CHANGE_LANG,
     CB_PROFILE_MORNING_BRIEF,
     CB_PROFILE_NOTIFICATIONS,
     CB_PROFILE_STATS,
     CB_PROFILE_TIMEZONE,
-    language_selector_keyboard,
     profile_keyboard,
 )
+from src.core.i18n import t
 from src.core.i18n import t as translate_func
 from src.models.user import NotificationPreferences, User
 
@@ -44,7 +39,7 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if update.callback_query:
         await update.callback_query.answer()
 
-    if not context.user_data: 
+    if not context.user_data:
         return
     lang = context.user_data.get("lang", "fr")
     db_user: User = context.user_data.get("db_user")
@@ -82,7 +77,9 @@ async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
 
     # Ajouter un bouton annuler au sélecteur
@@ -106,7 +103,9 @@ async def language_changed_from_profile(update: Update, context: ContextTypes.DE
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     new_lang = query.data.split(":")[1]  # profile_lang:fr → fr
     db_user: User = context.user_data.get("db_user")
 
@@ -146,7 +145,9 @@ async def show_notifications(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
     db_user: User = context.user_data.get("db_user")
 
@@ -202,7 +203,9 @@ async def toggle_notification(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     notif_type = query.data.replace(CB_NOTIF_TOGGLE_PREFIX, "")
     db_user: User = context.user_data.get("db_user")
 
@@ -223,7 +226,9 @@ async def show_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
     db_user: User = context.user_data.get("db_user")
 
@@ -250,13 +255,15 @@ async def handle_timezone_input(update: Update, context: ContextTypes.DEFAULT_TY
     if not context.user_data.get("_awaiting_timezone"):
         return
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
     db_user: User = context.user_data.get("db_user")
     user_input = update.message.text.strip()
 
     # Mapping simple ville → fuseau (sera enrichi)
-    CITY_TO_TZ = {
+    CITY_TO_TZ = {  # noqa: N806
         "paris": "Europe/Paris", "london": "Europe/London", "londres": "Europe/London",
         "new york": "America/New_York", "los angeles": "America/Los_Angeles",
         "tokyo": "Asia/Tokyo", "dubai": "Asia/Dubai", "dakar": "Africa/Dakar",
@@ -299,7 +306,9 @@ async def show_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
     db_user: User = context.user_data.get("db_user")
 
@@ -340,7 +349,9 @@ async def show_morning_brief_settings(update: Update, context: ContextTypes.DEFA
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
     db_user: User = context.user_data.get("db_user")
 

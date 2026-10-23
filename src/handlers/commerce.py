@@ -33,7 +33,6 @@ from src.services.commerce_service import (
     check_and_reduce_stock,
     create_order_from_cart,
     get_catalog_page,
-    get_order,
     get_product,
     get_user_orders,
     validate_promo_code,
@@ -55,7 +54,9 @@ async def show_catalog(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
 
     # shop:catalog:0 → page 0
@@ -117,8 +118,8 @@ async def show_catalog(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def handle_add_to_cart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Ajoute un produit au panier Redis."""
     query = update.callback_query
-    if not context.user_data: return
-    lang = context.user_data.get("lang", "fr")
+    if not context.user_data:
+        return
     db_user: User = context.user_data.get("db_user")
 
     product_id = query.data.split(":")[1]
@@ -144,7 +145,9 @@ async def show_cart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
     db_user: User = context.user_data.get("db_user")
 
@@ -195,7 +198,8 @@ async def show_cart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def handle_cart_update(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Modifie la quantité d'un produit."""
     query = update.callback_query
-    if not context.user_data: return
+    if not context.user_data:
+        return
     db_user: User = context.user_data.get("db_user")
 
     parts = query.data.split(":")
@@ -209,7 +213,8 @@ async def handle_cart_update(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def handle_cart_remove(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Supprime un produit du panier."""
     query = update.callback_query
-    if not context.user_data: return
+    if not context.user_data:
+        return
     db_user: User = context.user_data.get("db_user")
     pid = query.data.split(":")[1]
 
@@ -219,8 +224,8 @@ async def handle_cart_remove(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def handle_cart_clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Vide le panier."""
-    query = update.callback_query
-    if not context.user_data: return
+    if not context.user_data:
+        return
     db_user: User = context.user_data.get("db_user")
 
     await clear_cart(db_user.telegram_id)
@@ -236,7 +241,9 @@ async def checkout_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     query = update.callback_query
     await query.answer()
 
-    if context.user_data is None: return
+    if context.user_data is None:
+
+        return
     lang = context.user_data.get("lang", "fr")
     db_user: User = context.user_data.get("db_user")
 
@@ -267,7 +274,8 @@ async def checkout_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 async def handle_promo_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Traite le code promo saisi."""
-    if not context.user_data: return
+    if not context.user_data:
+        return
     lang = context.user_data.get("lang", "fr")
     code = update.message.text.strip().upper()
 
@@ -296,7 +304,8 @@ async def skip_promo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def show_payment_methods(update: Update, context: ContextTypes.DEFAULT_TYPE, from_query: bool = False) -> int:
     """Affiche le récapitulatif final et la confirmation de commande."""
-    if not context.user_data: return
+    if not context.user_data:
+        return
     lang = context.user_data.get("lang", "fr")
     db_user: User = context.user_data.get("db_user")
 
@@ -341,7 +350,9 @@ async def process_payment(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     query = update.callback_query
     await query.answer("Création de la commande...")
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
     db_user: User = context.user_data.get("db_user")
 
@@ -421,7 +432,9 @@ async def show_my_orders(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
     db_user: User = context.user_data.get("db_user")
 

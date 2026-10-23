@@ -83,8 +83,8 @@ async def create_bot_application() -> Application:
         group=-10,
     )
     # ── Enregistrement des handlers ──
-    from src.handlers.onboarding import register_onboarding_handlers
     from src.handlers.menu import register_menu_handlers
+    from src.handlers.onboarding import register_onboarding_handlers
     from src.handlers.profile import register_profile_handlers
 
     # Phase 3 : Onboarding + Navigation + Profil
@@ -111,22 +111,22 @@ async def create_bot_application() -> Application:
     # Phase 8 : Développeur
     from src.handlers.developer import register_developer_handlers
     register_developer_handlers(application)
-    
+
     # Handlers de test
     from src.handlers.test import register_test_handlers
     register_test_handlers(application)
-    
+
     # Handlers utilitaires pour groupes
     from src.handlers.group_utils import register_group_utils_handlers
     register_group_utils_handlers(application)
-    
+
     # Fonctionnalités avancées
     from src.handlers.admin_auth import register_admin_handlers
     register_admin_handlers(application)
-    
+
     from src.handlers.group_management import register_group_handlers
     register_group_handlers(application)
-    
+
     from src.handlers.developer_real import register_developer_handlers as register_real_dev_handlers
     register_real_dev_handlers(application)
 

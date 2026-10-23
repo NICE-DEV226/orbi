@@ -5,8 +5,7 @@ Catalogue paginé, commandes, codes promo.
 
 import hashlib
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from src.models.commerce import Order, OrderStatus, Product, PromoCode
 from src.models.user import User
@@ -18,7 +17,7 @@ PRODUCTS_PER_PAGE = 5
 
 async def generate_order_id() -> str:
     """Génère un ID de commande unique : ORD-YYYY-NNNNN."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     year = now.strftime("%Y")
     count = await Order.find(
         Order.order_id >= f"ORD-{year}-",
@@ -33,8 +32,8 @@ async def generate_order_id() -> str:
 
 async def get_catalog_page(
     page: int = 0,
-    category: Optional[str] = None,
-    search: Optional[str] = None,
+    category: str | None = None,
+    search: str | None = None,
 ) -> tuple[list[Product], int]:
     """
     Retourne une page du catalogue + nombre total de produits.
@@ -50,7 +49,7 @@ async def get_catalog_page(
     return products, total
 
 
-async def get_product(product_id: str) -> Optional[Product]:
+async def get_product(product_id: str) -> Product | None:
     """Récupère un produit par son ID."""
     from beanie import PydanticObjectId
     try:
@@ -66,7 +65,7 @@ async def get_product(product_id: str) -> Optional[Product]:
 async def create_order_from_cart(
     user: User,
     cart_items: list[dict],
-    promo_code: Optional[str] = None,
+    promo_code: str | None = None,
 ) -> Order:
     """Crée une commande à partir du panier."""
     order_id = await generate_order_id()
@@ -117,7 +116,7 @@ def generate_idempotency_key(user_id: int, order_id: str) -> str:
     return hashlib.sha256(f"{user_id}:{order_id}".encode()).hexdigest()[:32]
 
 
-async def get_order(order_id: str) -> Optional[Order]:
+async def get_order(order_id: str) -> Order | None:
     """Récupère une commande par son ID."""
     return await Order.find_one(Order.order_id == order_id)
 
@@ -126,7 +125,7 @@ async def get_order(order_id: str) -> Optional[Order]:
 # Codes Promo
 # ─────────────────────────────────────
 
-async def validate_promo_code(code: str) -> Optional[PromoCode]:
+async def validate_promo_code(code: str) -> PromoCode | None:
     """Vérifie la validité d'un code promo."""
     promo = await PromoCode.find_one(PromoCode.code == code.upper())
     if promo and promo.is_valid:
@@ -169,7 +168,7 @@ async def check_and_reduce_stock(cart_items: list[dict]) -> list[str]:
             unavailable.append(item.get("name", item["product_id"]))
         else:
             product.stock -= item["quantity"]
-            product.updated_at = datetime.now(timezone.utc)
+            product.updated_at = datetime.now(UTC)
             await product.save()
 
             # Si stock à 0, notifier les utilisateurs inscrits

@@ -18,12 +18,11 @@ from telegram.ext import (
 
 from src.bot.keyboards import CB_HOME, CB_MODULE_SUPPORT
 from src.core.i18n import t
-from src.models.ticket import SLA_SECONDS, TicketCategory, TicketPriority
+from src.models.ticket import SLA_SECONDS, TicketCategory
 from src.services.ticket_service import (
     MAX_OPEN_TICKETS,
-    TicketLimitExceeded,
+    TicketLimitExceededError,
     add_message,
-    close_ticket,
     count_open_tickets,
     create_ticket,
     get_ticket,
@@ -51,7 +50,9 @@ async def start_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
     db_user = context.user_data.get("db_user")
 
@@ -95,7 +96,9 @@ async def category_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
     category = query.data.split(":")[1]  # ticket_cat:billing → billing
     context.user_data["_ticket_category"] = category
@@ -111,7 +114,8 @@ async def category_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 async def subject_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Étape 3 : Sujet reçu → valider puis demander la description."""
-    if not context.user_data: return
+    if not context.user_data:
+        return
     lang = context.user_data.get("lang", "fr")
     subject = update.message.text.strip()
 
@@ -138,7 +142,8 @@ async def subject_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 async def description_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Étape 4 : Description reçue → afficher le récapitulatif pour confirmation."""
-    if not context.user_data: return
+    if not context.user_data:
+        return
     lang = context.user_data.get("lang", "fr")
     description = update.message.text.strip()
 
@@ -187,7 +192,9 @@ async def ticket_confirmed(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
     db_user = context.user_data.get("db_user")
 
@@ -234,7 +241,7 @@ async def ticket_confirmed(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             ]),
         )
 
-    except TicketLimitExceeded as e:
+    except TicketLimitExceededError as e:
         await query.edit_message_text(
             t("support.ticket_limit", lang, count=str(e.count)),
             reply_markup=InlineKeyboardMarkup([
@@ -259,7 +266,9 @@ async def ticket_cancelled(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
 
     # Nettoyage du contexte
@@ -290,7 +299,9 @@ async def show_my_tickets(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
     db_user = context.user_data.get("db_user")
 
@@ -346,7 +357,9 @@ async def view_ticket_detail(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
     ticket_id = query.data.split(":")[1]  # ticket_view:TKT-2026-00001
 
@@ -418,7 +431,9 @@ async def start_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
     ticket_id = query.data.split(":")[1]
     context.user_data["_replying_to_ticket"] = ticket_id
@@ -439,7 +454,9 @@ async def handle_ticket_reply(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not ticket_id:
         return
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
     text = update.message.text.strip()
 
@@ -465,7 +482,9 @@ async def resolve_ticket_handler(update: Update, context: ContextTypes.DEFAULT_T
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
     ticket_id = query.data.split(":")[1]
 
@@ -502,7 +521,9 @@ async def handle_csat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
     parts = query.data.split(":")  # csat:TKT-2026-00001:4
     ticket_id = parts[1]
@@ -526,7 +547,8 @@ async def handle_csat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
 async def handle_escalation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Propose l'escalade quand le bot ne comprend pas."""
-    if not context.user_data: return
+    if not context.user_data:
+        return
     lang = context.user_data.get("lang", "fr")
 
     keyboard = InlineKeyboardMarkup([

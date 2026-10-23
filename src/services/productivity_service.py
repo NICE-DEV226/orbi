@@ -7,12 +7,10 @@ Mode Focus (Pomodoro) basé sur Redis pour éviter la surcharge DB des timers.
 import json
 import logging
 import re
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from src.core.redis import get_redis
 from src.models.productivity import Note, Task, TaskPriority
-from src.models.user import User
 
 logger = logging.getLogger("orbi.services.productivity")
 
@@ -29,8 +27,8 @@ async def start_focus_session(telegram_id: int, duration_minutes: int, focus_typ
     """Démarre une session de Focus."""
     redis = get_redis()
     key = f"{FOCUS_PREFIX}{telegram_id}"
-    
-    now = datetime.now(timezone.utc)
+
+    now = datetime.now(UTC)
     session_data = {
         "user_id": telegram_id,
         "type": focus_type,
@@ -38,12 +36,12 @@ async def start_focus_session(telegram_id: int, duration_minutes: int, focus_typ
         "start_time": now.isoformat(),
         "status": "running",
     }
-    
+
     await redis.set(key, json.dumps(session_data), ex=FOCUS_TTL)
     logger.info("Focus session démarrée: user=%d, durée=%d min", telegram_id, duration_minutes)
     return session_data
 
-async def get_active_focus_session(telegram_id: int) -> Optional[dict]:
+async def get_active_focus_session(telegram_id: int) -> dict | None:
     """Récupère la session Focus active de l'utilisateur."""
     redis = get_redis()
     key = f"{FOCUS_PREFIX}{telegram_id}"
@@ -68,8 +66,8 @@ async def create_task(
     user_id: int,
     title: str,
     priority: TaskPriority = TaskPriority.MEDIUM,
-    due_date: Optional[datetime] = None,
-    group_id: Optional[int] = None,
+    due_date: datetime | None = None,
+    group_id: int | None = None,
 ) -> Task:
     """Crée une nouvelle tâche."""
     task = Task(
@@ -87,13 +85,13 @@ async def create_task(
 async def get_user_tasks(user_id: int, limit: int = 10, include_completed: bool = False) -> list[Task]:
     """Récupère les tâches d'un utilisateur, triées par priorité puis date."""
     query = Task.find(Task.user_telegram_id == user_id)
-    
+
     if not include_completed:
         query = query.find(Task.is_completed == False)  # noqa: E712
-        
+
     return await query.sort("priority", "due_date").limit(limit).to_list()
 
-async def get_task(task_id: str) -> Optional[Task]:
+async def get_task(task_id: str) -> Task | None:
     """Récupère une tâche spécifique."""
     from beanie import PydanticObjectId
     try:
@@ -104,8 +102,8 @@ async def get_task(task_id: str) -> Optional[Task]:
 async def toggle_task_completion(task: Task) -> Task:
     """Bascule l'état (terminé/non terminé) d'une tâche."""
     task.is_completed = not task.is_completed
-    task.completed_at = datetime.now(timezone.utc) if task.is_completed else None
-    task.updated_at = datetime.now(timezone.utc)
+    task.completed_at = datetime.now(UTC) if task.is_completed else None
+    task.updated_at = datetime.now(UTC)
     await task.save()
     return task
 
@@ -115,7 +113,7 @@ async def delete_task(task: Task) -> None:
 
 async def get_pending_reminders() -> list[Task]:
     """Récupère les tâches avec échéance imminente (pour APScheduler)."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     # Cherche les tâches non terminées, avec rappel activé, et dont la date d'échéance est passée
     return await Task.find(
         Task.is_completed == False,  # noqa: E712
@@ -135,7 +133,7 @@ def extract_hashtags(text: str) -> list[str]:
 async def create_note(
     user_id: int,
     content: str,
-    voice_file_id: Optional[str] = None,
+    voice_file_id: str | None = None,
 ) -> Note:
     """Crée une nouvelle note, extrayant automatiquement les hashtags."""
     hashtags = extract_hashtags(content)
@@ -149,14 +147,14 @@ async def create_note(
     logger.info("Note créée: %s (user=%d, tags=%s)", note.id, user_id, hashtags)
     return note
 
-async def get_user_notes(user_id: int, hashtag: Optional[str] = None, limit: int = 10) -> list[Note]:
+async def get_user_notes(user_id: int, hashtag: str | None = None, limit: int = 10) -> list[Note]:
     """Récupère les notes d'un utilisateur, éventuellement filtrées par hashtag."""
     query = Note.find(Note.user_telegram_id == user_id)
-    
+
     if hashtag:
         # Recherche la présence du hashtag dans le tableau
         query = query.find({"hashtags": hashtag.strip("#")})
-        
+
     return await query.sort(-Note.created_at).limit(limit).to_list()
 
 async def delete_note(note: Note) -> None:

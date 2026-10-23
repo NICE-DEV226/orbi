@@ -5,7 +5,7 @@ Conforme au CdC §5 : Module Communauté / Enquêtes.
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
@@ -44,7 +44,9 @@ async def show_polls(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
     polls = await get_active_polls(limit=5)
 
@@ -77,7 +79,9 @@ async def view_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
     poll_id = query.data.split(":")[1]
     poll = await get_poll(poll_id)
@@ -119,7 +123,8 @@ async def handle_vote(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     query = update.callback_query
     parts = query.data.split(":")
     poll_id = parts[1]
-    if not context.user_data: return
+    if not context.user_data:
+        return
     option_idx = int(parts[2])
 
     poll = await get_poll(poll_id)
@@ -140,7 +145,8 @@ async def handle_vote(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 async def handle_close_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Clôture un sondage."""
     query = update.callback_query
-    if not context.user_data: return
+    if not context.user_data:
+        return
     poll_id = query.data.split(":")[1]
     poll = await get_poll(poll_id)
     db_user: User = context.user_data.get("db_user")
@@ -162,7 +168,9 @@ async def start_poll_creation(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
     msg = {
         "fr": "📝 <b>Nouveau sondage</b>\n\nQuelle est votre question ?",
@@ -182,7 +190,8 @@ async def start_poll_creation(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def poll_question_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Question reçue → demander les options."""
-    if not context.user_data: return
+    if not context.user_data:
+        return
     lang = context.user_data.get("lang", "fr")
     context.user_data["_poll_question"] = update.message.text.strip()
 
@@ -203,7 +212,8 @@ async def poll_question_received(update: Update, context: ContextTypes.DEFAULT_T
 
 async def poll_options_received(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Options reçues → créer le sondage."""
-    if not context.user_data: return
+    if not context.user_data:
+        return
     lang = context.user_data.get("lang", "fr")
     db_user: User = context.user_data.get("db_user")
 
@@ -216,7 +226,7 @@ async def poll_options_received(update: Update, context: ContextTypes.DEFAULT_TY
         return STATE_POLL_OPTIONS
 
     # Création du sondage (valide pendant 24h par défaut)
-    end_date = datetime.now(timezone.utc) + timedelta(days=1)
+    end_date = datetime.now(UTC) + timedelta(days=1)
     poll = await create_poll(question, options, db_user.telegram_id, end_date=end_date)
 
     msg = {
@@ -241,7 +251,9 @@ async def cancel_poll_creation(update: Update, context: ContextTypes.DEFAULT_TYP
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     context.user_data.pop("_poll_question", None)
     await show_polls(update, context)
     return ConversationHandler.END
@@ -256,7 +268,9 @@ async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     query = update.callback_query
     await query.answer()
 
-    if not context.user_data: return
+    if not context.user_data:
+
+        return
     lang = context.user_data.get("lang", "fr")
     db_user: User = context.user_data.get("db_user")
 

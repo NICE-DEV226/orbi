@@ -4,16 +4,12 @@ Gestion des bots dans les groupes, modération, règles, et administration.
 """
 
 import logging
-import re
-from datetime import datetime, timezone, timedelta
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Chat, ChatPermissions
-from telegram.ext import CallbackQueryHandler, ContextTypes, MessageHandler, filters, ChatMemberHandler
+from telegram import ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import CallbackQueryHandler, ChatMemberHandler, ContextTypes, MessageHandler, filters
 
-from src.core.i18n import t
-from src.models.community import GroupConfig, ModerationLog, ModerationAction
-from src.models.user import User
+from src.models.community import GroupConfig, ModerationAction, ModerationLog
 
 logger = logging.getLogger("orbi.handlers.group")
 
@@ -22,10 +18,9 @@ async def handle_new_chat_member(update: Update, context: ContextTypes.DEFAULT_T
     """Gère l'arrivée du bot dans un nouveau groupe."""
     if not update.my_chat_member:
         return
-    
-    chat = update.effective_chat
+
     new_status = update.my_chat_member.new_chat_member.status
-    
+
     # Le bot a été ajouté au groupe
     if new_status in ["member", "administrator"]:
         await handle_bot_added_to_group(update, context)
@@ -37,10 +32,10 @@ async def handle_new_chat_member(update: Update, context: ContextTypes.DEFAULT_T
 async def handle_bot_added_to_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Configure le bot lorsqu'il est ajouté à un groupe."""
     chat = update.effective_chat
-    
+
     # Créer ou récupérer la configuration du groupe
     group_config = await GroupConfig.find_one(GroupConfig.chat_id == chat.id)
-    
+
     if not group_config:
         group_config = GroupConfig(
             chat_id=chat.id,
@@ -66,7 +61,7 @@ async def handle_bot_added_to_group(update: Update, context: ContextTypes.DEFAUL
         )
         await group_config.insert()
         logger.info(f"Nouvelle configuration créée pour le groupe {chat.title} ({chat.id})")
-    
+
     # Envoyer le message de bienvenue et configuration
     keyboard = InlineKeyboardMarkup([
         [
@@ -78,10 +73,10 @@ async def handle_bot_added_to_group(update: Update, context: ContextTypes.DEFAUL
             InlineKeyboardButton("📊 Statistiques", callback_data=f"group:stats:{chat.id}"),
         ]
     ])
-    
+
     await context.bot.send_message(
         chat_id=chat.id,
-        text=f"""
+        text="""
 🤖 **Orbi Bot configuré !**
 
 Je suis maintenant actif dans ce groupe. Voici ce que je peux faire :
@@ -101,7 +96,7 @@ Cliquez sur les boutons ci-dessous pour configurer le bot selon vos besoins !
 async def handle_bot_removed_from_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Nettoie la configuration lorsque le bot est retiré."""
     chat = update.effective_chat
-    
+
     # Marquer le groupe comme inactif
     group_config = await GroupConfig.find_one(GroupConfig.chat_id == chat.id)
     if group_config:
@@ -118,12 +113,12 @@ async def show_group_config(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     # Extraire le chat_id du callback_data
     callback_data = update.callback_query.data
     chat_id = int(callback_data.split(":")[-1]) if ":" in callback_data else update.effective_chat.id
-    
+
     group_config = await GroupConfig.find_one(GroupConfig.chat_id == chat_id)
     if not group_config:
         await update.effective_message.reply_text("❌ Configuration non trouvée")
         return
-    
+
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("👋 Message de bienvenue", callback_data=f"group:welcome:{chat_id}"),
@@ -138,9 +133,9 @@ async def show_group_config(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             InlineKeyboardButton("❌ Retour", callback_data="mod:home"),
         ]
     ])
-    
+
     status = "✅ Activé" if group_config.auto_moderation_enabled else "❌ Désactivé"
-    
+
     text = f"""
 ⚙️ **Configuration du Groupe**
 
@@ -150,7 +145,7 @@ async def show_group_config(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 Que souhaitez-vous configurer ?
     """
-    
+
     if update.callback_query:
         await update.callback_query.edit_message_text(text, reply_markup=keyboard)
     else:
@@ -164,21 +159,21 @@ async def toggle_auto_moderation(update: Update, context: ContextTypes.DEFAULT_T
 
     callback_data = update.callback_query.data
     chat_id = int(callback_data.split(":")[-1])
-    
+
     group_config = await GroupConfig.find_one(GroupConfig.chat_id == chat_id)
     if not group_config:
         return
-    
+
     group_config.auto_moderation_enabled = not group_config.auto_moderation_enabled
     await group_config.save()
-    
+
     status = "activée" if group_config.auto_moderation_enabled else "désactivée"
-    
+
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("⚙️ Retour à la config", callback_data=f"group:config:{chat_id}")],
         [InlineKeyboardButton("❌ Retour au menu", callback_data="mod:home")]
     ])
-    
+
     text = f"""
 🔧 **Modération Automatique**
 
@@ -192,7 +187,7 @@ La modération automatique est maintenant **{status}**.
 
 *Les administrateurs ne sont pas affectés par ces règles.*
     """
-    
+
     if update.callback_query:
         await update.callback_query.edit_message_text(text, reply_markup=keyboard)
     else:
@@ -206,17 +201,17 @@ async def show_group_rules(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     callback_data = update.callback_query.data
     chat_id = int(callback_data.split(":")[-1])
-    
+
     group_config = await GroupConfig.find_one(GroupConfig.chat_id == chat_id)
     if not group_config:
         return
-    
+
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("✏️ Modifier les règles", callback_data=f"group:edit_rules:{chat_id}")],
         [InlineKeyboardButton("📢 Annoncer les règles", callback_data=f"group:announce_rules:{chat_id}")],
         [InlineKeyboardButton("⚙️ Retour à la config", callback_data=f"group:config:{chat_id}")],
     ])
-    
+
     text = f"""
 📋 **Règles du Groupe**
 
@@ -224,7 +219,7 @@ async def show_group_rules(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 *Les règles sont visibles par tous les membres du groupe.*
     """
-    
+
     if update.callback_query:
         await update.callback_query.edit_message_text(text, reply_markup=keyboard)
     else:
@@ -235,54 +230,54 @@ async def handle_message_moderation(update: Update, context: ContextTypes.DEFAUL
     """Effectue la modération automatique des messages."""
     if not update.message or not update.effective_chat:
         return
-    
+
     chat = update.effective_chat
     message = update.message
     user = message.from_user
-    
+
     # Ne pas modérer les messages des admins
     if user and user.username in ["GroupAdmin", "GroupCreator"]:  # À adapter
         return
-    
+
     group_config = await GroupConfig.find_one(GroupConfig.chat_id == chat.id)
     if not group_config or not group_config.auto_moderation_enabled:
         return
-    
+
     # Récupérer le statut de l'utilisateur dans le groupe
     try:
         chat_member = await context.bot.get_chat_member(chat.id, user.id)
         if chat_member.status in ["administrator", "creator"]:
             return
-    except:
+    except Exception:
         pass
-    
+
     # Détection de spam/flood
     spam_detected = False
     reason = ""
-    
+
     # 1. Messages identiques répétés
     if message.text:
         recent_messages = await context.bot.get_chat_history(chat.id, limit=10)
         identical_count = sum(1 for msg in recent_messages if msg.text == message.text)
-        
+
         if identical_count >= group_config.max_identical_messages:
             spam_detected = True
             reason = "Messages identiques répétés"
-    
+
     # 2. Trop de mentions
     if message.entities:
         mention_count = sum(1 for entity in message.entities if entity.type == "mention")
         if mention_count > group_config.max_mentions_per_message:
             spam_detected = True
             reason = "Trop de mentions"
-    
+
     # 3. Liens suspects (si non autorisés)
     if not group_config.allow_links and message.entities:
         link_count = sum(1 for entity in message.entities if entity.type in ["url", "text_link"])
         if link_count > 0:
             spam_detected = True
             reason = "Liens non autorisés"
-    
+
     # Appliquer la sanction
     if spam_detected:
         await apply_spam_punishment(update, context, user.id, reason, group_config)
@@ -291,7 +286,7 @@ async def handle_message_moderation(update: Update, context: ContextTypes.DEFAUL
 async def apply_spam_punishment(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, reason: str, group_config: GroupConfig) -> None:
     """Applique une sanction pour spam."""
     chat = update.effective_chat
-    
+
     # Logger l'action
     await ModerationLog(
         target_telegram_id=user_id,
@@ -301,13 +296,13 @@ async def apply_spam_punishment(update: Update, context: ContextTypes.DEFAULT_TY
         group_chat_id=chat.id,
         is_automatic=True
     ).insert()
-    
+
     # Supprimer le message
     try:
         await update.message.delete()
-    except:
+    except Exception:
         pass
-    
+
     # Appliquer un mute de 5 minutes pour la première infraction
     try:
         mute_duration = 300  # 5 minutes
@@ -320,38 +315,38 @@ async def apply_spam_punishment(update: Update, context: ContextTypes.DEFAULT_TY
                 can_send_other_messages=False,
                 can_add_web_page_previews=False
             ),
-            until_date=datetime.now(timezone.utc) + timedelta(seconds=mute_duration)
+            until_date=datetime.now(UTC) + timedelta(seconds=mute_duration)
         )
-        
+
         await context.bot.send_message(
             chat_id=chat.id,
             text=f"🔇 *Spam détecté*\n\nUtilisateur muet pour 5 minutes\nRaison : {reason}"
         )
-    except:
+    except Exception:
         pass
 
 
 def register_group_handlers(application) -> None:
     """Enregistre les handlers de groupe."""
-    
+
     # Gestion des membres du groupe
     application.add_handler(ChatMemberHandler(handle_new_chat_member, ChatMemberHandler.CHAT_MEMBER))
-    
+
     # Modération des messages
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message_moderation))
-    
+
     # Callbacks de configuration groupe
     application.add_handler(CallbackQueryHandler(show_group_config, pattern=r"^group:config:\d+$"))
     application.add_handler(CallbackQueryHandler(toggle_auto_moderation, pattern=r"^group:auto_mod:\d+$"))
     application.add_handler(CallbackQueryHandler(show_group_rules, pattern=r"^group:rules:\d+$"))
-    
+
     # Handlers temporaires pour les callbacks non implémentés
     application.add_handler(CallbackQueryHandler(
         lambda u, c: c.bot.send_message(
             chat_id=u.effective_chat.id,
             text="🔧 Fonctionnalité en développement"
-        ), 
+        ),
         pattern=r"^group:(welcome|edit_rules|announce_rules|karma|tools|stats):\d+$"
     ))
-    
+
     logger.info("Handlers groupe/canal enregistrés")

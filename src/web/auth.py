@@ -4,11 +4,9 @@ Système de connexion par "Magic Link" (Token à usage unique généré via Tele
 """
 
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Optional
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from src.core.config import get_settings
@@ -31,7 +29,7 @@ async def create_web_session(user: User) -> str:
     return session_id
 
 
-async def get_current_admin(request: Request) -> Optional[User]:
+async def get_current_admin(request: Request) -> User | None:
     """Dépendance : récupère l'admin courant depuis le cookie de session."""
     session_id = request.cookies.get(COOKIE_NAME)
     if not session_id:
@@ -39,7 +37,7 @@ async def get_current_admin(request: Request) -> Optional[User]:
 
     redis = get_redis()
     telegram_id = await redis.get(f"websession:{session_id}")
-    
+
     if not telegram_id:
         return None
 
@@ -66,8 +64,8 @@ async def login_page(request: Request):
     admin = await get_current_admin(request)
     if admin:
         return RedirectResponse(url="/admin/", status_code=303)
-        
-    return templates.TemplateResponse("login.html", {"request": request})
+
+    return templates.TemplateResponse(request, "login.html", {})
 
 
 @router.get("/auth/{token}", include_in_schema=False)
@@ -75,11 +73,10 @@ async def auth_magic_link(token: str, request: Request):
     """Valide le Magic Link et pose le cookie de session."""
     redis = get_redis()
     telegram_id = await redis.get(f"{MAGIC_LINK_PREFIX}{token}")
-    
+
     if not telegram_id:
-        return templates.TemplateResponse(
-            "login.html", 
-            {"request": request, "error": "Lien invalide ou expiré (durée de validité : 5 minutes)."}
+        return templates.TemplateResponse(request, "login.html",
+            {"error": "Lien invalide ou expiré (durée de validité : 5 minutes)."},
         )
 
     # Le token est à usage unique : on le supprime
@@ -87,9 +84,8 @@ async def auth_magic_link(token: str, request: Request):
 
     user = await User.find_one(User.telegram_id == int(telegram_id))
     if not user or user.role not in ["admin", "superadmin"]:
-        return templates.TemplateResponse(
-            "login.html", 
-            {"request": request, "error": "Accès refusé. Rôle administrateur requis."}
+        return templates.TemplateResponse(request, "login.html",
+            {"error": "Accès refusé. Rôle administrateur requis."},
         )
 
     # Création de la session
@@ -114,7 +110,7 @@ async def logout(request: Request):
     if session_id:
         redis = get_redis()
         await redis.delete(f"websession:{session_id}")
-    
+
     response = RedirectResponse(url="/admin/login", status_code=303)
     response.delete_cookie(COOKIE_NAME)
     return response

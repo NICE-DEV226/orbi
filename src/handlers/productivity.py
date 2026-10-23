@@ -5,7 +5,7 @@ Conforme au CdC §6 : Module Productivité.
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
@@ -23,7 +23,6 @@ from src.models.user import User
 from src.services.productivity_service import (
     create_note,
     create_task,
-    delete_note,
     delete_task,
     get_active_focus_session,
     get_task,
@@ -49,7 +48,9 @@ async def show_focus(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     query = update.callback_query
     await query.answer()
 
-    if context.user_data is None: return
+    if context.user_data is None:
+
+        return
     lang = context.user_data.get("lang", "fr")
     db_user: User = context.user_data.get("db_user")
 
@@ -57,7 +58,7 @@ async def show_focus(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     if session and session["status"] == "running":
         start_time = datetime.fromisoformat(session["start_time"])
-        elapsed = (datetime.now(timezone.utc) - start_time).total_seconds() / 60
+        elapsed = (datetime.now(UTC) - start_time).total_seconds() / 60
         remaining = max(0, session["duration_minutes"] - elapsed)
 
         text = (
@@ -155,7 +156,7 @@ async def handle_task_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if tsk:
         await toggle_task_completion(tsk)
         await query.answer("✅ Tâche mise à jour.")
-    
+
     await show_tasks(update, context)
 
 
@@ -168,7 +169,7 @@ async def handle_task_delete(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if tsk:
         await delete_task(tsk)
         await query.answer("🗑️ Tâche supprimée.")
-    
+
     await show_tasks(update, context)
 
 
@@ -198,11 +199,11 @@ async def handle_task_title(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     title = update.message.text.strip()
 
     # Par défaut, échéance à demain, priorité moyenne
-    due = datetime.now(timezone.utc) + timedelta(days=1)
+    due = datetime.now(UTC) + timedelta(days=1)
     await create_task(db_user.telegram_id, title, due_date=due)
 
     confirm = {"fr": "✅ Tâche ajoutée (échéance demain).", "en": "✅ Task added.", "ar": "✅ تم إضافة المهمة."}
-    
+
     await update.message.reply_text(
         confirm.get(lang, confirm["fr"]),
         reply_markup=InlineKeyboardMarkup([
@@ -250,8 +251,8 @@ async def start_note_creation(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.answer()
 
     lang = context.user_data.get("lang", "fr")
-    msg = {"fr": "✏️ Écrivez votre note (ajoutez des #hashtags pour classer) :", 
-           "en": "✏️ Write your note (add #hashtags to categorize):", 
+    msg = {"fr": "✏️ Écrivez votre note (ajoutez des #hashtags pour classer) :",
+           "en": "✏️ Write your note (add #hashtags to categorize):",
            "ar": "✏️ اكتب ملاحظتك (أضف # للوسوم):"}
 
     await query.edit_message_text(
@@ -274,7 +275,7 @@ async def handle_note_content(update: Update, context: ContextTypes.DEFAULT_TYPE
     confirm = {"fr": f"✅ Note sauvegardée avec {len(note.hashtags)} hashtag(s).",
                "en": f"✅ Note saved with {len(note.hashtags)} hashtag(s).",
                "ar": f"✅ تم حفظ الملاحظة مع {len(note.hashtags)} وسم."}
-    
+
     await update.message.reply_text(
         confirm.get(lang, confirm["fr"]),
         reply_markup=InlineKeyboardMarkup([
@@ -291,7 +292,7 @@ async def cancel_productivity(update: Update, context: ContextTypes.DEFAULT_TYPE
     await query.answer()
 
     lang = context.user_data.get("lang", "fr")
-    
+
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton(t("productivity.tasks", lang), callback_data="prod:tasks")],
         [InlineKeyboardButton(t("productivity.notes", lang), callback_data="prod:notes")],

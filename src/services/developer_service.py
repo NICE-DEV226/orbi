@@ -6,8 +6,8 @@ Logs système, webhooks GitHub, statistiques d'infrastructure.
 import hashlib
 import hmac
 import logging
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from src.core.config import get_settings
 from src.core.redis import get_redis
@@ -47,7 +47,7 @@ async def process_github_webhook(
     action = payload.get("action", "")
     repository = payload.get("repository", {}).get("full_name", "unknown")
     sender = payload.get("sender", {}).get("login", "unknown")
-    
+
     # Extraction ciblée de détails selon le type d'événement
     details = {}
     if event_type == "push":
@@ -87,9 +87,9 @@ async def get_recent_github_events(limit: int = 5) -> list[GithubWebhookLog]:
 async def log_error(
     service: str,
     error_message: str,
-    traceback_str: Optional[str] = None,
-    user_id: Optional[int] = None,
-    metadata: Optional[dict[str, Any]] = None,
+    traceback_str: str | None = None,
+    user_id: int | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> ErrorLog:
     """Enregistre une erreur système."""
     err = ErrorLog(
@@ -109,14 +109,14 @@ async def get_unresolved_errors(limit: int = 10) -> list[ErrorLog]:
     return await ErrorLog.find(ErrorLog.is_resolved == False).sort(-ErrorLog.occurred_at).limit(limit).to_list()  # noqa: E712
 
 
-async def resolve_error(error_id: str, resolved_by: int) -> Optional[ErrorLog]:
+async def resolve_error(error_id: str, resolved_by: int) -> ErrorLog | None:
     """Marque une erreur comme résolue."""
     from beanie import PydanticObjectId
     try:
         err = await ErrorLog.get(PydanticObjectId(error_id))
         if err:
             err.is_resolved = True
-            err.resolved_at = datetime.now(timezone.utc)
+            err.resolved_at = datetime.now(UTC)
             err.resolved_by_telegram_id = resolved_by
             await err.save()
             return err
@@ -133,18 +133,18 @@ async def log_api_call(
     endpoint: str,
     method: str,
     status_code: int,
-    user_id: Optional[int] = None,
-    ip_address: Optional[str] = None,
+    user_id: int | None = None,
+    ip_address: str | None = None,
 ) -> None:
     """
     Enregistre un appel API (peut être appelé par un Middleware).
     NB: Si le volume est énorme, utiliser Redis ou un flux asynchrone type Kafka.
     Ici on le met dans MongoDB pour le Dashboard Développeur.
     """
-    # Éviter de logger les appels de healthcheck pour ne pas polluer 
+    # Éviter de logger les appels de healthcheck pour ne pas polluer
     if "health" in endpoint:
         return
-        
+
     api_log = ApiLog(
         endpoint=endpoint,
         method=method,
@@ -160,7 +160,7 @@ async def get_api_logs_stats() -> dict[str, Any]:
     total = await ApiLog.find().count()
     errors_500 = await ApiLog.find(ApiLog.status_code >= 500).count()
     errors_400 = await ApiLog.find(ApiLog.status_code >= 400, ApiLog.status_code < 500).count()
-    
+
     return {
         "total_calls": total,
         "server_errors": errors_500,

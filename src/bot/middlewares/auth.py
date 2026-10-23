@@ -4,7 +4,7 @@ Vérifie les rôles, gère les bans, et crée automatiquement les utilisateurs.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
@@ -65,7 +65,7 @@ class AuthMiddleware:
         # Cache dans user_data (évite un appel DB par message)
         cached = context.user_data.get("db_user")
         cache_time = context.user_data.get("db_user_cached_at", 0)
-        now_ts = datetime.now(timezone.utc).timestamp()
+        now_ts = datetime.now(UTC).timestamp()
 
         if cached and (now_ts - cache_time) < _USER_CACHE_TTL_SECONDS:
             # Met à jour les infos Telegram qui peuvent changer

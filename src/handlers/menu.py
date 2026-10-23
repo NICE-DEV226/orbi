@@ -7,7 +7,7 @@ Conforme au CdC §2 : Menu Principal accessible depuis n'importe quel état.
 import logging
 import os
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.error import BadRequest
 from telegram.ext import CallbackQueryHandler, ContextTypes
@@ -20,7 +20,6 @@ from src.bot.keyboards import (
     CB_MODULE_PROFILE,
     CB_MODULE_SHOP,
     CB_MODULE_SUPPORT,
-    main_menu_keyboard,
 )
 from src.core.i18n import t
 
@@ -33,7 +32,7 @@ LOGO_PATH = "logo.png"
 async def send_or_edit_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str, keyboard: InlineKeyboardMarkup) -> None:
     """Helper pour envoyer le menu avec le logo en image."""
     query = update.callback_query
-    
+
     if query:
         has_photo = bool(query.message.photo)
         if has_photo:
@@ -75,12 +74,12 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if update.callback_query:
         await update.callback_query.answer()
 
-    if not context.user_data: 
+    if not context.user_data:
         return
     lang = context.user_data.get("lang", "fr")
     # Pour s'assurer qu'il prend bien le titre
     text = t("menu.main.title", lang)
-    
+
     # Ajouter un bouton pour ajouter le bot à un groupe
     keyboard = InlineKeyboardMarkup([
         [
@@ -110,12 +109,12 @@ async def show_support_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     """Affiche le sous-menu Support avec le logo."""
     if update.callback_query:
         await update.callback_query.answer()
-    if not context.user_data: 
+    if not context.user_data:
         return
     lang = context.user_data.get("lang", "fr")
 
     text = f"⚙️ <b>{t('support.menu_title', lang)}</b>"
-    
+
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton(t("support.new_ticket", lang), callback_data="support:new_ticket"),
@@ -131,12 +130,12 @@ async def show_shop_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     """Affiche le sous-menu Boutique avec le logo."""
     if update.callback_query:
         await update.callback_query.answer()
-    if not context.user_data: 
+    if not context.user_data:
         return
     lang = context.user_data.get("lang", "fr")
 
     text = f"🛒 <b>{t('commerce.menu_title', lang)}</b>"
-    
+
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton(t("commerce.catalog", lang), callback_data="shop:catalog"),
@@ -156,12 +155,12 @@ async def show_community_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     """Affiche le sous-menu Communauté avec le logo."""
     if update.callback_query:
         await update.callback_query.answer()
-    if not context.user_data: 
+    if not context.user_data:
         return
     lang = context.user_data.get("lang", "fr")
 
     text = f"👥 <b>{t('community.menu_title', lang)}</b>"
-    
+
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton(t("community.polls", lang), callback_data="community:polls"),
@@ -178,12 +177,12 @@ async def show_productivity_menu(update: Update, context: ContextTypes.DEFAULT_T
     """Affiche le sous-menu Productivité avec le logo."""
     if update.callback_query:
         await update.callback_query.answer()
-    if not context.user_data: 
+    if not context.user_data:
         return
     lang = context.user_data.get("lang", "fr")
 
     text = f"🧠 <b>{t('productivity.menu_title', lang)}</b>"
-    
+
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton(t("productivity.new_task", lang), callback_data="prod:new_task"),
@@ -207,12 +206,12 @@ async def show_developers_menu(update: Update, context: ContextTypes.DEFAULT_TYP
     """Affiche le sous-menu Développeurs avec le logo."""
     if update.callback_query:
         await update.callback_query.answer()
-    if not context.user_data: 
+    if not context.user_data:
         return
     lang = context.user_data.get("lang", "fr")
 
     text = f"🛠️ <b>{t('developers.menu_title', lang)}</b>\n\n<i>Espace administrateur / Développeur</i>"
-    
+
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton(t("developers.api_keys", lang), callback_data="dev:api_keys"),
@@ -240,22 +239,22 @@ def register_menu_handlers(application) -> None:
     application.add_handler(CallbackQueryHandler(show_community_menu, pattern=f"^{CB_MODULE_COMMUNITY}$"))
     application.add_handler(CallbackQueryHandler(show_productivity_menu, pattern=f"^{CB_MODULE_PRODUCTIVITY}$"))
     application.add_handler(CallbackQueryHandler(show_developers_menu, pattern=f"^{CB_MODULE_DEVELOPERS}$"))
-    
+
     # Callbacks pour ajouter le bot à des groupes/canaux
-    from src.handlers.group_utils import add_to_group_command, add_to_channel_command
-    
+    from src.handlers.group_utils import add_to_channel_command, add_to_group_command
+
     application.add_handler(CallbackQueryHandler(
-        lambda u, c: add_to_group_command(u, c), 
+        lambda u, c: add_to_group_command(u, c),
         pattern=r"^group:add$"
     ))
     application.add_handler(CallbackQueryHandler(
-        lambda u, c: add_to_channel_command(u, c), 
+        lambda u, c: add_to_channel_command(u, c),
         pattern=r"^channel:add$"
     ))
-    
+
     # Callbacks pour les fonctionnalités avancées
     # Admin - déjà géré par register_admin_handlers()
     # Groupes - déjà géré par register_group_handlers()
     # Développeurs - déjà géré par register_real_dev_handlers()
-    
+
     logger.info("Handlers menu enregistrés")

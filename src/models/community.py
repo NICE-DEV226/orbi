@@ -3,13 +3,11 @@ Orbi — Modèles Communauté (Beanie Documents).
 Sondages, karma et modération.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Optional
 
 from beanie import Document, Indexed
 from pydantic import Field
-
 
 # ─────────────────────────────────────
 # Sondage
@@ -20,7 +18,7 @@ class Poll(Document):
 
     # ── Identité ──
     group_chat_id: Indexed(int)  # type: ignore[valid-type]
-    message_id: Optional[int] = None  # ID du message Telegram contenant le sondage
+    message_id: int | None = None  # ID du message Telegram contenant le sondage
     creator_telegram_id: int
 
     # ── Contenu ──
@@ -32,11 +30,11 @@ class Poll(Document):
     # ── Configuration ──
     is_anonymous: bool = False
     is_closed: bool = False
-    close_at: Optional[datetime] = None  # Fermeture automatique
+    close_at: datetime | None = None  # Fermeture automatique
 
     # ── Timestamps ──
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    closed_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    closed_at: datetime | None = None
 
     class Settings:
         name = "polls"
@@ -65,8 +63,8 @@ class KarmaLog(Document):
 
     giver_telegram_id: Indexed(int)  # type: ignore[valid-type]
     receiver_telegram_id: Indexed(int)  # type: ignore[valid-type]
-    group_chat_id: Optional[int] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    group_chat_id: int | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "karma_logs"
@@ -93,24 +91,24 @@ class ModerationLog(Document):
 
     # ── Cible ──
     target_telegram_id: Indexed(int)  # type: ignore[valid-type]
-    target_username: Optional[str] = None
+    target_username: str | None = None
 
     # ── Action ──
     action: ModerationAction
-    reason: Optional[str] = None
-    duration_seconds: Optional[int] = None  # Pour mute
+    reason: str | None = None
+    duration_seconds: int | None = None  # Pour mute
 
     # ── Contexte ──
-    group_chat_id: Optional[int] = None
-    admin_telegram_id: Optional[int] = None  # None si automatique
+    group_chat_id: int | None = None
+    admin_telegram_id: int | None = None  # None si automatique
     is_automatic: bool = False
 
     # ── Expiration ──
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
     is_expired: bool = False
 
     # ── Timestamps ──
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "moderation_logs"
@@ -134,18 +132,18 @@ class GroupConfig(Document):
     max_mentions_per_message: int = 5
 
     # ── Bienvenue ──
-    welcome_message_template: Optional[str] = None
+    welcome_message_template: str | None = None
     # Variables : {name}, {group}, {rules_link}, {member_count}
 
     # ── Règles ──
-    rules_text: Optional[str] = None  # Max 2000 chars
+    rules_text: str | None = None  # Max 2000 chars
 
     # ── Karma ──
     karma_button_enabled: bool = False
 
     # ── Timestamps ──
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "group_configs"

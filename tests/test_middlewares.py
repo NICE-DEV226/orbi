@@ -1,343 +1,188 @@
 """
 Tests pour les middlewares du bot Telegram.
-Test l'authentification, i18n, rate limiting et logging.
+Auth, i18n, rate limiting et logging — avec MongoDB et Redis simulés (voir conftest).
 """
 
-import pytest
-import asyncio
+import logging
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, timezone
 
-from telegram import Update, User
+import pytest
+from telegram import Update
+from telegram import User as TgUser
 from telegram.ext import ContextTypes
 
 from src.bot.middlewares.auth import AuthMiddleware
 from src.bot.middlewares.i18n import I18nMiddleware
-from src.bot.middlewares.rate_limit import RateLimitMiddleware
 from src.bot.middlewares.logging_mw import LoggingMiddleware
-from src.models.user import User as UserModel, UserRole
+from src.bot.middlewares.rate_limit import RateLimitMiddleware
+from src.models.user import User as UserModel
+from src.models.user import UserRole
+
+TG_ID = 123456789
 
 
 @pytest.fixture
 def mock_update():
-    """Mock pour un Update Telegram."""
+    """Update Telegram minimal : un message texte d'un utilisateur."""
     update = MagicMock(spec=Update)
-    user = MagicMock(spec=User)
-    user.id = 123456789
+    user = MagicMock(spec=TgUser)
+    user.id = TG_ID
     user.username = "test_user"
     user.first_name = "Test"
+    user.last_name = None
     user.language_code = "fr"
     update.effective_user = user
+    update.callback_query = None
+    update.my_chat_member = None
     update.message = MagicMock()
     update.message.text = "test message"
-    update.message.date = datetime.now(timezone.utc)
+    update.message.date = datetime.now(UTC)
+    update.effective_message = update.message
+    update.effective_message.reply_text = AsyncMock()
     return update
 
 
 @pytest.fixture
 def mock_context():
-    """Mock pour un Context Telegram."""
-    context = MagicMock(spec=ContextTypes)
+    context = MagicMock(spec=ContextTypes.DEFAULT_TYPE)
     context.user_data = {}
     context.bot_data = {}
     return context
 
 
+async def _make_user(**kwargs) -> UserModel:
+    data = {"telegram_id": TG_ID, "username": "test_user", "first_name": "Test", "language": "fr"}
+    user = UserModel(**{**data, **kwargs})
+    await user.insert()
+    return user
+
+
 class TestAuthMiddleware:
-    """Tests pour le middleware d'authentification."""
-    
-    @pytest.mark.asyncio
-    async def test_auth_new_user_creation(self, mock_update, mock_context):
-        """Test la création d'un nouvel utilisateur."""
+    async def test_new_user_is_created(self, mock_update, mock_context):
+        assert await AuthMiddleware()(mock_update, mock_context) is True
+
+        stored = await UserModel.find_one(UserModel.telegram_id == TG_ID)
+        assert stored is not None
+        assert stored.language is None  # la langue est choisie explicitement plus tard
+        assert mock_context.user_data["db_user"].telegram_id == TG_ID
+
+    async def test_existing_user_is_loaded_not_duplicated(self, mock_update, mock_context):
+        await _make_user(role=UserRole.ADMIN)
+
+        assert await AuthMiddleware()(mock_update, mock_context) is True
+
+        assert mock_context.user_data["db_user"].role == UserRole.ADMIN
+        assert await UserModel.find(UserModel.telegram_id == TG_ID).count() == 1
+
+    async def test_banned_user_is_blocked_and_notified(self, mock_update, mock_context):
+        await _make_user(is_banned=True, ban_reason="Spam")
         middleware = AuthMiddleware()
-        
-        with patch('src.models.user.User.find_one') as mock_find, \
-             patch('src.models.user.User.insert') as mock_insert:
-            
-            # L'utilisateur n'existe pas encore
-            mock_find.return_value = None
-            
-            # Créer l'utilisateur qui sera inséré
-            new_user = UserModel(
-                telegram_id=123456789,
-                username="test_user",
-                first_name="Test",
-                language="fr"
-            )
-            mock_insert.return_value = new_user
-            
-            result = await middleware(mock_update, mock_context)
-            
-            # Vérifier que l'utilisateur a été créé
-            assert result is True
-            assert "db_user" in mock_context.user_data
-            mock_find.assert_called_once()
-            mock_insert.assert_called_once()
-    
-    @pytest.mark.asyncio
-    async def test_auth_existing_user(self, mock_update, mock_context):
-        """Test le chargement d'un utilisateur existant."""
-        middleware = AuthMiddleware()
-        
-        existing_user = UserModel(
-            telegram_id=123456789,
-            username="test_user",
-            first_name="Test",
-            language="fr",
-            role=UserRole.USER
-        )
-        
-        with patch('src.models.user.User.find_one') as mock_find:
-            mock_find.return_value = existing_user
-            
-            result = await middleware(mock_update, mock_context)
-            
-            assert result is True
-            assert mock_context.user_data["db_user"] == existing_user
-            mock_find.assert_called_once()
-    
-    @pytest.mark.asyncio
-    async def test_auth_banned_user(self, mock_update, mock_context):
-        """Test le blocage d'un utilisateur banni."""
-        middleware = AuthMiddleware()
-        
-        banned_user = UserModel(
-            telegram_id=123456789,
-            username="test_user",
-            first_name="Test",
-            language="fr",
-            is_banned=True,
-            ban_reason="Spam"
-        )
-        
-        with patch('src.models.user.User.find_one') as mock_find, \
-             patch.object(middleware, '_send_ban_message') as mock_send:
-            
-            mock_find.return_value = banned_user
-            
-            result = await middleware(mock_update, mock_context)
-            
-            assert result is False  # L'utilisateur est bloqué
-            mock_send.assert_called_once()
-    
-    @pytest.mark.asyncio
-    async def test_auth_no_user(self, mock_context):
-        """Test le cas où il n'y a pas d'utilisateur (update système)."""
-        middleware = AuthMiddleware()
+
+        with patch.object(middleware, "_send_ban_message", new=AsyncMock()) as send:
+            assert await middleware(mock_update, mock_context) is False
+
+        send.assert_awaited_once()
+
+    async def test_update_without_user_is_allowed(self, mock_context):
         update = MagicMock(spec=Update)
         update.effective_user = None
-        
-        result = await middleware(update, mock_context)
-        
-        assert result is True  # Les updates système sont autorisés
+
+        assert await AuthMiddleware()(update, mock_context) is True
 
 
 class TestI18nMiddleware:
-    """Tests pour le middleware d'internationalisation."""
-    
-    @pytest.mark.asyncio
-    async def test_i18n_language_detection(self, mock_update, mock_context):
-        """Test la détection de langue."""
-        middleware = I18nMiddleware()
-        
-        # Simuler un utilisateur avec une langue en base
-        db_user = UserModel(
-            telegram_id=123456789,
-            username="test_user",
-            first_name="Test",
-            language="en"
-        )
-        mock_context.user_data["db_user"] = db_user
-        
-        with patch('src.core.i18n.t') as mock_translate:
-            mock_translate.return_value = "Translated text"
-            
-            await middleware(mock_update, mock_context)
-            
-            # Vérifier que la langue de l'utilisateur est utilisée
-            assert mock_context.user_data.get("language") == "en"
-    
-    @pytest.mark.asyncio
-    async def test_i18n_fallback_language(self, mock_update, mock_context):
-        """Test le fallback vers la langue par défaut."""
-        middleware = I18nMiddleware()
-        
-        # Utilisateur sans langue spécifiée
-        db_user = UserModel(
-            telegram_id=123456789,
-            username="test_user",
-            first_name="Test"
-        )
-        mock_context.user_data["db_user"] = db_user
-        
-        await middleware(mock_update, mock_context)
-        
-        # Devrait utiliser la langue par défaut (fr)
-        assert mock_context.user_data.get("language") == "fr"
-    
-    @pytest.mark.asyncio
-    async def test_i18n_translate_function(self, mock_update, mock_context):
-        """Test que la fonction t() est disponible dans le contexte."""
-        middleware = I18nMiddleware()
-        
-        db_user = UserModel(
-            telegram_id=123456789,
-            username="test_user",
-            first_name="Test",
-            language="fr"
-        )
-        mock_context.user_data["db_user"] = db_user
-        
-        with patch('src.core.i18n.t') as mock_translate:
-            mock_translate.return_value = "Texte traduit"
-            
-            await middleware(mock_update, mock_context)
-            
-            # La fonction t() devrait être disponible
-            assert "t" in mock_context.user_data
+    async def test_uses_language_of_db_user(self, mock_update, mock_context):
+        mock_context.user_data["db_user"] = UserModel(telegram_id=TG_ID, first_name="T", language="en")
+
+        await I18nMiddleware()(mock_update, mock_context)
+
+        assert mock_context.user_data["lang"] == "en"
+
+    async def test_falls_back_to_french_without_language(self, mock_update, mock_context):
+        mock_context.user_data["db_user"] = UserModel(telegram_id=TG_ID, first_name="T")
+
+        await I18nMiddleware()(mock_update, mock_context)
+
+        assert mock_context.user_data["lang"] == "fr"
+
+    async def test_translate_function_is_injected(self, mock_update, mock_context):
+        mock_context.user_data["db_user"] = UserModel(telegram_id=TG_ID, first_name="T", language="fr")
+
+        with patch("src.bot.middlewares.i18n.translate", return_value="Texte traduit") as translate:
+            await I18nMiddleware()(mock_update, mock_context)
+            assert mock_context.user_data["t"]("some.key") == "Texte traduit"
+
+        translate.assert_called_once_with("some.key", "fr")
+
+    async def test_update_without_user_is_ignored(self, mock_context):
+        update = MagicMock(spec=Update)
+        update.effective_user = None
+
+        await I18nMiddleware()(update, mock_context)
+
+        assert "lang" not in mock_context.user_data
 
 
 class TestRateLimitMiddleware:
-    """Tests pour le middleware de rate limiting."""
-    
-    @pytest.mark.asyncio
-    async def test_rate_limit_allowed(self, mock_update, mock_context):
-        """Test le cas où l'utilisateur est autorisé."""
-        middleware = RateLimitMiddleware()
-        
-        with patch('src.core.redis.cache_get') as mock_get, \
-             patch('src.core.redis.cache_set') as mock_set:
-            
-            # Pas de clé en cache = première requête
-            mock_get.return_value = None
-            
-            result = await middleware(mock_update, mock_context)
-            
-            assert result is True
-            mock_get.assert_called_once()
-            mock_set.assert_called_once()
-    
-    @pytest.mark.asyncio
-    async def test_rate_limit_blocked(self, mock_update, mock_context):
-        """Test le cas où l'utilisateur est rate limited."""
-        middleware = RateLimitMiddleware()
-        
-        with patch('src.core.redis.cache_get') as mock_get:
-            # L'utilisateur a déjà fait trop de requêtes
-            mock_get.return_value = "blocked"
-            
-            result = await middleware(mock_update, mock_context)
-            
-            assert result is False
-            mock_get.assert_called_once()
-    
-    @pytest.mark.asyncio
-    async def test_rate_limit_increment(self, mock_update, mock_context):
-        """Test l'incrémentation du compteur de requêtes."""
-        middleware = RateLimitMiddleware()
-        
-        with patch('src.core.redis.cache_get') as mock_get, \
-             patch('src.core.redis.cache_set') as mock_set:
-            
-            # L'utilisateur a fait quelques requêtes mais n'est pas bloqué
-            mock_get.return_value = "5"  # Moins que la limite
-            
-            result = await middleware(mock_update, mock_context)
-            
-            assert result is True
-            mock_get.assert_called_once()
-            mock_set.assert_called_once()
+    async def test_requests_under_the_limit_are_allowed(self, mock_update, mock_context):
+        middleware = RateLimitMiddleware(max_requests=3, window_seconds=60)
+
+        for _ in range(3):
+            assert await middleware(mock_update, mock_context) is True
+
+    async def test_request_over_the_limit_is_blocked_and_user_notified(self, mock_update, mock_context):
+        middleware = RateLimitMiddleware(max_requests=3, window_seconds=60)
+        for _ in range(3):
+            await middleware(mock_update, mock_context)
+
+        assert await middleware(mock_update, mock_context) is False
+
+        mock_update.effective_message.reply_text.assert_awaited_once()
+
+    async def test_limit_is_per_user(self, mock_update, mock_context):
+        middleware = RateLimitMiddleware(max_requests=1, window_seconds=60)
+        await middleware(mock_update, mock_context)
+        assert await middleware(mock_update, mock_context) is False
+
+        mock_update.effective_user.id = TG_ID + 1
+        assert await middleware(mock_update, mock_context) is True
+
+    async def test_redis_failure_is_fail_open(self, mock_update, mock_context):
+        middleware = RateLimitMiddleware(max_requests=1, window_seconds=60)
+
+        with patch("src.bot.middlewares.rate_limit.get_redis", side_effect=RuntimeError("redis down")):
+            assert await middleware(mock_update, mock_context) is True
 
 
 class TestLoggingMiddleware:
-    """Tests pour le middleware de logging."""
-    
-    @pytest.mark.asyncio
-    async def test_logging_basic(self, mock_update, mock_context):
-        """Test le logging de base."""
-        middleware = LoggingMiddleware()
-        
-        with patch('logging.getLogger') as mock_logger:
-            logger_instance = MagicMock()
-            mock_logger.return_value = logger_instance
-            
-            await middleware(mock_update, mock_context)
-            
-            # Vérifier que le log a été écrit
-            logger_instance.info.assert_called()
-            
-            # Vérifier les arguments du log
-            call_args = logger_instance.info.call_args
-            assert "user_id" in str(call_args)
-            assert "123456789" in str(call_args)
+    async def test_logs_user_and_message(self, mock_update, mock_context, caplog):
+        with caplog.at_level(logging.INFO):
+            await LoggingMiddleware()(mock_update, mock_context)
+
+        assert str(TG_ID) in caplog.text
+        assert "test message" in caplog.text
+        assert "_request_start" in mock_context.user_data
 
 
-class TestMiddlewareIntegration:
-    """Tests d'intégration des middlewares."""
-    
-    @pytest.mark.asyncio
-    async def test_middleware_chain_success(self, mock_update, mock_context):
-        """Test la chaîne complète des middlewares avec succès."""
-        auth_mw = AuthMiddleware()
-        i18n_mw = I18nMiddleware()
-        rate_limit_mw = RateLimitMiddleware()
-        logging_mw = LoggingMiddleware()
-        
-        # Mock pour que tout se passe bien
-        user = UserModel(
-            telegram_id=123456789,
-            username="test_user",
-            first_name="Test",
-            language="fr"
-        )
-        
-        with patch('src.models.user.User.find_one', return_value=user), \
-             patch('src.core.redis.cache_get', return_value=None), \
-             patch('src.core.redis.cache_set'), \
-             patch('logging.getLogger'):
-            
-            # Exécuter la chaîne de middlewares
-            await logging_mw(mock_update, mock_context)
-            auth_result = await auth_mw(mock_update, mock_context)
-            assert auth_result is True
-            
-            await i18n_mw(mock_update, mock_context)
-            rate_result = await rate_limit_mw(mock_update, mock_context)
-            assert rate_result is True
-            
-            # Vérifier que le contexte est bien peuplé
-            assert "db_user" in mock_context.user_data
-            assert "language" in mock_context.user_data
-            assert "t" in mock_context.user_data
-    
-    @pytest.mark.asyncio
-    async def test_middleware_chain_auth_failure(self, mock_update, mock_context):
-        """Test la chaîne avec échec d'authentification."""
-        auth_mw = AuthMiddleware()
-        logging_mw = LoggingMiddleware()
-        
-        # Utilisateur banni
-        banned_user = UserModel(
-            telegram_id=123456789,
-            username="test_user",
-            first_name="Test",
-            is_banned=True,
-            ban_reason="Spam"
-        )
-        
-        with patch('src.models.user.User.find_one', return_value=banned_user), \
-             patch.object(auth_mw, '_send_ban_message'), \
-             patch('logging.getLogger'):
-            
-            await logging_mw(mock_update, mock_context)
-            auth_result = await auth_mw(mock_update, mock_context)
-            
-            # L'authentification échoue
-            assert auth_result is False
-            
-            # Les autres middlewares ne devraient pas s'exécuter
-            assert "language" not in mock_context.user_data
+class TestMiddlewareChain:
+    async def test_chain_success_populates_context(self, mock_update, mock_context):
+        await _make_user()
 
+        await LoggingMiddleware()(mock_update, mock_context)
+        assert await AuthMiddleware()(mock_update, mock_context) is True
+        await I18nMiddleware()(mock_update, mock_context)
+        assert await RateLimitMiddleware()(mock_update, mock_context) is True
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+        assert "db_user" in mock_context.user_data
+        assert mock_context.user_data["lang"] == "fr"
+        assert "t" in mock_context.user_data
+
+    async def test_banned_user_stops_the_chain(self, mock_update, mock_context):
+        await _make_user(is_banned=True, ban_reason="Spam")
+        auth = AuthMiddleware()
+
+        with patch.object(auth, "_send_ban_message", new=AsyncMock()):
+            assert await auth(mock_update, mock_context) is False
+
+        assert "lang" not in mock_context.user_data

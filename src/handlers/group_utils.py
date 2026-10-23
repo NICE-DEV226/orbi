@@ -4,10 +4,8 @@ Commandes utilitaires pour ajouter le bot à des groupes et canaux.
 
 import logging
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CommandHandler, ContextTypes
-
-from src.core.i18n import t
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import CallbackQueryHandler, CommandHandler, ContextTypes
 
 logger = logging.getLogger("orbi.handlers.group_utils")
 
@@ -16,7 +14,7 @@ async def add_to_group_command(update: Update, context: ContextTypes.DEFAULT_TYP
     """Explique comment ajouter le bot à un groupe."""
     if not update.message:
         return
-    
+
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("📖 Guide Telegram", url="https://core.telegram.org/bots#adding-a-bot-to-a-group"),
@@ -30,7 +28,7 @@ async def add_to_group_command(update: Update, context: ContextTypes.DEFAULT_TYP
             InlineKeyboardButton("❌ Retour", callback_data="nav:home"),
         ]
     ])
-    
+
     text = """
 👥 **Ajouter Orbi à un groupe**
 
@@ -62,7 +60,7 @@ async def add_to_group_command(update: Update, context: ContextTypes.DEFAULT_TYP
 • `/admin` - Menu admin
 • `/stats` - Statistiques du groupe
     """
-    
+
     await update.message.reply_text(text, reply_markup=keyboard, parse_mode="HTML")
 
 
@@ -70,7 +68,7 @@ async def add_to_channel_command(update: Update, context: ContextTypes.DEFAULT_T
     """Explique comment ajouter le bot à un canal."""
     if not update.message:
         return
-    
+
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("📖 Guide Canal", url="https://core.telegram.org/bots#adding-a-bot-to-a-channel"),
@@ -81,7 +79,7 @@ async def add_to_channel_command(update: Update, context: ContextTypes.DEFAULT_T
             InlineKeyboardButton("❌ Retour", callback_data="nav:home"),
         ]
     ])
-    
+
     text = """
 📢 **Ajouter Orbi à un canal**
 
@@ -113,7 +111,7 @@ async def add_to_channel_command(update: Update, context: ContextTypes.DEFAULT_T
 • `/post` - Publier un message
 • `/schedule` - Programmer une publication
     """
-    
+
     await update.message.reply_text(text, reply_markup=keyboard, parse_mode="HTML")
 
 
@@ -121,7 +119,7 @@ async def group_config_callback(update: Update, context: ContextTypes.DEFAULT_TY
     """Callback pour la configuration de groupe."""
     if update.callback_query:
         await update.callback_query.answer()
-    
+
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("👋 Bienvenue", callback_data="group:welcome"),
@@ -135,7 +133,7 @@ async def group_config_callback(update: Update, context: ContextTypes.DEFAULT_TY
             InlineKeyboardButton("❌ Retour", callback_data="group:main"),
         ]
     ])
-    
+
     text = """
 🔧 **Configuration du Groupe**
 
@@ -164,7 +162,7 @@ async def group_config_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
 **Configurez chaque option ci-dessous !**
     """
-    
+
     if update.callback_query:
         await update.callback_query.edit_message_text(text, reply_markup=keyboard, parse_mode="HTML")
     else:
@@ -173,31 +171,31 @@ async def group_config_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
 def register_group_utils_handlers(application) -> None:
     """Enregistre les handlers utilitaires pour groupes."""
-    
+
     # Commandes
     application.add_handler(CommandHandler("addgroup", add_to_group_command))
     application.add_handler(CommandHandler("addchannel", add_to_channel_command))
-    
+
     # Callbacks
     application.add_handler(CallbackQueryHandler(group_config_callback, pattern=r"^group:config$"))
-    
+
     # Handlers temporaires pour les callbacks
     application.add_handler(CallbackQueryHandler(
         lambda u, c: c.bot.send_message(
             chat_id=u.effective_chat.id,
             text="👋 **Messages de bienvenue**\n\n⚙️ Fonctionnalité disponible une fois le bot ajouté au groupe",
             parse_mode="HTML"
-        ), 
+        ),
         pattern=r"^group:(welcome|rules|moderation|stats|main)$"
     ))
-    
+
     application.add_handler(CallbackQueryHandler(
         lambda u, c: c.bot.send_message(
             chat_id=u.effective_chat.id,
             text="📢 **Configuration du canal**\n\n⚙️ Fonctionnalité disponible une fois le bot ajouté au canal",
             parse_mode="HTML"
-        ), 
+        ),
         pattern=r"^channel:(config|stats)$"
     ))
-    
+
     logger.info("Handlers utilitaires de groupe enregistrés")

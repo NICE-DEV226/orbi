@@ -6,7 +6,6 @@ Conforme au CdC §4 : Panier géré par Redis.
 
 import json
 import logging
-from typing import Optional
 
 from src.core.redis import get_redis
 

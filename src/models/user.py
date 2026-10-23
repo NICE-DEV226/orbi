@@ -3,9 +3,8 @@ Orbi — Modèle User (Beanie Document).
 Représente un utilisateur Telegram dans la base MongoDB.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Optional
 
 from beanie import Document, Indexed
 from pydantic import Field
@@ -33,20 +32,20 @@ class User(Document):
 
     # ── Identité Telegram ──
     telegram_id: Indexed(int, unique=True)  # type: ignore[valid-type]
-    username: Optional[str] = None
+    username: str | None = None
     first_name: str = ""
-    last_name: Optional[str] = None
+    last_name: str | None = None
 
     # ── Préférences ──
-    language: str = Field(default="fr", pattern=r"^(fr|en|ar)$")
+    language: str | None = Field(default=None, pattern=r"^(fr|en|ar)$")  # None = pas encore choisie (onboarding)
     timezone: str = "UTC"
     role: UserRole = UserRole.USER
 
     # ── État ──
     is_banned: bool = False
-    ban_reason: Optional[str] = None
-    banned_at: Optional[datetime] = None
-    banned_by: Optional[int] = None  # telegram_id de l'admin qui a banni
+    ban_reason: str | None = None
+    banned_at: datetime | None = None
+    banned_by: int | None = None  # telegram_id de l'admin qui a banni
 
     # ── Notifications ──
     enabled_notifications: list[str] = Field(
@@ -66,9 +65,9 @@ class User(Document):
     karma_points: int = 0
 
     # ── Timestamps ──
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    last_active_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    last_active_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "users"
@@ -91,6 +90,6 @@ class User(Document):
 
     def touch(self) -> None:
         """Met à jour les timestamps d'activité."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         self.updated_at = now
         self.last_active_at = now

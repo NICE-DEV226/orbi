@@ -5,6 +5,7 @@ Permet de générer un lien auto-connecté valable 5 minutes.
 
 import logging
 import uuid
+
 from telegram import Update
 from telegram.ext import CommandHandler, ContextTypes
 
@@ -17,7 +18,7 @@ logger = logging.getLogger("orbi.handlers.admin")
 async def generate_magic_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Génère un lien unique pour accéder au Dashboard d'Administration Web."""
     user = context.user_data.get("db_user")
-    
+
     if not user or user.role not in ["admin", "superadmin"]:
         await update.message.reply_text("⛔ Rôle administrateur requis.")
         return
@@ -25,10 +26,10 @@ async def generate_magic_link(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Génération Token
     token = str(uuid.uuid4())
     redis = get_redis()
-    
+
     # 300 secondes = 5 minutes
     await redis.setex(f"{MAGIC_LINK_PREFIX}{token}", 300, str(user.telegram_id))
-    
+
     # Lien de base
     base_url = get_settings().BASE_URL
     magic_url = f"{base_url}/admin/auth/{token}"
