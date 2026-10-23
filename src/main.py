@@ -157,6 +157,7 @@ def create_app() -> FastAPI:
 
     # ── Enregistrement du Dashboard Web (Phase 10) ──
     from src.web.auth import router as web_auth_router
+    from src.web.dev import router as web_dev_router
     from src.web.router import router as web_dashboard_router
 
     # Montage optionnel de statiques si nécessaires un jour
@@ -164,6 +165,7 @@ def create_app() -> FastAPI:
 
     app.include_router(web_auth_router, prefix="/admin")
     app.include_router(web_dashboard_router)
+    app.include_router(web_dev_router)
 
     from fastapi import BackgroundTasks, HTTPException, Request
 
