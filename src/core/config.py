@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRATION_MINUTES: int = 60 * 24  # 24h
 
+    # ── Tokens API (Bearer) — vides = routes correspondantes refusées ──
+    ADMIN_API_TOKEN: str = ""
+    DEV_API_TOKEN: str = ""
+
+    # ── GitHub ──
+    GITHUB_WEBHOOK_SECRET: str = ""
+
     # ── Stripe ──
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""

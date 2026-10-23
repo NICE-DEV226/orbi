@@ -49,7 +49,7 @@ def event_loop():
 async def setup_test_environment():
     """Configuration automatique de l'environnement de test."""
     # Variables d'environnement pour les tests
-    os.environ["ENVIRONMENT"] = "test"
+    os.environ["ENVIRONMENT"] = "development"
     os.environ["MONGODB_DB"] = "orbi_test"
     os.environ["REDIS_URL"] = "redis://localhost:6379/15"  # DB différente pour les tests
     
