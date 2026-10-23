@@ -844,3 +844,360 @@ La gravité est une estimation initiale, pas une évaluation issue d'un audit te
 La direction retenue est de faire d'Orbi une plateforme de coordination extensible, qui se connecte en priorité aux agents et outils existants plutôt que de construire immédiatement les siens. Son cœur doit gérer les projets, intégrations, tâches, exécutions, permissions, approbations et événements. Le premier objectif de développement est un parcours complet et vérifiable, pilotable depuis un téléphone, avant d'étendre la plateforme aux équipes, au déploiement et aux autres modules.
 
 **Ce document est une spécification initiale, pas une preuve de faisabilité complète.** Les choix définitifs dépendront de l'audit du dépôt, de l'étude des fournisseurs et de la validation du besoin utilisateur.
+
+
+---
+
+## 21. Spécifications fonctionnelles détaillées — noyau MVP
+
+Cette section transforme les principes précédents en exigences testables. Les critères ci-dessous sont normatifs pour le MVP, sauf lorsqu'une capacité dépend explicitement du fournisseur. Une capacité indisponible doit être déclarée comme non supportée, jamais simulée.
+
+### F-01 — Authentification et session
+
+**But :** permettre à une personne de se connecter et d'accéder uniquement aux ressources autorisées.
+
+**Préconditions :** le fournisseur d'identité et le mécanisme de session sont sélectionnés dans un ADR.
+
+**Flux nominal :**
+1. L'utilisateur initie la connexion.
+2. Le serveur valide le retour du fournisseur ou les identifiants selon le mécanisme retenu.
+3. Le serveur établit une session avec une durée et une politique de renouvellement définies.
+4. L'interface obtient uniquement les informations de profil nécessaires.
+5. L'utilisateur peut consulter et révoquer les sessions ou connexions disponibles selon les capacités implémentées.
+
+**Cas d'erreur :** identité refusée, callback invalide, session expirée, compte désactivé, fournisseur indisponible, tentative de réutilisation d'un callback, absence de permission.
+
+**Règles :**
+- Les opérations d'autorisation sont vérifiées côté serveur.
+- Les cookies de session en production utilisent les attributs sécurisés appropriés.
+- Les tokens ne sont pas renvoyés dans les journaux ni exposés au JavaScript de l'interface sans nécessité validée.
+- Les routes de démonstration ne peuvent pas ouvrir une session privilégiée en production.
+
+**Critères d'acceptation :**
+- Un utilisateur non authentifié ne peut pas accéder aux ressources privées.
+- Un utilisateur ne peut pas accéder à un workspace dont il n'est pas membre.
+- Une session expirée est refusée côté serveur.
+- Les erreurs de connexion ne révèlent pas de secrets ni d'informations excessives sur l'existence d'un compte.
+- Les tests couvrent les scénarios autorisés et refusés.
+
+### F-02 — Workspaces, membres et permissions
+
+**But :** isoler les ressources personnelles et collaboratives.
+
+**Flux nominal :**
+1. Un utilisateur crée un workspace ou accepte une invitation.
+2. Le propriétaire invite un membre selon le mécanisme d'invitation retenu.
+3. Le membre accepte l'invitation.
+4. Un rôle lui est attribué.
+5. Toute action ultérieure est évaluée par rapport au workspace, au rôle, à la ressource et à la politique applicable.
+
+**Règles :**
+- Le rôle par défaut est le moins privilégié.
+- Un membre ne peut pas s'accorder lui-même des permissions.
+- Les changements de rôle, invitations, départs et transferts de propriété sont auditables.
+- Un membre retiré perd l'accès aux nouvelles opérations immédiatement ou dans un délai défini et testé.
+- Le comportement des tâches en cours après retrait d'un membre doit être explicite ; le retrait ne doit pas exposer leurs résultats à l'ancien membre.
+
+**Critères d'acceptation :**
+- Les tests inter-workspaces démontrent l'absence de lecture et d'écriture croisées.
+- Un rôle insuffisant ne peut pas gérer les intégrations ni approuver une action privilégiée.
+- Un propriétaire ne peut pas supprimer le dernier propriétaire sans transfert ou procédure de récupération documentée.
+- Les invitations expirées ou déjà consommées ne peuvent pas être réutilisées.
+
+### F-03 — Connexion et gestion d'une intégration
+
+**But :** permettre à un utilisateur autorisé de connecter un service externe à Orbi.
+
+**Flux nominal :**
+1. L'utilisateur choisit un fournisseur disponible.
+2. Orbi explique les permissions demandées et leur finalité.
+3. L'utilisateur autorise la connexion auprès du fournisseur.
+4. Orbi valide la réponse, associe la connexion à son propriétaire et stocke la référence secrète de façon sécurisée.
+5. Orbi vérifie la connexion si le fournisseur permet un test sûr.
+6. L'interface affiche le statut, les scopes accordés et les capacités disponibles.
+
+**États proposés :** `pending`, `connected`, `degraded`, `expired`, `revoked`, `error`.
+
+**Cas d'erreur :** autorisation refusée, scopes insuffisants, callback invalide, token expiré, fournisseur inaccessible, quota dépassé, compte externe supprimé.
+
+**Règles :**
+- Une intégration appartient à un utilisateur ou workspace explicite.
+- Les scopes demandés sont minimaux et documentés.
+- Les secrets ne sont jamais retournés lors d'une lecture normale de l'intégration.
+- La révocation désactive l'utilisation future de la connexion ; les exécutions déjà commencées suivent une politique documentée.
+- Un statut « connecté » ne prouve pas que toutes les capacités du fournisseur fonctionnent.
+
+**Critères d'acceptation :**
+- L'utilisateur peut connecter, consulter, diagnostiquer et révoquer une intégration.
+- Les erreurs de connexion sont affichées sans révéler le secret.
+- Une intégration révoquée ne peut plus lancer de nouvelle action.
+- Les scopes accordés sont consultables et comparables aux scopes requis par une action.
+
+### F-04 — Catalogue des connecteurs et capacités
+
+**But :** permettre à l'interface et au moteur de workflow de choisir uniquement des actions supportées.
+
+**Comportement :**
+- Chaque connecteur expose son identifiant, sa version, son état et ses capacités supportées.
+- Les capacités peuvent dépendre des scopes, de l'abonnement fournisseur ou de la configuration.
+- L'interface ne propose pas une action connue comme impossible dans la configuration actuelle.
+- Le serveur vérifie à nouveau la capacité au moment de l'exécution : l'affichage du bouton n'est pas une autorisation.
+
+**Critères d'acceptation :**
+- Une capacité absente retourne une erreur stable de type « non supportée ».
+- Une capacité qui a été retirée chez le fournisseur échoue proprement.
+- Un connecteur peut être désactivé sans rendre indisponibles les autres connecteurs.
+- Les tests de contrat vérifient le mapping des capacités et erreurs.
+
+### F-05 — Création et modification d'une tâche
+
+**But :** transformer une intention utilisateur en travail explicite et traçable.
+
+**Données minimales :** projet, titre ou description, auteur, contraintes, statut, date de création et références éventuelles vers intégration et exécutions.
+
+**Flux nominal :**
+1. L'utilisateur choisit un projet accessible.
+2. Il décrit le résultat recherché et, si nécessaire, les critères d'acceptation.
+3. Orbi valide l'accès au projet et les champs requis.
+4. Orbi crée la tâche avec un identifiant stable.
+5. L'utilisateur peut consulter son statut et son historique.
+
+**Règles :**
+- La tâche ne démarre pas une action privilégiée simplement parce qu'elle a été créée.
+- Une tâche doit conserver le contexte utile à l'audit sans copier inutilement tout le contenu du dépôt.
+- Les modifications importantes après lancement sont versionnées ou créent une nouvelle tentative clairement identifiée.
+- Une tâche supprimée ou archivée ne doit pas effacer les obligations d'audit.
+
+**Critères d'acceptation :**
+- Une tâche ne peut être créée dans un projet inaccessible.
+- Une requête répétée ne crée pas de doublon lorsqu'une clé d'idempotence valide est fournie.
+- L'utilisateur peut distinguer une tâche en attente, en cours, bloquée, réussie, échouée ou annulée.
+- Les champs et transitions invalides sont refusés avec une erreur documentée.
+
+### F-06 — Lancement et suivi d'une exécution
+
+**But :** exécuter une tâche via un connecteur sans bloquer l'interface.
+
+**Flux nominal :**
+1. Le serveur valide les permissions, la capacité et la politique de risque.
+2. Il crée une exécution persistée.
+3. Il déclenche le worker ou le connecteur.
+4. Il enregistre les transitions d'état et événements disponibles.
+5. Il normalise le résultat du fournisseur.
+6. Il expose le résultat et les références externes à l'utilisateur autorisé.
+
+**Règles :**
+- Le client reçoit un identifiant de suivi sans devoir maintenir une requête HTTP ouverte.
+- Les statuts sont persistés et récupérables après redémarrage.
+- Les retries sont limités et adaptés à la nature de l'opération.
+- Une réponse réseau perdue ne doit pas provoquer automatiquement une seconde opération non idempotente.
+- L'annulation est une demande, pas une garantie : l'interface indique si elle est acceptée, en attente ou non supportée.
+- Les sorties externes sont considérées comme des données non fiables.
+
+**Critères d'acceptation :**
+- Une exécution peut être suivie après rechargement de l'interface.
+- Les états impossibles sont rejetés ou réconciliés.
+- Un échec fournisseur est visible avec une catégorie d'erreur exploitable.
+- Un doublon de requête n'engendre pas deux opérations externes si l'idempotence est applicable.
+- Les tests simulent timeout, interruption worker, erreur fournisseur et réponse inconnue.
+
+### F-07 — Résultats, diff, tests et pull request
+
+**But :** donner à l'utilisateur les éléments nécessaires pour évaluer le travail réalisé.
+
+**Contenu affiché selon disponibilité :**
+- statut final et résumé ;
+- fournisseur et référence externe ;
+- branche et pull request ;
+- fichiers modifiés ou lien vers le diff ;
+- résultats des tests réellement exécutés ;
+- journaux et erreurs filtrés ;
+- éléments non vérifiés ou indisponibles.
+
+**Règles :**
+- Ne jamais afficher « tests réussis » si les tests n'ont pas été exécutés.
+- Séparer résumé généré, résultat machine et décision humaine.
+- Vérifier l'autorisation avant d'afficher un diff ou un journal privé.
+- Limiter et paginer les sorties volumineuses.
+- Masquer les secrets connus dans les journaux et les extraits.
+- Conserver les références externes même si le fournisseur ne permet pas de télécharger le diff.
+
+**Critères d'acceptation :**
+- L'utilisateur peut identifier ce qui a été modifié et ce qui a été testé.
+- Les tests absents sont explicitement signalés.
+- Un utilisateur sans accès au dépôt ne peut pas consulter les résultats privés.
+- Une sortie volumineuse ne bloque pas l'interface.
+
+### F-08 — Approbations et opérations à risque
+
+**But :** empêcher qu'une action sensible soit exécutée sans permission et validation requises.
+
+**Exemples :** merge, déploiement de production, modification de secrets, changement de permissions, migration destructive, suppression d'une ressource.
+
+**Flux nominal :**
+1. Une action est proposée avec son périmètre, sa cible et ses conséquences.
+2. Le moteur évalue la politique.
+3. Si une approbation est requise, l'exécution passe à `awaiting_approval`.
+4. Un approbateur autorisé consulte les détails et accepte ou refuse.
+5. Le serveur vérifie que l'action approuvée n'a pas changé.
+6. L'action est exécutée et le résultat est audité.
+
+**Règles :**
+- Le demandeur ne peut pas approuver sa propre action lorsque la politique exige une séparation des responsabilités.
+- Une approbation expire selon une durée documentée.
+- Une approbation ne vaut que pour une action et un périmètre précis.
+- Un changement matériel invalide l'approbation.
+- Une répétition du clic d'approbation ne déclenche pas plusieurs opérations.
+
+**Critères d'acceptation :**
+- Une action non approuvée est bloquée côté serveur.
+- Une approbation d'un utilisateur non autorisé est refusée.
+- L'approbation, le refus, l'expiration et l'invalidation sont auditables.
+- Les tests couvrent les courses entre approbation, changement d'action et lancement.
+
+### F-09 — Notifications et événements
+
+**But :** informer les utilisateurs des changements utiles sans rendre les notifications indispensables à la cohérence de l'état.
+
+**Événements initiaux possibles :** tâche créée, exécution commencée, exécution terminée, exécution échouée, approbation requise, approbation décidée, intégration expirée, action bloquée.
+
+**Règles :**
+- Les préférences utilisateur déterminent les notifications non critiques.
+- Les notifications sensibles ne divulguent pas de code privé ou de secret.
+- Une notification peut être retardée ou dupliquée ; la source de vérité reste l'état persisté.
+- Les notifications ont une référence vers la ressource accessible.
+- Les échecs de livraison sont mesurés et traités avec une politique bornée.
+
+**Critères d'acceptation :**
+- Une notification n'est envoyée qu'à un destinataire autorisé.
+- Une notification dupliquée ne crée pas une deuxième exécution.
+- L'utilisateur peut retrouver le statut réel depuis l'application après avoir manqué une notification.
+- Les échecs de livraison ne font pas échouer la tâche métier elle-même.
+
+### F-10 — Historique et audit
+
+**But :** permettre de comprendre qui a fait quoi, quand, sur quelle ressource et avec quel résultat.
+
+**Événements auditables minimum :** connexion ou révocation d'intégration, changement de membre ou rôle, création de tâche, lancement/annulation d'exécution, approbation/refus, changement de politique, opération de déploiement, modification d'une ressource privilégiée.
+
+**Champs conceptuels :** identifiant d'événement, acteur, action, ressource, workspace, timestamp, résultat, ID de corrélation et métadonnées minimales.
+
+**Règles :**
+- Un utilisateur ordinaire ne peut pas modifier ou supprimer l'audit.
+- Les journaux n'incluent pas de secrets ni de corps sensibles par défaut.
+- La rétention et les droits de consultation sont définis.
+- L'audit ne remplace pas les journaux techniques ; les deux ont des finalités distinctes.
+
+**Critères d'acceptation :**
+- Les actions privilégiées produisent une entrée d'audit.
+- Les entrées peuvent être filtrées selon les permissions.
+- Les tentatives refusées importantes sont traçables sans exposer de données sensibles.
+- Les tests vérifient que l'accès et la modification non autorisés sont impossibles.
+
+### F-11 — Quotas et coûts
+
+**But :** limiter les usages inattendus et rendre visibles les consommations connues.
+
+**Exigences :**
+- Limites configurables par utilisateur, workspace, connecteur et type d'opération lorsque la mesure est possible.
+- Vérification avant lancement et pendant l'exécution lorsque l'API du fournisseur le permet.
+- Affichage du coût comme exact, estimé ou indisponible ; ne pas présenter une estimation comme une facture réelle.
+- Politique de dépassement : bloquer, demander confirmation ou utiliser une limite de secours.
+- Limiter les boucles de retry et les tâches simultanées.
+- Enregistrer les consommations renvoyées par les fournisseurs avec leur provenance.
+
+**Critères d'acceptation :**
+- Une limite dépassée empêche le lancement selon la politique.
+- Un coût inconnu est affiché comme inconnu.
+- Les tâches interrompues ne sont pas relancées indéfiniment.
+- Les règles de quota sont testées en cas de concurrence.
+
+### F-12 — Administration et configuration
+
+**But :** permettre aux administrateurs autorisés de diagnostiquer la plateforme et gérer les paramètres opérationnels sans accéder arbitrairement au contenu privé.
+
+Fonctions candidates :
+- état des connecteurs et dépendances ;
+- erreurs récentes et files d'exécution ;
+- désactivation d'un connecteur ;
+- configuration des limites et politiques ;
+- état des workers ;
+- gestion des membres et rôles ;
+- historique des changements d'administration.
+
+**Règles :**
+- Les opérations d'administration sont séparées des opérations ordinaires.
+- Les actions destructives demandent une confirmation adaptée.
+- Les secrets ne sont pas révélés dans le dashboard.
+- Chaque modification de configuration est auditée.
+- Le dashboard ne doit pas exposer publiquement les métriques internes ou les journaux sensibles.
+
+**Critères d'acceptation :**
+- Un administrateur peut diagnostiquer une intégration en erreur sans lire son secret.
+- Les rôles non administrateurs ne peuvent pas changer les politiques globales.
+- Une désactivation de connecteur empêche les nouvelles exécutions et affiche l'effet sur celles en cours.
+- Les changements de configuration sont traçables et testés.
+
+### F-13 — Interface mobile et reprise de session
+
+**But :** rendre les opérations de supervision efficaces sur un écran réduit et une connexion parfois instable.
+
+**Exigences UX :**
+- Liste des tâches et exécutions avec filtres simples.
+- Vue de détail avec statut, progression disponible, résultat et action suivante.
+- Distinction visuelle entre action disponible, action en attente d'approbation et action impossible.
+- Confirmations explicites pour les opérations sensibles.
+- Gestion de chargement, état vide, erreur réseau, timeout et données potentiellement périmées.
+- Actualisation sans créer de nouvelles exécutions.
+- Liens vers les outils externes lorsque l'examen détaillé est mieux réalisé chez le fournisseur.
+- Accessibilité clavier et lecteur d'écran pour les parcours principaux.
+
+**Critères d'acceptation :**
+- Recharger la page ne relance pas une tâche.
+- Une perte de connexion ne perd pas l'identifiant de l'exécution.
+- Une donnée ancienne est distinguée d'un état confirmé à jour lorsque c'est détectable.
+- Le parcours de lancement, suivi et revue est testable sur un viewport mobile.
+
+### F-14 — Modules historiques Orbi
+
+Les modules historiques — support/tickets, commerce/paiements, communauté, productivité, API développeurs et dashboard Telegram — doivent faire l'objet d'une fiche d'audit indépendante.
+
+Pour chaque module, documenter :
+1. valeur utilisateur et profil concerné ;
+2. fonctions réellement implémentées ;
+3. état des tests et risques de sécurité ;
+4. dépendances et coût de maintenance ;
+5. cohérence avec la nouvelle vision ;
+6. décision : conserver, refactoriser, isoler, déprécier ou retirer ;
+7. critères d'acceptation avant remise en service.
+
+**Règle de décision :** ne pas conserver une fonctionnalité uniquement parce qu'elle existe déjà, et ne pas la supprimer uniquement parce que la vision a changé. La décision doit être justifiée par sa valeur, sa qualité et son coût.
+
+---
+
+## 22. Modèle de fiche obligatoire pour toute nouvelle fonctionnalité
+
+Toute fonctionnalité ajoutée après cette version doit être spécifiée à l'aide du modèle suivant avant l'implémentation.
+
+### [ID] — [Nom de la fonctionnalité]
+
+- **Statut :** décidé / proposé / à investiguer.
+- **Objectif utilisateur :** problème précis à résoudre.
+- **Acteurs et permissions :** qui peut l'utiliser, qui peut l'administrer.
+- **Préconditions :** intégrations, configuration et données nécessaires.
+- **Déclencheur :** action utilisateur ou événement système.
+- **Flux nominal :** étapes observables de bout en bout.
+- **Règles métier :** invariants, transitions et contraintes.
+- **Entrées / sorties :** schémas, champs obligatoires et données sensibles.
+- **États :** états possibles et transitions autorisées.
+- **Erreurs et cas limites :** timeout, doublon, permission, quota, ressource supprimée.
+- **Sécurité :** actifs, menaces, autorisations, secrets et audit.
+- **Persistance :** données créées ou modifiées, rétention et migration.
+- **Intégrations :** contrats externes, capacités requises et limites.
+- **Observabilité :** logs, métriques et alertes utiles.
+- **Tests :** unitaires, intégration, contrat, sécurité et end-to-end.
+- **Critères d'acceptation :** assertions vérifiables, sans formulations vagues.
+- **Hors périmètre :** ce que cette version ne promet pas.
+- **Dépendances et décisions :** liens vers les ADR et fonctionnalités associées.
+
+Aucune fiche ne doit déclarer une capacité « terminée » sur la seule base d'une interface, d'un endpoint ou d'une réponse simulée.
