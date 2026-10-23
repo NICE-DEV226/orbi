@@ -50,7 +50,7 @@ async def request_magic_link(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
 
     # Construire l'URL de connexion
-    login_url = f"{base_url}/admin/magic-login/{magic_link_id}"
+    login_url = f"{base_url}/admin/auth/{magic_link_id}"
 
     # Envoyer le lien par Telegram
     lang = context.user_data.get("lang", "fr")

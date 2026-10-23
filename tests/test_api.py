@@ -150,3 +150,29 @@ class TestErrorHandling:
 
     def test_method_not_allowed(self, client):
         assert client.delete("/health").status_code == 405
+
+
+class TestBotToDashboardLogin:
+    async def test_link_sent_by_bot_logs_the_admin_in(self, aclient):
+        """Le lien généré par le bot (/admin magic link) doit être accepté par la route web."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        from src.handlers.admin_auth import request_magic_link
+
+        admin = await User(telegram_id=77, first_name="Root", role="superadmin").insert()
+        update = MagicMock()
+        update.callback_query.answer = AsyncMock()
+        update.callback_query.edit_message_text = AsyncMock()
+        context = MagicMock()
+        context.user_data = {"db_user": admin, "lang": "fr"}
+
+        await request_magic_link(update, context)
+
+        keyboard = update.callback_query.edit_message_text.call_args.kwargs["reply_markup"]
+        login_url = keyboard.inline_keyboard[0][0].url
+        path = "/" + login_url.split("/", 3)[3]
+
+        response = await aclient.get(path)
+
+        assert response.status_code == 303
+        assert "admsession=" in response.headers["set-cookie"]
