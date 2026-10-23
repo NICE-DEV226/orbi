@@ -76,7 +76,7 @@ async def auth_magic_link(token: str, request: Request):
 
     if not telegram_id:
         return templates.TemplateResponse(request, "login.html",
-            {"error": "Lien invalide ou expiré (durée de validité : 5 minutes)."},
+            {"error": "Lien invalide ou expiré (durée de validité : 10 minutes)."},
         )
 
     # Le token est à usage unique : on le supprime
