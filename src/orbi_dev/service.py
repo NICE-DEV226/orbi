@@ -150,6 +150,8 @@ async def revoke_integration(owner_id: int, integration_id: str) -> Integration:
     integration = await get_integration(owner_id, integration_id)
     integration.status = IntegrationStatus.REVOKED
     await IntegrationSecret.find(IntegrationSecret.integration_id == str(integration.id)).delete()
+    # Efface aussi un éventuel champ hérité (avant migration) resté dans le document.
+    await Integration.get_pymongo_collection().update_one({"_id": integration.id}, {"$unset": {"secret_ciphertext": ""}})
     integration.revoked_at = datetime.now(UTC)
     await integration.save()
     await record_audit(owner_id, "integration.revoke", "integration", str(integration.id))

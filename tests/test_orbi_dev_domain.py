@@ -328,3 +328,67 @@ class TestAudit:
         records = await AuditRecord.find().to_list()
         assert {r.action for r in records} >= {"project.create", "integration.connect", "task.create"}
         assert all(SECRET not in r.model_dump_json() for r in records)
+
+
+class TestLegacySecretMigration:
+    """Intégrations créées avant la migration : le secret était dans le document `Integration`."""
+
+    async def _legacy_integration(self, status="active"):
+        from src.orbi_dev.models import Integration
+
+        integration = Integration(owner_id=ALICE, provider="fake", status=status)
+        await integration.insert()
+        await Integration.get_pymongo_collection().update_one(
+            {"_id": integration.id}, {"$set": {"secret_ciphertext": encrypt_secret(SECRET)}}
+        )
+        return integration
+
+    async def test_legacy_secret_is_moved_and_the_old_field_removed(self):
+        from src.orbi_dev.migrations import migrate_legacy_secrets
+
+        integration = await self._legacy_integration()
+
+        assert await migrate_legacy_secrets() == 1
+
+        raw = await Integration.get_pymongo_collection().find_one({"_id": integration.id})
+        assert "secret_ciphertext" not in raw
+        assert decrypt_secret(await service.get_secret_ciphertext(ALICE, str(integration.id))) == SECRET
+
+    async def test_migration_is_idempotent(self):
+        from src.orbi_dev.migrations import migrate_legacy_secrets
+
+        await self._legacy_integration()
+        await migrate_legacy_secrets()
+
+        assert await migrate_legacy_secrets() == 0
+        assert await IntegrationSecret.find().count() == 1
+
+    async def test_existing_new_secret_is_never_overwritten(self):
+        from src.orbi_dev.migrations import migrate_legacy_secrets
+
+        integration = await self._legacy_integration()
+        newer = encrypt_secret("newer_secret_value_987654")
+        await IntegrationSecret(integration_id=str(integration.id), owner_id=ALICE, ciphertext=newer).insert()
+
+        await migrate_legacy_secrets()
+
+        assert await service.get_secret_ciphertext(ALICE, str(integration.id)) == newer
+
+    async def test_revoked_legacy_integration_loses_its_secret_without_copy(self):
+        from src.orbi_dev.migrations import migrate_legacy_secrets
+
+        integration = await self._legacy_integration(status="revoked")
+
+        await migrate_legacy_secrets()
+
+        raw = await Integration.get_pymongo_collection().find_one({"_id": integration.id})
+        assert "secret_ciphertext" not in raw
+        assert await service.get_secret_ciphertext(ALICE, str(integration.id)) is None
+
+    async def test_revoke_erases_a_leftover_legacy_field(self):
+        integration = await self._legacy_integration()
+
+        await service.revoke_integration(ALICE, str(integration.id))
+
+        raw = await Integration.get_pymongo_collection().find_one({"_id": integration.id})
+        assert "secret_ciphertext" not in raw
