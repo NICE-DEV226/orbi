@@ -11,7 +11,6 @@ Règles :
 """
 
 import hashlib
-import re
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -31,16 +30,10 @@ from src.orbi_dev.models import (
     Task,
     TaskStatus,
 )
+from src.orbi_dev.redact import sanitize_text
 from src.orbi_dev.state import ExecutionStatus, InvalidTransitionError, ensure_transition, is_terminal
 
 DEFAULT_EXECUTION_TIMEOUT = timedelta(hours=2)
-
-_SECRET_PATTERNS = [
-    re.compile(r"(?i)(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}"),
-    re.compile(r"(?i)(api[_-]?key|token|secret|password)\s*[=:]\s*\S+"),
-    re.compile(r"\b(?:sk|ghp|gho|ghs|github_pat|cog|key)_[A-Za-z0-9_-]{8,}"),
-]
-
 
 class NotFoundError(Exception):
     """Ressource inexistante ou appartenant à un autre propriétaire (indistinguables volontairement)."""
@@ -48,14 +41,6 @@ class NotFoundError(Exception):
 
 class ConflictError(Exception):
     """Opération refusée par l'état courant de la ressource."""
-
-
-def sanitize_text(text: str | None, limit: int = 500) -> str:
-    """Retire les motifs de secrets courants et borne la longueur avant tout stockage/affichage."""
-    cleaned = text or ""
-    for pattern in _SECRET_PATTERNS:
-        cleaned = pattern.sub("[redacted]", cleaned)
-    return cleaned[:limit]
 
 
 def _oid(value: str) -> PydanticObjectId:
@@ -246,6 +231,14 @@ async def list_active_executions(limit: int = 200) -> list[Execution]:
     """Exécutions à suivre auprès du fournisseur (toutes propriétaires : usage worker uniquement)."""
     active = [ExecutionStatus.RUNNING, ExecutionStatus.CANCEL_REQUESTED, ExecutionStatus.NEEDS_ATTENTION]
     return await Execution.find({"status": {"$in": [s.value for s in active]}}).limit(limit).to_list()
+
+
+async def list_stuck_queued(older_than: timedelta, limit: int = 100) -> list[Execution]:
+    """Exécutions restées `queued` (process arrêté entre la création et le lancement)."""
+    cutoff = datetime.now(UTC) - older_than
+    return await Execution.find(
+        {"status": ExecutionStatus.QUEUED.value, "updated_at": {"$lt": cutoff}}
+    ).limit(limit).to_list()
 
 
 async def list_events(owner_id: int, execution_id: str) -> list[ExecutionEvent]:

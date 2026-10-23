@@ -45,6 +45,9 @@ async def lifespan(app: FastAPI):
     await init_performance_optimizations()
     logger.info("⚡ Optimisations de performance initialisées")
 
+    from src.orbi_dev.worker import start_worker, stop_worker
+
+    dev_worker = start_worker()
     bot_app = None
     scheduler_started = False
     try:
@@ -70,6 +73,7 @@ async def lifespan(app: FastAPI):
 
     # ── Arrêt ──
     logger.info("🛑 Orbi s'arrête...")
+    await stop_worker(dev_worker)
     try:
         if scheduler_started:
             from src.services.scheduler import stop_scheduler

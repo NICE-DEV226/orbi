@@ -33,11 +33,12 @@ ACTIVE_STATUSES: frozenset[ExecutionStatus] = frozenset(
 ALLOWED_TRANSITIONS: dict[ExecutionStatus, frozenset[ExecutionStatus]] = {
     S.AWAITING_APPROVAL: frozenset({S.QUEUED, S.CANCELLED}),
     S.QUEUED: frozenset({S.RUNNING, S.FAILED, S.CANCEL_REQUESTED, S.CANCELLED, S.TIMED_OUT, S.NEEDS_ATTENTION}),
-    S.RUNNING: frozenset({S.SUCCEEDED, S.FAILED, S.CANCEL_REQUESTED, S.TIMED_OUT, S.NEEDS_ATTENTION}),
+    # RUNNING -> CANCELLED : annulation décidée côté fournisseur (hors Orbi).
+    S.RUNNING: frozenset({S.SUCCEEDED, S.FAILED, S.CANCEL_REQUESTED, S.CANCELLED, S.TIMED_OUT, S.NEEDS_ATTENTION}),
     # L'annulation peut perdre la course contre la fin naturelle du travail.
     S.CANCEL_REQUESTED: frozenset({S.CANCELLED, S.SUCCEEDED, S.FAILED, S.TIMED_OUT, S.NEEDS_ATTENTION}),
     # Après réconciliation, l'état réel du fournisseur est adopté.
-    S.NEEDS_ATTENTION: frozenset({S.RUNNING, S.SUCCEEDED, S.FAILED, S.CANCELLED, S.TIMED_OUT}),
+    S.NEEDS_ATTENTION: frozenset({S.RUNNING, S.SUCCEEDED, S.FAILED, S.CANCEL_REQUESTED, S.CANCELLED, S.TIMED_OUT}),
     S.SUCCEEDED: frozenset(),
     S.FAILED: frozenset(),
     S.CANCELLED: frozenset(),
