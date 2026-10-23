@@ -58,6 +58,8 @@ def _get_document_models() -> list:
     from src.models.productivity import Note, Reminder, Task
     from src.models.ticket import Ticket
     from src.models.user import User
+    from src.orbi_dev.models import AuditRecord, Execution, ExecutionEvent, Integration, Project
+    from src.orbi_dev.models import Task as DevTask
 
     return [
         User,
@@ -79,6 +81,12 @@ def _get_document_models() -> list:
         ApiLog,
         ErrorLog,
         GithubWebhookLog,
+        Project,
+        Integration,
+        DevTask,
+        Execution,
+        ExecutionEvent,
+        AuditRecord,
     ]
 
 

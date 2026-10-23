@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     DEV_API_TOKEN: str = ""
     METRICS_API_TOKEN: str = ""
 
+    # ── Chiffrement des secrets d'intégration (clés Fernet, séparées par des virgules) ──
+    SECRETS_ENCRYPTION_KEY: str = ""
+
     # ── GitHub ──
     GITHUB_WEBHOOK_SECRET: str = ""
 
