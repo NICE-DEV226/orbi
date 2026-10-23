@@ -13,7 +13,7 @@ L'ADR-0002 impose d'intégrer un agent existant avant d'en construire un, et de 
 - Lecture des pages de documentation officielles le 2026-10-23 (liens ci-dessous). Le schéma OpenAPI de Devin a été analysé localement.
 - Seul ce que la documentation affirme est classé « confirmé ». Tout le reste est « non confirmé », ce qui ne veut pas dire « absent ».
 - **Aucun fournisseur n'a été testé avec un compte réel.** Les prix, quotas et disponibilités par plan n'ont pas été vérifiés, sauf indication contraire.
-- Certaines pages sont longues ; la page des endpoints Cursor n'a été lue que sur ses 100 000 premiers caractères (sur ~130 000).
+- La page des endpoints Cursor n'a été lue que sur ses 100 000 premiers caractères (sur ~130 000) ; sa [spécification OpenAPI](https://cursor.com/docs-static/cloud-agents-openapi.yaml) a ensuite été analysée en entier pour confirmer l'URL de base (`https://api.cursor.com`), le format d'`agentId` (`bc-<uuid>`), les codes d'erreur et les en-têtes de limite de débit.
 
 ## Comparaison
 
@@ -27,13 +27,13 @@ L'ADR-0002 impose d'intégrer un agent existant avant d'en construire un, et de 
 | Authentification serveur-à-serveur | ✅ clé de compte de service (Bearer) ; jetons utilisateur d'1 h | ✅ utilisateur de service `cog_…` (Bearer) | ⚠️ jeton utilisateur (PAT fin ou GitHub App « user-to-server ») ; **jetons d'installation non supportés** | ✅ clé API (`x-goog-api-key`) | ✅ jeton Bearer propre à la tâche | ❓ |
 | Webhooks / push | ❌ pas en v1 (présents en v0) | ❓ | ❓ | ❓ | n/a | ❓ |
 | Stabilité annoncée | ⚠️ « public beta, APIs may change » | ✅ v3 courante ; v1/v2 en dépréciation | ⚠️ « public preview, subject to change » | ⚠️ chemin `v1alpha` | ⚠️ « research preview » ; en-tête bêta daté | ❓ |
-| Plan / coût | ❓ non indiqué dans les pages lues | ❓ API non mentionnée dans les plans lus (Free 0 $, Pro 20 $/mois, Max 200 $/mois, Teams ≥ 80 $/mois) | ⚠️ Copilot Business ou Enterprise requis | ❓ quotas non indiqués | ⚠️ plan Pro/Max/Team/Enterprise ; 30 déclenchements/heure par tâche | ❓ |
+| Plan / coût | ⚠️ un plan spécifique est exigé (code d'erreur `plan_required` dans l'OpenAPI) mais non précisé ; quotas : `usage_limit_exceeded`, en-têtes `Retry-After` / `X-RateLimit-*` sur 429 ; tarifs non indiqués | ❓ API non mentionnée dans les plans lus (Free 0 $, Pro 20 $/mois, Max 200 $/mois, Teams ≥ 80 $/mois) | ⚠️ Copilot Business ou Enterprise requis | ❓ quotas non indiqués | ⚠️ plan Pro/Max/Team/Enterprise ; 30 déclenchements/heure par tâche | ❓ |
 
 Légende : ✅ confirmé par la doc officielle · ⚠️ confirmé avec réserve · ❌ confirmé absent de la doc lue · ❓ non confirmé.
 
 ### Sources
 
-- Cursor : [aperçu de l'API](https://cursor.com/docs/cloud-agent/api/overview), [endpoints](https://cursor.com/docs/cloud-agent/api/endpoints)
+- Cursor : [aperçu de l'API](https://cursor.com/docs/cloud-agent/api/overview), [endpoints](https://cursor.com/docs/cloud-agent/api/endpoints), [spécification OpenAPI](https://cursor.com/docs-static/cloud-agents-openapi.yaml)
 - Devin : [aperçu](https://docs.devin.ai/api-reference/overview), [spécification OpenAPI v3](https://docs.devin.ai/v3-openapi.json), [plans self-serve](https://docs.devin.ai/admin/billing/self-serve.md)
 - GitHub Copilot : [API REST des tâches d'agent](https://docs.github.com/en/rest/agent-tasks/agent-tasks)
 - Jules : [aperçu de l'API](https://jules.google/docs/api/reference/overview/), [sessions](https://jules.google/docs/api/reference/sessions/)
@@ -56,7 +56,7 @@ Deuxième candidat, à implémenter seulement pour prouver que l'interface n'est
 ## Risques et conditions de validation
 
 - **API en bêta publique** : changements possibles. L'adaptateur isole le fournisseur derrière une interface ; une garde de version et des tests de contrat limitent la casse.
-- **Plan, coût et limites de débit non confirmés.** Avant de déclarer le connecteur terminé, vérifier avec une vraie clé : plan requis, tarification, quotas, comportement `429`.
+- **Plan et tarification non confirmés.** L'API exige un plan (`plan_required`) sans dire lequel, et les tarifs ne sont pas documentés dans les pages lues. Avant de déclarer le connecteur terminé, vérifier avec une vraie clé : plan requis, coût d'un agent, quotas, comportement `429`.
 - **Adaptateur écrit d'après la documentation, sans compte réel.** Le gate de sortie de la phase 3 (« un parcours bout-en-bout prouvé avec un fournisseur réel ou sandbox ») n'est donc **pas** atteint tant qu'un essai réel n'a pas eu lieu sur un dépôt de test. Le fournisseur factice local ne le remplace pas.
 - **Verrouillage fournisseur** : réduit par l'interface commune, mais les capacités propriétaires doivent rester exposées explicitement (ADR-0002).
 - **Conditions d'utilisation et traitement des données** (stockage du code, entraînement) : non examinés ici ; à lire avant d'envoyer du code privé.
