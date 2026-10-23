@@ -14,14 +14,21 @@ concurrency:
 
 jobs:
   test:
+    # Le job « test » (3.12) garde son nom : c'est celui d'une éventuelle protection de branche.
+    name: ${{ matrix.python == '3.12' && 'test' || format('test (py{0})', matrix.python) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.12 = minimum supporté ; 3.14 = version de l'image Docker de production (Dockerfile)
+        python: ["3.12", "3.14"]
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python }}
           cache: pip
           cache-dependency-path: pyproject.toml
 
