@@ -141,9 +141,20 @@ def _remote_fields(remote: RemoteRun) -> dict:
     return {k: v for k, v in fields.items() if v is not None}
 
 
-async def _converge(execution: Execution, remote: RemoteRun, *, message: str) -> Execution:
+# Phrase d'historique selon l'état atteint, quand l'appelant n'en fournit pas.
+_TARGET_MESSAGE = {
+    ExecutionStatus.RUNNING: "L'agent travaille",
+    ExecutionStatus.SUCCEEDED: "L'agent a terminé",
+    ExecutionStatus.FAILED: "L'agent n'a pas abouti",
+    ExecutionStatus.CANCELLED: "Exécution annulée",
+    ExecutionStatus.TIMED_OUT: "Arrêtée : durée maximale dépassée",
+}
+
+
+async def _converge(execution: Execution, remote: RemoteRun, *, message: str | None = None) -> Execution:
     """Aligne l'exécution sur l'état distant, en passant par `running` si la table l'exige."""
     target = _REMOTE_TO_STATUS[remote.status]
+    message = message or _TARGET_MESSAGE[target] + (" : une pull request est prête" if target == ExecutionStatus.SUCCEEDED and remote.pr_url else "")
     fields = _remote_fields(remote)
     if target in (ExecutionStatus.FAILED, ExecutionStatus.TIMED_OUT):
         fields["error_message"] = remote.error_message or "Échec signalé par le fournisseur"
@@ -155,7 +166,7 @@ async def _converge(execution: Execution, remote: RemoteRun, *, message: str) ->
         return execution
     if not can_transition(execution.status, target):
         if can_transition(execution.status, ExecutionStatus.RUNNING) and can_transition(ExecutionStatus.RUNNING, target):
-            execution = await _safe_transition(execution, ExecutionStatus.RUNNING, message="Pris en charge par le fournisseur")
+            execution = await _safe_transition(execution, ExecutionStatus.RUNNING, message="L'agent a pris la tâche")
         else:
             return execution
     if execution.status == ExecutionStatus.RUNNING and target == ExecutionStatus.RUNNING:
@@ -203,7 +214,7 @@ async def _launch_with_retries(
                 await sleep(e.retry_after if e.retry_after is not None else min(2**attempt, 8))
                 continue
             raise
-        return await _converge(execution, remote, message="Lancé chez le fournisseur")
+        return await _converge(execution, remote, message="L'agent a démarré")
     raise last_error or ConnectorError(ErrorCategory.UNKNOWN, "Lancement impossible")
 
 
@@ -221,7 +232,7 @@ async def _reconcile_unknown_launch(execution: Execution, connector: AgentConnec
             execution.owner_id, str(execution.id), EventKind.RECONCILIATION,
             "Réponse de lancement perdue ; exécution retrouvée chez le fournisseur",
         )
-        return await _converge(execution, remote, message="Réconcilié après un délai dépassé")
+        return await _converge(execution, remote, message="Exécution retrouvée chez le fournisseur après une coupure")
     return await _safe_transition(
         execution, ExecutionStatus.NEEDS_ATTENTION,
         message="Résultat du lancement inconnu : vérification en cours, aucun nouveau lancement automatique",
@@ -272,7 +283,7 @@ async def refresh_execution(owner_id: int, execution_id: str) -> Execution:
         execution, poll_count=execution.poll_count + 1, last_polled_at=datetime.now(UTC)
     )
     previous = execution.status
-    execution = await _converge(execution, remote, message="Mis à jour depuis le fournisseur")
+    execution = await _converge(execution, remote)
     if previous == ExecutionStatus.NEEDS_ATTENTION and execution.status != previous:
         await service.add_event(
             owner_id, execution_id, EventKind.RECONCILIATION, f"Réconcilié : {execution.status.value}"
@@ -384,4 +395,4 @@ async def request_cancel(owner_id: int, execution_id: str) -> Execution:
             if e.category == ErrorCategory.NOT_FOUND:  # le lancement n'a jamais abouti : rien à annuler
                 return await _safe_transition(execution, ExecutionStatus.CANCELLED, message="Annulée : inconnue du fournisseur")
             raise
-    return await _converge(execution, remote, message="Annulation confirmée par le fournisseur")
+    return await _converge(execution, remote, message="Annulation confirmée")

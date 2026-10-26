@@ -1,0 +1,47 @@
+{% extends "layout.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Projets · Orbi{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>Projets</h1>
+    <p class="sub">Les dépôts sur lesquels les agents peuvent travailler.</p>
+  </div>
+</header>
+
+{% if projects %}
+<ul class="rows">
+  {% for p in projects %}
+  <li>
+    <div class="row plain">
+      <div>
+        <div class="row-title">{{ p.name }}</div>
+        <div class="row-meta">{{ p.repo_url|repo }}, branche <code>{{ p.default_branch }}</code></div>
+      </div>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="empty">
+  <h2>Aucun projet</h2>
+  <p>Ajoutez le dépôt GitHub sur lequel un agent doit travailler.</p>
+</div>
+{% endif %}
+
+<details class="add"{% if error or not projects %} open{% endif %}>
+  <summary>{{ icon('plus') }} Ajouter un projet</summary>
+  {% if error %}<div class="alert" role="alert">{{ error }}</div>{% endif %}
+  <form method="post" action="/dev/projects" hx-disabled-elt="find button[type=submit]">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field"><label for="name">Nom</label><input id="name" name="name" maxlength="100" required placeholder="orbi-api"></div>
+    <div class="field">
+      <label for="repo_url">Adresse du dépôt</label>
+      <input id="repo_url" name="repo_url" inputmode="url" autocapitalize="none" required placeholder="https://github.com/organisation/depot">
+      <p class="hint">Une adresse https, par exemple celle de la page GitHub du dépôt.</p>
+    </div>
+    <div class="field"><label for="default_branch">Branche de départ</label><input id="default_branch" name="default_branch" value="main" maxlength="100"></div>
+    <button class="btn btn-primary" type="submit">Ajouter le projet</button>
+  </form>
+</details>
+{% endblock %}

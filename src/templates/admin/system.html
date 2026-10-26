@@ -1,0 +1,19 @@
+{% extends "layout.html" %}
+{% block title %}Système · Orbi{% endblock %}
+{% block content %}
+<header class="page-head"><div><h1>Système</h1><p class="sub">Ce qui tourne, mesuré maintenant.</p></div></header>
+<h2 class="log-title">Services</h2>
+<dl class="facts" style="margin-bottom:2rem">
+  {% for name, ok in health %}
+  <div><dt>{{ name }}</dt><dd><span class="tag {{ 'ok' if ok else 'bad' }}">{{ 'Disponible' if ok else 'Indisponible' }}</span></dd></div>
+  {% endfor %}
+  <div><dt>Suivi des exécutions</dt><dd>{% if refresh_interval %}toutes les {{ refresh_interval }} s{% else %}désactivé{% endif %}</dd></div>
+</dl>
+<h2 class="log-title">Activité</h2>
+<dl class="facts">
+  <div><dt>Utilisateurs non bannis</dt><dd>{{ kpis.users }}</dd></div>
+  <div><dt>Tickets ouverts</dt><dd>{{ kpis.open_tickets }}</dd></div>
+  <div><dt>Exécutions en cours</dt><dd>{{ kpis.active_executions }}</dd></div>
+  <div><dt>Pull requests proposées</dt><dd>{{ kpis.pull_requests }}</dd></div>
+</dl>
+{% endblock %}

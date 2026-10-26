@@ -226,7 +226,7 @@ async def create_execution(
         deadline_at=datetime.now(UTC) + timeout,
     )
     await execution.insert()
-    await _append_event(execution, EventKind.NOTE, message="Exécution créée", to_status=execution.status)
+    await _append_event(execution, EventKind.NOTE, message="Tâche enregistrée", to_status=execution.status)
     await record_audit(owner_id, "execution.create", "execution", str(execution.id))
     return execution
 

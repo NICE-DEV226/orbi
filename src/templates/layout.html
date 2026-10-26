@@ -1,0 +1,75 @@
+{% from "_macros.html" import mark, icon %}
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <meta name="robots" content="noindex">
+  <!-- htmx durci : pas d'eval, pas de <script> dans les fragments, pas de copie des pages dans le stockage local -->
+  <meta name="htmx-config" content='{"allowEval": false, "allowScriptTags": false, "historyCacheSize": 0, "includeIndicatorStyles": false}'>
+  <title>{% block title %}Orbi{% endblock %}</title>
+  <link rel="stylesheet" href="/static/orbi.css?v={{ asset_v }}">
+  <!-- Mini App Telegram : sans effet dans un navigateur ordinaire -->
+  <script src="https://telegram.org/js/telegram-web-app.js?64"></script>
+  <script src="/static/vendor/htmx-2.0.4.min.js" defer></script>
+</head>
+<body hx-boost="true">
+{% include "_sprite.html" %}
+<a class="skip" href="#main">Aller au contenu</a>
+<div id="app" class="shell" hx-headers='{{ {"X-CSRF-Token": csrf_token} | tojson }}' data-depth="{% block depth %}root{% endblock %}">
+  <aside class="rail">
+    <a class="brand" href="/dev/">{{ mark('ring-mark') }} Orbi</a>
+    <nav aria-label="Navigation">
+      {% for item in rail %}
+      <a class="link" href="{{ item.href }}"{% if item.key == section %} aria-current="page"{% endif %}>{{ icon(item.icon) }} {{ item.label }}</a>
+      {% endfor %}
+    </nav>
+    <div class="rail-foot">
+      <div><strong>{{ admin.display_name }}</strong><div class="small muted">{{ admin.role }}</div></div>
+      <form method="post" action="/admin/logout" hx-boost="false"><button class="btn btn-quiet btn-sm" type="submit">{{ icon('logout', 'icon-sm') }} Se déconnecter</button></form>
+    </div>
+  </aside>
+
+  <main id="main" class="main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <nav class="tabbar" aria-label="Navigation principale">
+    {% for item in tabs %}
+    <a href="{{ item.href }}"{% if item.key == section or (item.key == 'settings' and section in settings_children) %} aria-current="page"{% endif %}>{{ icon(item.icon) }}<span>{{ item.label }}</span></a>
+    {% endfor %}
+  </nav>
+</div>
+
+<script>
+// Mini App Telegram : thème, couleurs de la fenêtre et bouton retour natif (sans effet hors Telegram).
+(function () {
+  var tg = window.Telegram && window.Telegram.WebApp;
+  var inTelegram = !!(tg && tg.initData);
+  function hex(rgb) {
+    var m = rgb.match(/\d+/g);
+    return "#" + m.slice(0, 3).map(function (n) { return ("0" + (+n).toString(16)).slice(-2); }).join("");
+  }
+  function chrome() {
+    if (!inTelegram) { return; }
+    try {
+      var bg = hex(getComputedStyle(document.body).backgroundColor);
+      tg.setHeaderColor(bg); tg.setBackgroundColor(bg);
+      if (tg.setBottomBarColor) { tg.setBottomBarColor(bg); }
+    } catch (e) { /* version ancienne de Telegram */ }
+    var app = document.getElementById("app");
+    if (app && app.dataset.depth === "detail") { tg.BackButton.show(); } else { tg.BackButton.hide(); }
+  }
+  function theme() { document.documentElement.dataset.theme = tg.colorScheme === "light" ? "light" : "dark"; }
+  if (inTelegram) {
+    tg.ready(); tg.expand(); theme();
+    tg.onEvent("themeChanged", function () { theme(); chrome(); });
+    tg.BackButton.onClick(function () { if (history.length > 1) { history.back(); } else { location.assign("/dev/"); } });
+  }
+  document.addEventListener("DOMContentLoaded", chrome);
+  document.body.addEventListener("htmx:afterSettle", chrome);
+})();
+</script>
+</body>
+</html>

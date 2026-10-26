@@ -10,16 +10,15 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
 from src.core.config import get_settings
 from src.core.redis import get_redis
 from src.models.user import User
 from src.web.telegram_auth import InvalidInitDataError, validate_init_data
+from src.web.ui import ASSET_VERSION, templates
 
 router = APIRouter()
-templates = Jinja2Templates(directory="src/templates")
 
 MAGIC_LINK_PREFIX = "magic_link:"
 COOKIE_NAME = "admsession"
@@ -118,9 +117,11 @@ async def login_page(request: Request):
     # Si déjà connecté, redirige
     admin = await get_current_admin(request)
     if admin:
-        return RedirectResponse(url="/admin/", status_code=303)
+        return RedirectResponse(url=DEFAULT_AFTER_LOGIN, status_code=303)
 
-    return templates.TemplateResponse(request, "login.html", {"next": safe_next(request.query_params.get("next"))})
+    return templates.TemplateResponse(
+        request, "login.html", {"next": safe_next(request.query_params.get("next")), "asset_v": ASSET_VERSION}
+    )
 
 
 @router.get("/auth/{token}", include_in_schema=False)
@@ -130,8 +131,9 @@ async def auth_magic_link(token: str, request: Request):
     telegram_id = await redis.get(f"{MAGIC_LINK_PREFIX}{token}")
 
     if not telegram_id:
-        return templates.TemplateResponse(request, "login.html",
-            {"error": "Lien invalide ou expiré (durée de validité : 10 minutes)."},
+        return templates.TemplateResponse(
+            request, "login.html",
+            {"error": "Ce lien est invalide ou expiré (il est valable 10 minutes et ne sert qu'une fois).", "asset_v": ASSET_VERSION},
         )
 
     # Le token est à usage unique : on le supprime
@@ -139,14 +141,14 @@ async def auth_magic_link(token: str, request: Request):
 
     user = await User.find_one(User.telegram_id == int(telegram_id))
     if not user or user.role not in ["admin", "superadmin"]:
-        return templates.TemplateResponse(request, "login.html",
-            {"error": "Accès refusé. Rôle administrateur requis."},
+        return templates.TemplateResponse(
+            request, "login.html", {"error": "Accès réservé aux administrateurs.", "asset_v": ASSET_VERSION}
         )
 
     # Création de la session
     session_id = await create_web_session(user)
 
-    response = RedirectResponse(url="/admin/", status_code=303)
+    response = RedirectResponse(url=DEFAULT_AFTER_LOGIN, status_code=303)
     set_session_cookie(response, session_id)
     return response
 

@@ -15,6 +15,8 @@ Documentation de cadrage pour la reprise progressive du dépôt. Les documents d
 - [ADR-0005 : Motor → PyMongo async](adr/0005-motor-to-pymongo-async.md) — migration Beanie 2.
 - [ADR-0006 : Python 3.14](adr/0006-python-3.14.md) — correction de la métadonnée de Beanie.
 - [ADR-0007 : Mini App Telegram](adr/0007-telegram-mini-app.md) — accès web depuis Telegram, cookies, limites.
+- [ADR-0008 : interface Jinja + htmx](adr/0008-web-ui-jinja-htmx.md) — un seul shell, sans framework CSS ni CDN.
+- [Design de l'interface](DESIGN.md) — anneau d'orbite, jetons, typographie, règles d'écriture.
 
 ## Statut
 

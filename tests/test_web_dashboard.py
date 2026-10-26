@@ -52,8 +52,8 @@ class TestTickets:
         assert r.status_code == 200 and "Panne du bot" in r.text
 
 
-class TestDashboardHome:
-    async def test_kpis_are_computed_from_the_database(self, aclient):
+class TestSystemPage:
+    async def test_indicators_are_computed_from_the_database(self, aclient):
         await User(telegram_id=1, first_name="A").insert()
         await User(telegram_id=2, first_name="B").insert()
         await User(telegram_id=3, first_name="C", is_banned=True).insert()
@@ -64,19 +64,23 @@ class TestDashboardHome:
                 idempotency_key=f"k{i}", client_ref=f"c{i}", pr_url=pr,
             ).insert()
 
-        html = (await aclient.get("/admin/", cookies=await admin_cookies())).text
+        html = (await aclient.get("/admin/system", cookies=await admin_cookies())).text
 
         # 2 non bannis + l'admin de la session = 3 ; 1 ticket ouvert ; 1 exécution en cours ; 1 PR
-        for label, value in [("Utilisateurs (non bannis)", 3), ("Tickets ouverts", 1),
-                             ("Exécutions Orbi Dev en cours", 1), ("Pull requests proposées", 1)]:
-            block = html.split(label)[1].split("</h2>")[0]
+        for label, value in [("Utilisateurs non bannis", 3), ("Tickets ouverts", 1),
+                             ("Exécutions en cours", 1), ("Pull requests proposées", 1)]:
+            block = html.split(f"<dt>{label}</dt>")[1].split("</dd>")[0]
             assert f">{value}" in block, (label, block)
 
+    async def test_services_are_reported(self, aclient):
+        html = (await aclient.get("/admin/system", cookies=await admin_cookies())).text
+        assert "Base de données" in html and "Disponible" in html
+
     async def test_no_invented_numbers_nor_phantom_chart(self, aclient):
-        html = (await aclient.get("/admin/", cookies=await admin_cookies())).text
-        assert "1250.00" not in html
-        assert "Chart" not in html and "activityChart" not in html
-        assert "Exporter CSV" not in html
+        cookies = await admin_cookies()
+        for path in ("/admin/", "/admin/system", "/dev/"):
+            html = (await aclient.get(path, cookies=cookies)).text
+            assert "1250.00" not in html and "Chart" not in html and "Exporter CSV" not in html
 
 
 class TestUsersPage:
@@ -100,7 +104,7 @@ class TestRemovedSurface:
         assert r.status_code in (404, 405)
 
     async def test_navigation_has_no_dead_links(self, aclient):
-        html = (await aclient.get("/admin/", cookies=await admin_cookies())).text
+        html = (await aclient.get("/dev/", cookies=await admin_cookies())).text
         for dead in ("/admin/broadcasts", "/admin/commerce", "/admin/config"):
             assert dead not in html
 

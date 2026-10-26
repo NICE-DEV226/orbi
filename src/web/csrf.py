@@ -27,7 +27,7 @@ def csrf_token_for(request: Request) -> str:
 async def csrf_protect(request: Request) -> None:
     """Dépendance des routes qui modifient l'état : refuse (403) sans jeton valide pour cette session."""
     session_id = request.cookies.get(COOKIE_NAME, "")
-    form = await request.form()
-    submitted = str(form.get("csrf_token", ""))
+    # En-tête (requêtes htmx) ou champ de formulaire (soumission classique) : l'un des deux suffit, il doit être valide.
+    submitted = request.headers.get("x-csrf-token") or str((await request.form()).get("csrf_token", ""))
     if not session_id or not hmac.compare_digest(submitted.encode(), csrf_token(session_id).encode()):
         raise HTTPException(status_code=403, detail="Jeton CSRF invalide")

@@ -43,8 +43,8 @@ async def seed(owner: int, prompt="Corrige le bug"):
 
 
 class TestAccess:
-    @pytest.mark.parametrize("path", ["/dev/", "/dev/tasks/new", "/dev/projects", "/dev/integrations",
-                                      "/dev/executions/abc", "/dev/api/executions/abc"])
+    @pytest.mark.parametrize("path", ["/dev/", "/dev/runs", "/dev/tasks/new", "/dev/projects", "/dev/integrations",
+                                      "/dev/executions/abc", "/dev/executions/abc/panel"])
     async def test_anonymous_is_redirected_to_login(self, path):
         transport = httpx.ASGITransport(app=create_app())
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
@@ -141,13 +141,11 @@ class TestFullJourney:
             await client.post(f"/dev/executions/{execution_id}/refresh", data={"csrf_token": token})
 
             page = await client.get(page_url)
-            assert "Terminée" in page.text
-            assert "https://github.com/acme/demo/pull/1" in page.text
-            data = (await client.get(f"/dev/api/executions/{execution_id}")).json()
-            assert data["status"] == "succeeded" and data["terminal"] is True
-            assert data["pr_url"] == "https://github.com/acme/demo/pull/1"
+            assert "Terminé" in page.text and "Une pull request est prête" in page.text
+            assert 'href="https://github.com/acme/demo/pull/1"' in page.text
+            assert "hx-trigger" not in page.text.split('id="run-panel"')[1].split(">")[0]  # terminé : le suivi s'arrête
             # rechargement : l'état vient de la base, identique
-            assert (await client.get(page_url)).text == page.text or "Terminée" in (await client.get(page_url)).text
+            assert "Une pull request est prête" in (await client.get(page_url)).text
 
     async def test_cancel_from_the_ui(self):
         client, _, token = await login()
@@ -156,8 +154,7 @@ class TestFullJourney:
         async with client:
             r = await client.post(f"/dev/executions/{execution.id}/cancel", data={"csrf_token": token})
             assert r.status_code == 303
-            data = (await client.get(f"/dev/api/executions/{execution.id}")).json()
-        assert data["status"] == "cancelled"
+        assert (await service.get_execution(500, str(execution.id))).status.value == "cancelled"
 
     async def test_retry_only_after_a_terminal_execution(self):
         client, _, token = await login()
@@ -177,8 +174,8 @@ class TestFullJourney:
             active = (await client.get(f"/dev/executions/{execution.id}")).text
             await runner.request_cancel(500, str(execution.id))
             done = (await client.get(f"/dev/executions/{execution.id}")).text
-        assert "setInterval(poll" in active and "Annuler" in active
-        assert "setInterval(poll" not in done and "Nouvelle tentative" in done
+        assert 'hx-trigger="every 3s"' in active and "Arrêter" in active
+        assert 'hx-trigger="every 3s"' not in done and "Nouvelle tentative" in done
 
 
 class TestIntegrationsSafety:
@@ -187,7 +184,7 @@ class TestIntegrationsSafety:
         async with client:
             r = await client.post("/dev/integrations", data={"csrf_token": token, "provider": "fake", "api_key": "invalid"})
         assert r.status_code == 200
-        assert "Clé refusée" in r.text
+        assert "refusé cette clé" in r.text
         assert await service.list_integrations(500) == []
 
     async def test_api_key_never_appears_in_any_page(self):
@@ -255,9 +252,9 @@ class TestUntrustedContent:
         client, _, _ = await login()
         async with client:
             html = (await client.get(f"/dev/executions/{execution.id}")).text
-            data = (await client.get(f"/dev/api/executions/{execution.id}")).json()
-        assert url not in html
-        assert data["pr_url"] is None and data["external_url"] is None
+            fragment = (await client.get(f"/dev/executions/{execution.id}/panel")).text
+        assert url not in html and url not in fragment
+        assert "Ouvrir la pull request" not in html
 
     async def test_user_prompt_is_escaped(self):
         client, _, _ = await login()
@@ -266,9 +263,9 @@ class TestUntrustedContent:
             html = (await client.get(f"/dev/executions/{execution.id}")).text
         assert "<script>alert(3)</script>" not in html
 
-    async def test_json_endpoint_is_not_cacheable(self):
+    async def test_authenticated_pages_and_fragments_are_not_cacheable(self):
         client, _, _ = await login()
         _, _, _, execution = await seed(500)
         async with client:
-            r = await client.get(f"/dev/api/executions/{execution.id}")
-        assert r.headers["cache-control"] == "no-store"
+            for path in ("/dev/", "/dev/runs", f"/dev/executions/{execution.id}", f"/dev/executions/{execution.id}/panel"):
+                assert (await client.get(path)).headers["cache-control"] == "no-store", path

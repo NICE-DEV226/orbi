@@ -1,83 +1,54 @@
-{% extends "base.html" %}
+{% from "_macros.html" import mark %}
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <meta name="robots" content="noindex">
+  <title>Connexion · Orbi</title>
+  <link rel="stylesheet" href="/static/orbi.css?v={{ asset_v }}">
+  <script src="https://telegram.org/js/telegram-web-app.js?64"></script>
+</head>
+<body>
+<main class="bare">
+  <div class="panel">
+    {{ mark('ring-mark') }}
+    <h1>Orbi</h1>
+    <p class="muted" style="margin-bottom:1.5rem">Pilotez vos agents de code depuis votre téléphone.</p>
 
-{% block content %}
-<div class="container d-flex flex-column justify-content-center align-items-center" style="min-height: 100vh;">
-    
-    <div class="text-center mb-4">
-        <h1 class="display-5 text-primary fw-bold"><i class="bi bi-globe"></i> Orbi Admin</h1>
-        <p class="lead text-muted">Console de gestion sécurisée</p>
+    {% if error %}<div class="alert" role="alert">{{ error }}</div>{% endif %}
+    <div id="tg-status" class="alert info" role="status" hidden>Connexion avec Telegram…</div>
+    <div id="tg-error" class="alert" role="alert" hidden></div>
+
+    <div class="sheet">
+      <h2>Se connecter</h2>
+      <ol class="steps">
+        <li>Ouvrez le bot Orbi dans Telegram.</li>
+        <li>Envoyez <code>/web</code> : le bot répond avec un lien personnel.</li>
+        <li>Ouvrez ce lien. Il est valable 10 minutes et ne sert qu'une fois.</li>
+      </ol>
+      <p class="hint" style="margin-top:1rem">Dans Telegram, le bouton « Orbi Dev » du bot ouvre l'application directement, sans lien. Accès réservé aux administrateurs.</p>
     </div>
-
-    <div class="card bg-dark border-secondary shadow-lg p-4" style="max-width: 500px; width: 100%;">
-        <div class="card-body text-center">
-            
-            {% if error %}
-            <div class="alert alert-danger" role="alert">
-                <i class="bi bi-exclamation-triangle-fill"></i> {{ error }}
-            </div>
-            {% endif %}
-
-            <div id="tg-status" class="alert alert-info" hidden>Connexion via Telegram…</div>
-            <div id="tg-error" class="alert alert-danger" hidden></div>
-
-            <div class="mb-4">
-                <i class="bi bi-shield-lock display-1 text-secondary"></i>
-            </div>
-            
-            <h4 class="card-title mb-3">Authentification Requise</h4>
-            <p class="card-text text-muted mb-4">
-                L'accès à ce dashboard s'effectue via un <strong>Magic Link</strong> sécurisé lié à votre compte Telegram. 
-                Aucun mot de passe n'est nécessaire.
-            </p>
-
-            <div class="alert alert-info text-start">
-                <strong>Comment se connecter ?</strong>
-                <ol class="mt-2 mb-0">
-                    <li>Ouvrez le Bot Telegram Orbi</li>
-                    <li>Envoyez la commande <code>/web</code> (réservée aux administrateurs)</li>
-                    <li>Cliquez sur le lien unique qui vous sera généré !</li>
-                </ol>
-            </div>
-
-            <div class="mt-4 text-muted small">
-                Ce lien à usage unique expire au bout de 10 minutes.<br>
-                (Réservé aux profils <span class="badge bg-primary">admin</span> ou <span class="badge bg-danger">superadmin</span>)
-            </div>
-
-        </div>
-    </div>
-
-</div>
-{% endblock %}
-
-{% block scripts %}
-<!-- Mini App Telegram : si la page est ouverte depuis Telegram, la connexion est automatique (initData signée vérifiée côté serveur) -->
-<script src="https://telegram.org/js/telegram-web-app.js?64"></script>
+  </div>
+</main>
 <script>
+// Ouverte depuis Telegram (Mini App), la page se connecte seule : l'identité signée par Telegram est vérifiée côté serveur.
 (function () {
-    var tg = window.Telegram && window.Telegram.WebApp;
-    if (!tg || !tg.initData) { return; }  // navigateur ordinaire : lien magique
-    tg.ready();
-    document.getElementById("tg-status").hidden = false;
-    var next = {{ (next or "/dev/") | tojson }};
-    fetch("/admin/telegram-login", {
-        method: "POST", credentials: "same-origin",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({initData: tg.initData, next: next})
-    }).then(function (r) {
-        return r.json().then(function (d) { return {ok: r.ok, d: d}; });
-    }).then(function (res) {
-        if (res.ok) { location.replace(res.d.redirect); return; }
-        document.getElementById("tg-status").hidden = true;
-        var box = document.getElementById("tg-error");
-        box.textContent = res.d.detail || "Connexion refusée.";
-        box.hidden = false;
-    }).catch(function () {
-        document.getElementById("tg-status").hidden = true;
-        var box = document.getElementById("tg-error");
-        box.textContent = "Réseau indisponible, réessayez.";
-        box.hidden = false;
-    });
+  var tg = window.Telegram && window.Telegram.WebApp;
+  if (!tg || !tg.initData) { return; }
+  tg.ready(); tg.expand();
+  document.documentElement.dataset.theme = tg.colorScheme === "light" ? "light" : "dark";
+  var status = document.getElementById("tg-status"), box = document.getElementById("tg-error");
+  status.hidden = false;
+  function fail(text) { status.hidden = true; box.textContent = text; box.hidden = false; }
+  fetch("/admin/telegram-login", {
+    method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({initData: tg.initData, next: {{ (next or "/dev/") | tojson }}})
+  }).then(function (r) { return r.json().then(function (d) { return {ok: r.ok, d: d}; }); })
+    .then(function (res) { if (res.ok) { location.replace(res.d.redirect); } else { fail(res.d.detail || "Connexion refusée."); } })
+    .catch(function () { fail("Réseau indisponible : réessayez."); });
 })();
 </script>
-{% endblock %}
+</body>
+</html>

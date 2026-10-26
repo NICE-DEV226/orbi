@@ -1,0 +1,38 @@
+{% extends "layout.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Support · Orbi{% endblock %}
+{% block depth %}{{ 'detail' if selected else 'root' }}{% endblock %}
+{% block content %}
+{% if selected %}
+<a class="back" href="/admin/tickets">{{ icon('chevron') }} Support</a>
+<header class="page-head"><div><h1>{{ selected.subject }}</h1><p class="sub">{{ selected.ticket_id }}, ouvert {{ selected.created_at|ago }} par l'utilisateur {{ selected.user_telegram_id }}</p></div></header>
+<div class="cluster" style="margin-bottom:1.5rem">
+  <span class="tag">{{ selected.status }}</span><span class="tag {% if selected.priority.value in ('urgent', 'high') %}bad{% endif %}">priorité {{ selected.priority }}</span><span class="tag">{{ selected.category }}</span>
+</div>
+<div class="ask"><p class="label">Demande</p><p class="prose">{{ selected.description }}</p></div>
+{% if selected.messages %}
+<h2 class="log-title">Échanges</h2>
+<ol class="log">
+  {% for m in selected.messages %}
+  <li><div class="when">{{ 'Agent' if m.get('role') == 'agent' else 'Utilisateur' }}</div><div class="prose">{{ m.get('text', '') }}</div></li>
+  {% endfor %}
+</ol>
+{% endif %}
+{% else %}
+<header class="page-head"><div><h1>Support</h1><p class="sub">{{ tickets|length }} ticket(s) récent(s), les réponses se font depuis le bot Telegram.</p></div></header>
+{% if tickets %}
+<ul class="rows">
+  {% for t in tickets %}
+  <li>
+    <a class="row plain" href="/admin/tickets?id={{ t.id }}">
+      <div><div class="row-title">{{ t.subject }}</div><div class="row-meta">{{ t.ticket_id }}, {{ t.created_at|ago }}, utilisateur {{ t.user_telegram_id }}</div></div>
+      <div class="row-end"><span class="tag {% if t.priority.value in ('urgent', 'high') %}bad{% endif %}">{{ t.priority }}</span>{{ icon('chevron', 'icon-sm') }}</div>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="empty"><h2>Aucun ticket</h2><p>Les demandes de support ouvertes depuis le bot apparaîtront ici.</p></div>
+{% endif %}
+{% endif %}
+{% endblock %}

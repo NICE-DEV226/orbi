@@ -1,0 +1,64 @@
+{% extends "layout.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Connexions · Orbi{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>Connexions</h1>
+    <p class="sub">Les fournisseurs d'agents de code auxquels Orbi confie le travail.</p>
+  </div>
+</header>
+
+{% if integrations %}
+<ul class="rows">
+  {% for i in integrations %}
+  <li>
+    <div class="row plain stacked">
+      <div>
+        <div class="row-title">{{ i.label if i.label else i.provider|provider_name }}</div>
+        <div class="row-meta">
+          {% if i.label and i.label != (i.provider|provider_name) %}{{ i.provider|provider_name }}, connecté{% else %}Connecté{% endif %} {{ i.connected_at|ago }}.
+          {% if i.capabilities %}Peut {{ i.capabilities|capabilities }}.{% endif %}
+        </div>
+      </div>
+      <div class="row-end">
+        <span class="tag {% if i.status.value == 'active' %}ok{% elif i.status.value == 'invalid' %}bad{% endif %}">{{ {'active': 'Active', 'invalid': 'Clé refusée', 'revoked': 'Révoquée'}[i.status.value] }}</span>
+        {% if i.status.value != 'revoked' %}
+        <form method="post" action="/dev/integrations/{{ i.id }}/revoke" hx-confirm="Révoquer cette clé dans Orbi ? Les exécutions en cours ne seront plus suivies." hx-boost="true">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="btn btn-danger btn-sm" type="submit">Révoquer</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<div class="empty">
+  <h2>Aucune connexion</h2>
+  <p>Saisissez la clé d'API d'un fournisseur d'agent pour pouvoir lui confier des tâches.</p>
+</div>
+{% endif %}
+
+<details class="add"{% if error or not integrations %} open{% endif %}>
+  <summary>{{ icon('plus') }} Connecter un fournisseur</summary>
+  {% if error %}<div class="alert" role="alert">{{ error }}</div>{% endif %}
+  <form method="post" action="/dev/integrations" autocomplete="off" hx-disabled-elt="find button[type=submit]">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field">
+      <label for="provider">Fournisseur</label>
+      <select id="provider" name="provider" required>
+        {% for p in providers %}<option value="{{ p }}">{{ p|provider_name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="api_key">Clé d'API</label>
+      <input id="api_key" name="api_key" type="password" autocomplete="off" autocapitalize="none" required>
+      <p class="hint">Orbi vérifie la clé, puis la chiffre : elle n'est jamais réaffichée. La révoquer ici ne la supprime pas chez le fournisseur, supprimez-la aussi dans son tableau de bord.</p>
+    </div>
+    <div class="field"><label for="label">Nom (facultatif)</label><input id="label" name="label" maxlength="100" placeholder="Compte personnel"></div>
+    <button class="btn btn-primary" type="submit">Vérifier et connecter</button>
+  </form>
+</details>
+{% endblock %}

@@ -27,7 +27,7 @@ Orbi est un projet open source qui permet de **lancer et suivre des tâches de d
 | **Support** | Tickets guidés par conversation, SLA, satisfaction (CSAT), alertes aux admins | Bot Telegram |
 | **Productivité** | Tâches, notes, minuteur de concentration | Bot Telegram |
 | **Outils développeur** | Événements GitHub reçus, journal d'erreurs, statistiques d'infrastructure | Bot Telegram (admins) |
-| **Dashboard admin** | Utilisateurs, tickets, indicateurs, lien de connexion généré depuis le bot | Web : `/admin/` |
+| **Administration** | Utilisateurs, tickets, état du système, dans la même interface | Web : `/admin/` |
 | **Communauté** *(optionnelle)* | Sondages, karma, modération de groupes | Bot Telegram — désactivée par défaut |
 
 Interface du bot en **français, anglais et arabe**.
@@ -111,7 +111,7 @@ La configuration de production est **fail-closed** : démarrage refusé si `JWT_
 | `GET` | `/api/v1/admin/users`, `/tickets` | Lecture seule (jeton Bearer) |
 | `GET` | `/api/v1/dev/health/stats`, `/errors/unresolved` | Infrastructure et erreurs (jeton Bearer) |
 | `POST` | `/webhook/telegram`, `/webhook/github` | Webhooks entrants (secret vérifié) |
-| `GET` | `/admin/` , `/admin/users`, `/admin/tickets` | Dashboard (session administrateur) |
+| `GET` | `/admin/`, `/admin/users`, `/admin/tickets`, `/admin/system` | Administration (session administrateur) |
 | `GET` | `/dev/…` | Interface mobile Orbi Dev (session administrateur, CSRF sur toute écriture) |
 
 ---
@@ -141,9 +141,10 @@ src/
 ├── models/              # Documents Beanie (utilisateurs, tickets, productivité, logs, communauté)
 ├── orbi_dev/            # Orbi Dev : modèles, machine à états, chiffrement, orchestration, connecteurs, worker
 │   └── connectors/      # Contrat de connecteur, Cursor Cloud Agents, fournisseur factice (hors production)
-├── web/                 # Authentification par lien magique, dashboard, interface Orbi Dev, CSRF
+├── web/                 # Authentification (lien magique, Mini App), pages Orbi Dev et administration, CSRF
 ├── api/                 # API Bearer admin et développeur
-├── templates/           # Gabarits Jinja2
+├── templates/           # Gabarits Jinja2 (un seul shell) et fragments htmx
+├── static/              # CSS, police et htmx auto-hébergés (aucun CDN)
 └── locales/             # Traductions fr / en / ar
 ```
 
