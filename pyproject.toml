@@ -2,8 +2,7 @@
 name = "orbi"
 version = "1.0.0"
 description = "Orbi — Assistant Universel Telegram @OrbiBot"
-# Beanie 2.x exige Python < 3.14 (voir docs/adr/0005-motor-to-pymongo-async.md)
-requires-python = ">=3.12,<3.14"
+requires-python = ">=3.12"
 dependencies = [
     # Telegram Bot
     "python-telegram-bot[ext]>=21.0,<23.0",
@@ -46,6 +45,21 @@ dev = [
     "httpx",
     "fakeredis>=2.26.0",
     "ruff>=0.6.0",
+]
+
+# Beanie 2.2.0 déclare « Requires-Python <3.14 » alors qu'il fonctionne en 3.14 (voir docs/adr/0006-python-3.14.md).
+# On ne corrige que cette métadonnée (dépendances inchangées, extras non utilisés omis) ;
+# à retirer dès que Beanie publie une version qui supporte officiellement 3.14.
+[[tool.uv.dependency-metadata]]
+name = "beanie"
+version = "2.2.0"
+requires-python = ">=3.10"
+requires-dist = [
+    "pydantic>=2.4,<3.0",
+    "click>=7",
+    "lazy-model>=0.4.0,<1.0.0",
+    "pymongo>=4.11.0,<5.0.0,!=4.15.0",
+    "typing-extensions>=4.7",
 ]
 
 [tool.ruff]

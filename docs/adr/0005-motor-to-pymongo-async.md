@@ -14,7 +14,7 @@ Passer à Beanie 2.2 + PyMongo `AsyncMongoClient` et retirer Motor.
 
 ## Conséquences
 
-- **Python < 3.14.** Beanie 2.2.0 déclare `requires-python <3.14`. `pyproject.toml` impose `>=3.12,<3.14`, l'image Docker revient en 3.13, la CI teste 3.12 et 3.13 et Dependabot ignore les images Python ≥ 3.14. À lever quand Beanie supportera 3.14.
+- **Python < 3.14 (levé par l'[ADR-0006](0006-python-3.14.md)).** Beanie 2.2.0 déclare `requires-python <3.14` ; la migration avait d'abord ramené le projet en 3.13. L'ADR-0006 rétablit 3.14 en corrigeant cette métadonnée.
 - **Les champs `Field(exclude=True)` ne sont plus persistés** par Beanie 2 (vérifié : le document stocké ne les contient pas). Le texte chiffré des clés d'intégration, qui utilisait ce mécanisme, est donc stocké dans sa propre collection (`orbi_dev_integration_secrets`), hors de tout modèle exposé à l'interface. Sans ce changement, les clés auraient été perdues silencieusement.
 - **Le client async est lié à la boucle d'événements qui l'a créé.** En production, un seul client vit dans la boucle d'Uvicorn. En test, toute la session partage une boucle (`asyncio_default_*_loop_scope = "session"`) et le `TestClient` synchrone est remplacé par un client httpx asynchrone.
 - **Les tests utilisent un vrai MongoDB.** `mongomock-motor` n'est plus compatible. Les tests exigent donc une instance MongoDB (service dans la CI, `docker run` en local) ; ils échouent avec un message explicite si elle est injoignable. En contrepartie, ils exercent les vrais index uniques et la vraie sémantique de mise à jour atomique.

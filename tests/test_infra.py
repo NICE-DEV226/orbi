@@ -71,3 +71,31 @@ class TestLivenessAndMetrics:
         assert response.status_code == 200
         assert 'route="/health"' in response.text
         assert "does-not-exist-123" not in response.text  # cardinalité bornée
+
+
+class TestLifespanShutdown:
+    async def test_failed_bot_start_does_not_cause_a_shutdown_error(self, caplog, monkeypatch):
+        """Token invalide : le bot ne démarre pas, l'arrêt ne doit ni tenter de l'arrêter ni logguer d'erreur."""
+        import logging
+        from unittest.mock import AsyncMock
+
+        import src.bot.app as bot_module
+        import src.main as main_module
+
+        monkeypatch.setenv("ORBI_DEV_REFRESH_INTERVAL", "0")
+        get_settings.cache_clear()
+        stop_bot = AsyncMock()
+        monkeypatch.setattr(bot_module, "create_bot_application", AsyncMock(return_value=object()))
+        monkeypatch.setattr(bot_module, "start_bot", AsyncMock(side_effect=RuntimeError("token rejected")))
+        monkeypatch.setattr(bot_module, "stop_bot", stop_bot)
+        for name in ("init_db", "init_redis", "close_redis", "close_db"):
+            monkeypatch.setattr(main_module, name, AsyncMock())
+        monkeypatch.setattr(main_module, "init_performance_optimizations", AsyncMock())
+        monkeypatch.setattr(main_module, "cleanup_performance_optimizations", AsyncMock())
+
+        with caplog.at_level(logging.ERROR):
+            async with main_module.lifespan(main_module.create_app()):
+                pass
+
+        stop_bot.assert_not_awaited()
+        assert "Erreur à l'arrêt" not in caplog.text

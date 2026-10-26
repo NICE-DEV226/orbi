@@ -88,16 +88,18 @@ Les tests utilisent un **vrai MongoDB** (Redis est simulé). Démarrez une insta
 
 ```bash
 docker run -d --rm --name orbi_test_mongo -p 127.0.0.1:27017:27017 mongo:7.0.45
-pip install -e ".[dev]"
-TELEGRAM_BOT_TOKEN=test pytest
+uv sync --all-extras
+TELEGRAM_BOT_TOKEN=test uv run pytest
 ```
 
-Pour une autre instance, définissez `MONGODB_TEST_URI` (une base jetable y est créée puis supprimée). Python 3.12 ou 3.13 : Beanie 2 ne supporte pas encore 3.14.
+> **Installer avec `uv`.** Sur Python 3.14, `pip install` échoue car Beanie y déclare une borne `<3.14` que le lockfile corrige (ADR-0006). `uv sync` installe exactement les versions verrouillées ; `pip` reste utilisable en 3.12 et 3.13.
+
+Pour une autre instance, définissez `MONGODB_TEST_URI` (une base jetable y est créée puis supprimée). Python 3.12 à 3.14 (Beanie 2 ne déclare pas encore 3.14 mais y fonctionne : voir ADR-0006).
 
 ### En développement local :
 ```bash
-# 1. Installez les dépendances
-pip install -e .
+# 1. Installez les dépendances (versions verrouillées)
+uv sync
 
 # 2. Démarrez MongoDB et Redis localement
 # MongoDB : mongod
