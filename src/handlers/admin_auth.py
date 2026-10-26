@@ -8,8 +8,9 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import CallbackQueryHandler, ContextTypes
+from telegram.ext import CallbackQueryHandler, CommandHandler, ContextTypes, filters
 
+from src.bot.keyboards import orbi_dev_button
 from src.core.config import get_settings
 from src.core.i18n import t
 from src.core.redis import get_redis
@@ -29,13 +30,23 @@ async def request_magic_link(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not context.user_data:
         return
 
+    # Le lien donne accès au dashboard : jamais dans un groupe ou un canal, où tous les membres le verraient.
+    chat = update.effective_chat
+    if chat is not None and chat.type != "private":
+        message = "🔒 Cette commande n'est disponible qu'en message privé avec le bot."
+        if update.callback_query:
+            await update.callback_query.answer(message, show_alert=True)
+        elif update.effective_message:
+            await update.effective_message.reply_text(message)
+        return
+
     db_user = context.user_data.get("db_user")
     if not db_user or db_user.role not in ["admin", "superadmin"]:
         lang = context.user_data.get("lang", "fr")
         if update.callback_query:
-            await update.callback_query.edit_message_text(
-                "🚫 Accès réservé aux administrateurs"
-            )
+            await update.callback_query.edit_message_text("🚫 Accès réservé aux administrateurs")
+        elif update.effective_message:
+            await update.effective_message.reply_text("🚫 Accès réservé aux administrateurs")
         return
 
     # Générer un Magic Link unique
@@ -55,26 +66,39 @@ async def request_magic_link(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     # Envoyer le lien par Telegram
     lang = context.user_data.get("lang", "fr")
+    settings = get_settings()
 
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔐 Se connecter au Dashboard", url=login_url)],
-        [InlineKeyboardButton(t("common.back", lang), callback_data="nav:home")]
-    ])
+    rows = []
+    # Telegram refuse les boutons-liens vers une URL non publique (http://localhost) : bouton seulement en https,
+    # le lien reste toujours dans le texte du message.
+    if settings.public_https:
+        rows.append([InlineKeyboardButton("🔐 Se connecter au Dashboard", url=login_url)])
+    mini_app = orbi_dev_button()
+    if mini_app:
+        rows.append([mini_app])
+    rows.append([InlineKeyboardButton(t("common.back", lang), callback_data="nav:home")])
+    keyboard = InlineKeyboardMarkup(rows)
 
-    text = """
-🔐 **Lien de connexion Admin Dashboard**
-
-Voici votre lien sécurisé pour accéder au dashboard web :
-
-⏰ *Valide pendant 10 minutes*
-
-📊 *Accès complet aux fonctionnalités d'administration*
-    """
+    text = (
+        "🔐 <b>Connexion au dashboard</b>\n\n"
+        f"Lien à usage unique, valable 10 minutes :\n{login_url}\n\n"
+        "Depuis Telegram, le bouton « Orbi Dev » s'ouvre directement, sans lien."
+    )
 
     if update.callback_query:
         await update.callback_query.edit_message_text(text, reply_markup=keyboard)
     else:
         await update.effective_message.reply_text(text, reply_markup=keyboard)
+
+
+async def web_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/web : envoie le lien de connexion au dashboard (administrateurs)."""
+    await request_magic_link(update, context)
+
+
+async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """/admin : ouvre le panneau d'administration (administrateurs)."""
+    await show_admin_panel(update, context)
 
 
 async def show_admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -89,9 +113,9 @@ async def show_admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if not db_user or db_user.role not in ["admin", "superadmin"]:
         lang = context.user_data.get("lang", "fr")
         if update.callback_query:
-            await update.callback_query.edit_message_text(
-                "🚫 Accès réservé aux administrateurs"
-            )
+            await update.callback_query.edit_message_text("🚫 Accès réservé aux administrateurs")
+        elif update.effective_message:
+            await update.effective_message.reply_text("🚫 Accès réservé aux administrateurs")
         return
 
     lang = context.user_data.get("lang", "fr")
@@ -183,6 +207,10 @@ async def show_admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 def register_admin_handlers(application) -> None:
     """Enregistre les handlers d'administration."""
+
+    # Commandes d'accès (administrateurs)
+    application.add_handler(CommandHandler("web", web_command, filters=filters.ChatType.PRIVATE))
+    application.add_handler(CommandHandler("admin", admin_command, filters=filters.ChatType.PRIVATE))
 
     # Panneau admin
     application.add_handler(CallbackQueryHandler(show_admin_panel, pattern=r"^admin:panel$"))

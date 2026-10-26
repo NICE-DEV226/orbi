@@ -19,6 +19,7 @@ from src.bot.keyboards import (
     CB_MODULE_PRODUCTIVITY,
     CB_MODULE_SUPPORT,
     main_menu_keyboard,
+    orbi_dev_button,
 )
 from src.core.config import get_settings
 from src.core.i18n import t
@@ -80,7 +81,7 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # Pour s'assurer qu'il prend bien le titre
     text = t("menu.main.title", lang)
 
-    keyboard = main_menu_keyboard(lang)
+    keyboard = main_menu_keyboard(lang, is_admin=bool(getattr(context.user_data.get("db_user"), "is_admin", False)))
 
     await send_or_edit_menu(update, context, text, keyboard)
 
@@ -170,10 +171,9 @@ async def show_developers_menu(update: Update, context: ContextTypes.DEFAULT_TYP
             InlineKeyboardButton(t("developers.stats", lang), callback_data="dev:stats"),
         ],
     ]
-    # Telegram n'accepte que des liens https pour les boutons URL
-    base_url = get_settings().BASE_URL.rstrip("/")
-    if base_url.startswith("https://"):
-        rows.append([InlineKeyboardButton("🤖 Orbi Dev (web)", url=f"{base_url}/dev/")])
+    mini_app = orbi_dev_button()
+    if mini_app:
+        rows.append([mini_app])
     rows.append([InlineKeyboardButton(t("common.home", lang), callback_data=CB_HOME)])
     keyboard = InlineKeyboardMarkup(rows)
 

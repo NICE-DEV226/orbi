@@ -12,6 +12,9 @@ Documentation de cadrage pour la reprise progressive du dépôt. Les documents d
 - [ADR-0002 : intégration d'agents existants](adr/0002-integrate-existing-agents.md) — stratégie des connecteurs.
 - [ADR-0003 : modèle durable d'exécution](adr/0003-durable-execution-model.md) — tâches, exécutions et événements.
 - [ADR-0004 : premier fournisseur d'agent](adr/0004-first-agent-provider.md) — comparaison sourcée et choix proposé.
+- [ADR-0005 : Motor → PyMongo async](adr/0005-motor-to-pymongo-async.md) — migration Beanie 2.
+- [ADR-0006 : Python 3.14](adr/0006-python-3.14.md) — correction de la métadonnée de Beanie.
+- [ADR-0007 : Mini App Telegram](adr/0007-telegram-mini-app.md) — accès web depuis Telegram, cookies, limites.
 
 ## Statut
 

@@ -107,6 +107,17 @@ def create_app() -> FastAPI:
 
     app.middleware("http")(metrics_middleware)
 
+    @app.middleware("http")
+    async def security_headers(request, call_next):
+        response = await call_next(request)
+        # Telegram Web charge les Mini Apps dans une iframe : seuls notre origine et les domaines Telegram peuvent nous encadrer.
+        response.headers.setdefault(
+            "Content-Security-Policy", "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org"
+        )
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "same-origin")
+        return response
+
     # ── Liveness : le process répond (aucune dépendance externe) ──
     @app.get("/livez", tags=["Infrastructure"], include_in_schema=False)
     async def liveness() -> dict:

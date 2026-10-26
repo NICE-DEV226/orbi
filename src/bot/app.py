@@ -6,7 +6,7 @@ Enregistre les middlewares (i18n, auth, rate limit, logging).
 
 import logging
 
-from telegram import Update
+from telegram import MenuButtonWebApp, Update, WebAppInfo
 from telegram.ext import Application, ApplicationBuilder, Defaults, TypeHandler
 
 from src.bot.middlewares.auth import AuthMiddleware
@@ -128,6 +128,25 @@ async def create_bot_application() -> Application:
     return application
 
 
+async def configure_menu_button(application: Application) -> None:
+    """
+    Place le bouton « Orbi Dev » (Mini App) à côté du champ de saisie, pour le compte superadmin uniquement
+    (les autres administrateurs utilisent le bouton du menu principal). Sans effet si BASE_URL n'est pas en https.
+    """
+    settings = get_settings()
+    if not settings.public_https or not settings.ADMIN_CHAT_ID:
+        return
+    try:
+        await application.bot.set_chat_menu_button(
+            chat_id=settings.ADMIN_CHAT_ID,
+            menu_button=MenuButtonWebApp(
+                text="Orbi Dev", web_app=WebAppInfo(url=f"{settings.BASE_URL.rstrip('/')}/dev/")
+            ),
+        )
+    except Exception as e:  # le bouton est un confort : ne jamais empêcher le bot de démarrer
+        logger.warning("Bouton de menu Mini App non configuré : %s", type(e).__name__)
+
+
 async def start_bot(application: Application) -> None:
     """Démarre le bot selon le mode configuré."""
     settings = get_settings()
@@ -142,6 +161,7 @@ async def start_bot(application: Application) -> None:
         )
         await application.initialize()
         await application.start()
+        await configure_menu_button(application)
     else:
         # Mode polling (développement)
         logger.info("Démarrage en mode polling")
@@ -151,6 +171,7 @@ async def start_bot(application: Application) -> None:
             allowed_updates=["message", "callback_query", "my_chat_member"],
             drop_pending_updates=True,
         )
+        await configure_menu_button(application)
 
 
 async def stop_bot(application: Application) -> None:

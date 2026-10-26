@@ -55,7 +55,13 @@ SECRETS_ENCRYPTION_KEY=<la clé générée>
 
 Sans cette clé, aucune clé fournisseur ne peut être enregistrée (l'application l'indique explicitement). Pour la rotation, listez plusieurs clés séparées par des virgules : la première chiffre, toutes déchiffrent.
 
-Connexion au dashboard : dans le bot, ouvrez le panneau administrateur (réservé aux rôles `admin`/`superadmin`) puis « Obtenir un lien Dashboard » ; le lien est à usage unique et valable 10 minutes.
+#### Accéder à l'interface web (rôle `admin` ou `superadmin` requis)
+
+- **Depuis Telegram (Mini App)** : bouton « 🤖 Orbi Dev » du menu principal (ou à côté du champ de saisie pour le superadmin). Connexion automatique, sans lien. **Nécessite `BASE_URL` en https public** (domaine ou tunnel) : Telegram refuse les Mini Apps sur `http://localhost`.
+- **Depuis un navigateur** : envoyez `/web` au bot ; il répond avec un lien à usage unique valable 10 minutes. En développement (`http://localhost:8000`), le lien est dans le texte du message.
+- `/admin` ouvre le panneau d'administration du bot.
+
+Le compte doit d'abord exister : envoyez `/start` au bot, puis (premier superadmin) lancez l'application avec `ADMIN_CHAT_ID` renseigné.
 
 ### 5. Module Communauté (optionnel)
 

@@ -3,7 +3,7 @@ Orbi — Constantes de callback_data et constructeurs de claviers inline.
 Point centralisé pour éviter les chaînes magiques dans les handlers.
 """
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 from src.core.config import get_settings
 from src.core.i18n import t
@@ -55,26 +55,43 @@ def language_selector_keyboard() -> InlineKeyboardMarkup:
     ])
 
 
-def main_menu_keyboard(lang: str) -> InlineKeyboardMarkup:
-    """Clavier du menu principal. Le module Communauté n'apparaît que s'il est activé (ENABLE_COMMUNITY)."""
+def orbi_dev_button(label: str = "🤖 Orbi Dev") -> InlineKeyboardButton | None:
+    """Bouton qui ouvre Orbi Dev comme Mini App Telegram. Telegram exige une URL https publique : sinon, pas de bouton."""
+    settings = get_settings()
+    if not settings.public_https:
+        return None
+    return InlineKeyboardButton(label, web_app=WebAppInfo(url=f"{settings.BASE_URL.rstrip('/')}/dev/"))
+
+
+def main_menu_keyboard(lang: str, is_admin: bool = False) -> InlineKeyboardMarkup:
+    """
+    Clavier du menu principal. Le module Communauté n'apparaît que s'il est activé (ENABLE_COMMUNITY) ;
+    Orbi Dev et l'administration n'apparaissent que pour les administrateurs.
+    """
     support = InlineKeyboardButton(t("menu.main.support", lang), callback_data=CB_MODULE_SUPPORT)
     productivity = InlineKeyboardButton(t("menu.main.productivity", lang), callback_data=CB_MODULE_PRODUCTIVITY)
     developers = InlineKeyboardButton(t("menu.main.developers", lang), callback_data=CB_MODULE_DEVELOPERS)
     profile = InlineKeyboardButton(t("menu.main.profile", lang), callback_data=CB_MODULE_PROFILE)
 
-    if not get_settings().ENABLE_COMMUNITY:
-        return InlineKeyboardMarkup([[support, productivity], [developers], [profile]])
+    if get_settings().ENABLE_COMMUNITY:
+        community = InlineKeyboardButton(t("menu.main.community", lang), callback_data=CB_MODULE_COMMUNITY)
+        rows = [
+            [support, community],
+            [productivity, developers],
+            [profile],
+            [
+                InlineKeyboardButton("👥 Ajouter à un groupe", callback_data="group:add"),
+                InlineKeyboardButton("📢 Ajouter à un canal", callback_data="channel:add"),
+            ],
+        ]
+    else:
+        rows = [[support, productivity], [developers], [profile]]
 
-    community = InlineKeyboardButton(t("menu.main.community", lang), callback_data=CB_MODULE_COMMUNITY)
-    return InlineKeyboardMarkup([
-        [support, community],
-        [productivity, developers],
-        [profile],
-        [
-            InlineKeyboardButton("👥 Ajouter à un groupe", callback_data="group:add"),
-            InlineKeyboardButton("📢 Ajouter à un canal", callback_data="channel:add"),
-        ],
-    ])
+    if is_admin:
+        admin_row = [InlineKeyboardButton("🔐 Administration", callback_data="admin:panel")]
+        mini_app = orbi_dev_button()
+        rows.insert(0, [mini_app] + admin_row if mini_app else admin_row)
+    return InlineKeyboardMarkup(rows)
 
 
 def profile_keyboard(lang: str) -> InlineKeyboardMarkup:
