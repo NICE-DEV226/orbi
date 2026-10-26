@@ -13,6 +13,7 @@ from telegram.ext import CallbackQueryHandler, ContextTypes
 from src.core.config import get_settings
 from src.core.i18n import t
 from src.core.redis import get_redis
+from src.core.text import esc
 
 logger = logging.getLogger("orbi.handlers.admin_auth")
 
@@ -106,7 +107,7 @@ async def show_admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     text = f"""
 🛠️ **Panneau Administrateur**
 
-Bienvenue, *{db_user.display_name}* !
+Bienvenue, *{esc(db_user.display_name)}* !
 
 📊 *Rôle* : {db_user.role.upper()}
 🔑 *ID* : `{db_user.telegram_id}`

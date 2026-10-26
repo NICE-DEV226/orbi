@@ -22,6 +22,7 @@ from src.bot.keyboards import (
 from src.core.config import get_settings
 from src.core.i18n import t
 from src.core.i18n import t as translate_func
+from src.core.text import esc
 from src.models.user import NotificationPreferences, User
 
 logger = logging.getLogger("orbi.handlers.profile")
@@ -65,7 +66,7 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     text = f"👤 **{translate_func('profile.title', lang)}**\n\n" + translate_func(
         "profile.info",
         lang,
-        name=db_user.display_name,
+        name=esc(db_user.display_name),
         lang_code=LANG_LABELS.get(db_user.language, db_user.language),
         role=role_label,
         joined=joined,
@@ -136,7 +137,7 @@ async def language_changed_from_profile(update: Update, context: ContextTypes.DE
     text += "\n\n" + t("profile.title", new_lang) + "\n\n" + t(
         "profile.info",
         new_lang,
-        name=db_user.display_name,
+        name=esc(db_user.display_name),
         lang=LANG_LABELS.get(new_lang, new_lang),
         role=role_label,
         joined=joined,

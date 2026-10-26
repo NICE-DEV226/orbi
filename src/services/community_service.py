@@ -130,7 +130,7 @@ async def add_karma(
 
 async def get_top_karma_users(limit: int = 10) -> list[User]:
     """Récupère le classement des utilisateurs par Karma."""
-    return await User.find().sort(-User.karma_points).limit(limit).to_list()
+    return await User.find(User.karma_points > 0).sort(-User.karma_points).limit(limit).to_list()
 
 
 # ─────────────────────────────────────

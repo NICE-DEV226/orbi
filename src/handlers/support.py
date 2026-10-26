@@ -18,6 +18,7 @@ from telegram.ext import (
 
 from src.bot.keyboards import CB_HOME, CB_MODULE_SUPPORT
 from src.core.i18n import t
+from src.core.text import esc
 from src.models.ticket import SLA_SECONDS, TicketCategory
 from src.services.ticket_service import (
     MAX_OPEN_TICKETS,
@@ -330,7 +331,7 @@ async def show_my_tickets(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     buttons = []
     for tk in tickets:
         emoji = status_emoji.get(tk.status.value, "❓")
-        lines.append(f"{emoji} <b>{tk.ticket_id}</b> — {tk.subject[:30]}")
+        lines.append(f"{emoji} <b>{tk.ticket_id}</b> — {esc(tk.subject[:30])}")
         buttons.append([
             InlineKeyboardButton(
                 f"{emoji} {tk.ticket_id}",
@@ -398,12 +399,12 @@ async def view_ticket_detail(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if ticket.messages:
         last = ticket.messages[-1]
         role_label = {"user": "👤", "agent": "🎧"}.get(last.get("role", ""), "")
-        last_msg = f"\n\n💬 Dernier message : {role_label} {last.get('text', '')[:100]}"
+        last_msg = f"\n\n💬 Dernier message : {role_label} {esc(last.get('text', '')[:100])}"
 
     text = (
         f"🎫 <b>Ticket {ticket.ticket_id}</b>\n\n"
         f"📂 Catégorie : {category}\n"
-        f"📝 Sujet : {ticket.subject}\n"
+        f"📝 Sujet : {esc(ticket.subject)}\n"
         f"📊 Statut : {status}\n"
         f"⏰ Créé le : {ticket.created_at.strftime('%d/%m/%Y %H:%M')}"
         f"{'  ⚠️ SLA dépassé' if ticket.sla_breached else ''}"

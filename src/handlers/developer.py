@@ -11,6 +11,7 @@ from telegram.ext import CallbackQueryHandler, ContextTypes
 
 from src.bot.keyboards import CB_MODULE_DEVELOPERS
 from src.core.i18n import t
+from src.core.text import esc
 from src.models.user import User
 from src.services.developer_service import (
     get_api_logs_stats,
@@ -56,14 +57,14 @@ async def show_github_events(update: Update, context: ContextTypes.DEFAULT_TYPE)
         for ev in events:
             date_str = ev.received_at.strftime("%d/%m %H:%M")
             repo = ev.repository.split("/")[-1]
-            text += f"▪️ <b>[{date_str}] {ev.event_type}</b> sur {repo} by {ev.sender}\n"
+            text += f"▪️ <b>[{date_str}] {esc(ev.event_type)}</b> sur {esc(repo)} by {esc(ev.sender)}\n"
 
             # Détails extraits
             if ev.payload_details:
                 if "message" in ev.payload_details:
-                    text += f"   💬 <i>{ev.payload_details['message'][:50]}...</i>\n"
+                    text += f"   💬 <i>{esc(ev.payload_details['message'][:50])}...</i>\n"
                 elif "title" in ev.payload_details:
-                    text += f"   📌 <i>{ev.payload_details['title']} ({ev.payload_details.get('state', '')})</i>\n"
+                    text += f"   📌 <i>{esc(ev.payload_details['title'])} ({esc(ev.payload_details.get('state', ''))})</i>\n"
 
     buttons = [[InlineKeyboardButton(t("common.back", context.user_data.get("lang", "fr")), callback_data=CB_MODULE_DEVELOPERS)]]
     await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons))
@@ -102,7 +103,7 @@ async def show_infra_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     text += "🧠 <b>Cache Redis :</b>\n"
     if "error" in redis_stats:
-        text += f"└ ⚠️ Erreur: {redis_stats['error']}\n"
+        text += f"└ ⚠️ Erreur: {esc(redis_stats['error'])}\n"
     else:
         text += f"├ Version : {redis_stats.get('version')}\n"
         text += f"├ Uptime : {redis_stats.get('uptime_days')} jours\n"
@@ -140,8 +141,8 @@ async def show_error_logs(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     else:
         for err in errors:
             date_str = err.occurred_at.strftime("%d/%m %H:%M")
-            text += f"▪️ [{date_str}] <b>{err.service}</b>\n"
-            text += f"   ❌ {err.error_message[:40]}...\n"
+            text += f"▪️ [{date_str}] <b>{esc(err.service)}</b>\n"
+            text += f"   ❌ {esc(err.error_message[:40])}...\n"
 
             buttons.append([InlineKeyboardButton(f"✅ Marquer résolu ({err.service})", callback_data=f"dev_err_resolve:{err.id}")])
 

@@ -18,6 +18,7 @@ from telegram.ext import (
 
 from src.bot.keyboards import CB_HOME, CB_MODULE_COMMUNITY
 from src.core.i18n import t
+from src.core.text import esc
 from src.models.user import User
 from src.services.community_service import (
     close_poll,
@@ -65,7 +66,7 @@ async def show_polls(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     buttons = []
 
     for p in polls:
-        text += f"🔹 {p.question} ({p.total_votes} votes)\n"
+        text += f"🔹 {esc(p.question)} ({p.total_votes} votes)\n"
         buttons.append([InlineKeyboardButton(f"🗳️ {p.question[:20]}...", callback_data=f"poll_view:{p.id}")])
 
     buttons.append([InlineKeyboardButton(t("community.create_poll", lang), callback_data="community:poll_new")])
@@ -93,13 +94,13 @@ async def view_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     db_user: User = context.user_data.get("db_user")
     has_voted = db_user.telegram_id in poll.voters
 
-    text = f"📊 <b>{poll.question}</b>\n\n"
+    text = f"📊 <b>{esc(poll.question)}</b>\n\n"
     buttons = []
 
     for i, opt in enumerate(poll.options):
         qty = opt["votes"]
         pct = (qty / poll.total_votes * 100) if poll.total_votes > 0 else 0
-        text += f"▪️ {opt['text']} — {qty} votes ({pct:.1f}%)\n"
+        text += f"▪️ {esc(opt['text'])} — {qty} votes ({pct:.1f}%)\n"
 
         if not has_voted and poll.is_active:
             buttons.append([InlineKeyboardButton(f"Voter : {opt['text']}", callback_data=f"poll_vote:{poll.id}:{i}")])
@@ -230,9 +231,9 @@ async def poll_options_received(update: Update, context: ContextTypes.DEFAULT_TY
     poll = await create_poll(question, options, db_user.telegram_id, end_date=end_date)
 
     msg = {
-        "fr": f"✅ Sondage créé !\n\n<b>{poll.question}</b>",
-        "en": f"✅ Poll created!\n\n<b>{poll.question}</b>",
-        "ar": f"✅ تم إنشاء الاستطلاع!\n\n<b>{poll.question}</b>",
+        "fr": f"✅ Sondage créé !\n\n<b>{esc(poll.question)}</b>",
+        "en": f"✅ Poll created!\n\n<b>{esc(poll.question)}</b>",
+        "ar": f"✅ تم إنشاء الاستطلاع!\n\n<b>{esc(poll.question)}</b>",
     }
 
     await update.message.reply_text(
@@ -281,7 +282,7 @@ async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     for i, u in enumerate(top_users):
         medal = "🥇" if i == 0 else "🥈" if i == 1 else "🥉" if i == 2 else f"{i+1}."
-        text += f"{medal} <b>{u.display_name}</b> — {u.karma_points} pts\n"
+        text += f"{medal} <b>{esc(u.display_name)}</b> — {u.karma_points} pts\n"
 
     await query.edit_message_text(
         text,
