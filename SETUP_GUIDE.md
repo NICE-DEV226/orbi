@@ -92,7 +92,7 @@ pip install -e ".[dev]"
 TELEGRAM_BOT_TOKEN=test pytest
 ```
 
-Pour une autre instance, définissez `MONGODB_TEST_URI` (une base jetable y est créée puis supprimée). Python 3.12 ou 3.13 : Beanie 2 ne supporte pas encore 3.14.
+Pour une autre instance, définissez `MONGODB_TEST_URI` (une base jetable y est créée puis supprimée). Python 3.12 à 3.14 (Beanie 2 ne déclare pas encore 3.14 mais y fonctionne : voir ADR-0006).
 
 ### En développement local :
 ```bash

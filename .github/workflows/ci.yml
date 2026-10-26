@@ -21,8 +21,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.12 = minimum supporté ; 3.13 = version de l'image Docker (Beanie 2 exige Python < 3.14)
-        python: ["3.12", "3.13"]
+        # 3.12 = minimum supporté ; 3.14 = version de l'image Docker de production ; 3.13 = intermédiaire
+        python: ["3.12", "3.13", "3.14"]
     services:
       mongodb:
         image: mongo:7.0.45

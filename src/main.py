@@ -49,12 +49,14 @@ async def lifespan(app: FastAPI):
 
     dev_worker = start_worker()
     bot_app = None
+    bot_started = False
     scheduler_started = False
     try:
         # Démarrage du bot Telegram
         from src.bot.app import create_bot_application, start_bot, stop_bot
         bot_app = await create_bot_application()
         await start_bot(bot_app)
+        bot_started = True
         app.state.bot_app = bot_app  # Stocke la référence pour les webhooks
         logger.info("🤖 Bot Telegram démarré")
 
@@ -78,7 +80,7 @@ async def lifespan(app: FastAPI):
         if scheduler_started:
             from src.services.scheduler import stop_scheduler
             await stop_scheduler()
-        if bot_app is not None:
+        if bot_started and bot_app is not None:  # inutile (et en erreur) si le démarrage a échoué
             from src.bot.app import stop_bot
             await stop_bot(bot_app)
     except Exception:
