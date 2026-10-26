@@ -57,7 +57,7 @@ async def request_magic_link(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔐 Se connecter au Dashboard", url=login_url)],
-        [InlineKeyboardButton(t("common.back", lang), callback_data="mod:home")]
+        [InlineKeyboardButton(t("common.back", lang), callback_data="nav:home")]
     ])
 
     text = """
@@ -100,15 +100,7 @@ async def show_admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             InlineKeyboardButton("🔐 Obtenir un lien Dashboard", callback_data="admin:magic_link"),
             InlineKeyboardButton("📊 Voir les statistiques", callback_data="admin:stats"),
         ],
-        [
-            InlineKeyboardButton("👥 Gérer les utilisateurs", callback_data="admin:users"),
-            InlineKeyboardButton("🎧 Gérer les tickets", callback_data="admin:tickets"),
-        ],
-        [
-            InlineKeyboardButton("⚙️ Configuration du bot", callback_data="admin:config"),
-            InlineKeyboardButton("📢 Envoyer une annonce", callback_data="admin:broadcast"),
-        ],
-        [InlineKeyboardButton(t("common.back", lang), callback_data="mod:home")]
+        [InlineKeyboardButton(t("common.back", lang), callback_data="nav:home")]
     ])
 
     text = f"""
@@ -120,7 +112,7 @@ Bienvenue, *{db_user.display_name}* !
 🔑 *ID* : `{db_user.telegram_id}`
 ⏰ *Connecté* : {datetime.now(UTC).strftime("%H:%M:%S")}
 
-Que souhaitez-vous gérer ?
+Que souhaitez-vous faire ?
     """
 
     if update.callback_query:
@@ -188,48 +180,6 @@ async def show_admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await update.effective_message.reply_text(text, reply_markup=keyboard)
 
 
-async def broadcast_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Envoie un message à tous les utilisateurs."""
-    if update.callback_query:
-        await update.callback_query.answer()
-
-    if not context.user_data:
-        return
-
-    db_user = context.user_data.get("db_user")
-    if not db_user or db_user.role != "superadmin":
-        lang = context.user_data.get("lang", "fr")
-        if update.callback_query:
-            await update.callback_query.edit_message_text(
-                "🚫 Accès réservé au Super Admin"
-            )
-        return
-
-    lang = context.user_data.get("lang", "fr")
-
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📢 Envoyer à tous", callback_data="admin:broadcast_all")],
-        [InlineKeyboardButton("👥 Envoyer aux admins", callback_data="admin:broadcast_admins")],
-        [InlineKeyboardButton(t("common.back", lang), callback_data="admin:panel")]
-    ])
-
-    text = """
-📢 **Centre d'Annonce**
-
-Choisissez la cible de votre message :
-
-📋 *Tous les utilisateurs actifs*
-👥 *Administrateurs uniquement*
-
-⚠️ *Utilisez avec responsabilité*
-    """
-
-    if update.callback_query:
-        await update.callback_query.edit_message_text(text, reply_markup=keyboard)
-    else:
-        await update.effective_message.reply_text(text, reply_markup=keyboard)
-
-
 def register_admin_handlers(application) -> None:
     """Enregistre les handlers d'administration."""
 
@@ -239,17 +189,5 @@ def register_admin_handlers(application) -> None:
 
     # Statistiques
     application.add_handler(CallbackQueryHandler(show_admin_stats, pattern=r"^admin:stats$"))
-
-    # Annonces
-    application.add_handler(CallbackQueryHandler(broadcast_message, pattern=r"^admin:broadcast$"))
-
-    # Handlers temporaires pour les callbacks non implémentés
-    application.add_handler(CallbackQueryHandler(
-        lambda u, c: c.bot.send_message(
-            chat_id=u.effective_chat.id,
-            text="🔧 Fonctionnalité en développement"
-        ),
-        pattern=r"^admin:(users|tickets|config|broadcast_all|broadcast_admins)$"
-    ))
 
     logger.info("Handlers admin auth enregistrés")

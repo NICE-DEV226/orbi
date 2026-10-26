@@ -4,7 +4,6 @@ Connecte les requêtes HTTP (Navigateur) aux vues HTML (Jinja2).
 """
 
 import re
-from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
@@ -90,35 +89,9 @@ async def tickets_manager(request: Request, admin: User = Depends(require_admin)
         except Exception:
             pass
 
-    # Helper Jinja2 pour accéder à datetime.now
-    def now_func():
-        return datetime.now(UTC)
-
     return templates.TemplateResponse(request, "tickets.html", {
         "admin": admin,
         "active_tab": "tickets",
         "tickets": tickets,
         "selected_ticket": selected_ticket,
-        "now": now_func
-    })
-
-
-@router.get("/broadcasts", response_class=HTMLResponse)
-async def broadcasts_manager(request: Request, admin: User = Depends(require_admin)):
-    """Affiche l'interface de diffusion de messages."""
-    # Simulation des derniers broadcasts pour l'UI (le modèle Broadcast n'ayant pas été requis jusqu'ici)
-    mock_broadcasts = [
-         {
-             "created_at": datetime.now(UTC) - timedelta(hours=2),
-             "message_fr": "Alerte maintenance : le service sera indisponible de 2h à 4h cette nuit.",
-             "target_lang": "all",
-             "delivered_count": 1450,
-             "failed_count": 12
-         }
-    ]
-
-    return templates.TemplateResponse(request, "broadcasts.html", {
-        "admin": admin,
-        "active_tab": "broadcasts",
-        "broadcasts": mock_broadcasts
     })

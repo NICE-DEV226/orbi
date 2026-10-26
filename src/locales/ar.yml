@@ -103,13 +103,10 @@ productivity:
 
 # ── Developers ──
 developers:
-  menu_title: "👨‍💻 **المطورون**\n\nإدارة تكاملات API الخاصة بك:"
-  api_keys: "🔑 مفاتيح API الخاصة بي"
-  webhooks: "🔗 الـ Webhooks الخاصة بي"
-  sandbox: "🧪 بيئة الاختبار"
-  logs: "📊 سجلات API"
+  menu_title: "👨‍💻 **المطورون**\n\nمراقبة البنية التحتية:"
+  webhooks: "🔗 أحداث GitHub"
+  logs: "📊 الأخطاء"
   stats: "📈 الإحصائيات"
-  docs: "📖 وثائق API"
 
 # ── Notifications ──
 notifications:

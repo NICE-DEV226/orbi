@@ -50,21 +50,3 @@ async def unresolved_errors(dev: dict = Depends(verify_dev_token)) -> dict[str, 
         "count": len(errors),
         "errors": [e.model_dump() for e in errors]
     }
-
-
-@dev_router.post("/test-log")
-async def test_error_log(
-    service: str,
-    message: str,
-    dev: dict = Depends(verify_dev_token)
-) -> dict[str, str]:
-    """Force la création d'une erreur dans les logs (utile pour tester le dashboard)."""
-    from src.services.developer_service import log_error
-
-    err = await log_error(
-        service=service,
-        error_message=message,
-        metadata={"source": "api_test"}
-    )
-
-    return {"status": "created", "error_id": str(err.id)}

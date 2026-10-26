@@ -108,10 +108,6 @@ async def create_bot_application() -> Application:
     from src.handlers.developer import register_developer_handlers
     register_developer_handlers(application)
 
-    # Handlers de test
-    from src.handlers.test import register_test_handlers
-    register_test_handlers(application)
-
     # Handlers utilitaires pour groupes
     from src.handlers.group_utils import register_group_utils_handlers
     register_group_utils_handlers(application)
@@ -122,9 +118,6 @@ async def create_bot_application() -> Application:
 
     from src.handlers.group_management import register_group_handlers
     register_group_handlers(application)
-
-    from src.handlers.developer_real import register_developer_handlers as register_real_dev_handlers
-    register_real_dev_handlers(application)
 
     logger.info(
         "Bot Telegram initialisé (mode=%s, middlewares=4, handlers=phase3+4+5+6+7+8)",

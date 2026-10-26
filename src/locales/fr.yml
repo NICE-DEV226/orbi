@@ -103,13 +103,10 @@ productivity:
 
 # ── Développeurs ──
 developers:
-  menu_title: "👨‍💻 **Développeurs**\n\nGérez vos intégrations API :"
-  api_keys: "🔑 Mes API Keys"
-  webhooks: "🔗 Mes Webhooks"
-  sandbox: "🧪 Sandbox"
-  logs: "📊 Logs API"
+  menu_title: "👨‍💻 **Développeurs**\n\nSuivi de l'infrastructure :"
+  webhooks: "🔗 Événements GitHub"
+  logs: "📊 Erreurs"
   stats: "📈 Statistiques"
-  docs: "📖 Documentation API"
 
 # ── Notifications ──
 notifications:

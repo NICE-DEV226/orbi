@@ -62,16 +62,3 @@ async def list_tickets(
         "data": [t.model_dump() for t in tickets],
         "count": len(tickets)
     }
-
-
-@admin_router.post("/broadcast")
-async def broadcast_message(
-    message: dict,
-    admin: dict = Depends(verify_admin_token)
-) -> dict[str, str]:
-    """Envoie un message via le bot à une liste d'utilisateurs. (Squelette)"""
-    text = message.get("text")
-    if not text:
-        raise HTTPException(status_code=400, detail="Text is required")
-
-    return {"status": "accepted", "message": "Broadcast queued (wip)"}

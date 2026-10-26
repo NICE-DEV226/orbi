@@ -56,7 +56,7 @@
                 <h6 class="mb-1 text-truncate">{{ ticket.subject }}</h6>
                 <small class="text-muted">{{ ticket.created_at.strftime('%d/%m %H:%M') }}</small>
             </div>
-            <p class="mb-1 text-muted small">Par @{{ ticket.user_id }} — Priorité : <span class="badge bg-{{ 'danger' if ticket.priority == 'high' else 'warning' if ticket.priority == 'medium' else 'info' }}">{{ ticket.priority }}</span></p>
+            <p class="mb-1 text-muted small">Par @{{ ticket.user_telegram_id }} — Priorité : <span class="badge bg-{{ 'danger' if ticket.priority == 'high' else 'warning' if ticket.priority == 'medium' else 'info' }}">{{ ticket.priority }}</span></p>
         </a>
         {% else %}
         <div class="p-4 text-center text-muted">Aucun ticket récent.</div>

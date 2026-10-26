@@ -20,6 +20,7 @@ from src.bot.keyboards import (
     CB_MODULE_SUPPORT,
     main_menu_keyboard,
 )
+from src.core.config import get_settings
 from src.core.i18n import t
 
 logger = logging.getLogger("orbi.handlers.menu")
@@ -173,21 +174,19 @@ async def show_developers_menu(update: Update, context: ContextTypes.DEFAULT_TYP
 
     text = f"🛠️ <b>{t('developers.menu_title', lang)}</b>\n\n<i>Espace administrateur / Développeur</i>"
 
-    keyboard = InlineKeyboardMarkup([
+    rows = [
+        [InlineKeyboardButton(t("developers.webhooks", lang), callback_data="dev:github")],
         [
-            InlineKeyboardButton(t("developers.api_keys", lang), callback_data="dev:api_keys"),
-            InlineKeyboardButton(t("developers.webhooks", lang), callback_data="dev:github"),
-        ],
-        [
-            InlineKeyboardButton(t("developers.sandbox", lang), callback_data="dev:sandbox"),
             InlineKeyboardButton(t("developers.logs", lang), callback_data="dev:logs"),
-        ],
-        [
             InlineKeyboardButton(t("developers.stats", lang), callback_data="dev:stats"),
-            InlineKeyboardButton(t("developers.docs", lang), callback_data="dev:docs"),
         ],
-        [InlineKeyboardButton(t("common.home", lang), callback_data=CB_HOME)],
-    ])
+    ]
+    # Telegram n'accepte que des liens https pour les boutons URL
+    base_url = get_settings().BASE_URL.rstrip("/")
+    if base_url.startswith("https://"):
+        rows.append([InlineKeyboardButton("🤖 Orbi Dev (web)", url=f"{base_url}/dev/")])
+    rows.append([InlineKeyboardButton(t("common.home", lang), callback_data=CB_HOME)])
+    keyboard = InlineKeyboardMarkup(rows)
 
     await send_or_edit_menu(update, context, text, keyboard)
 
