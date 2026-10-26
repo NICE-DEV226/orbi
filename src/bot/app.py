@@ -96,10 +96,6 @@ async def create_bot_application() -> Application:
     from src.handlers.support import register_support_handlers
     register_support_handlers(application)
 
-    # Phase 6 : Communauté
-    from src.handlers.community import register_community_handlers
-    register_community_handlers(application)
-
     # Phase 7 : Productivité
     from src.handlers.productivity import register_productivity_handlers
     register_productivity_handlers(application)
@@ -108,20 +104,25 @@ async def create_bot_application() -> Application:
     from src.handlers.developer import register_developer_handlers
     register_developer_handlers(application)
 
-    # Handlers utilitaires pour groupes
-    from src.handlers.group_utils import register_group_utils_handlers
-    register_group_utils_handlers(application)
-
     # Fonctionnalités avancées
     from src.handlers.admin_auth import register_admin_handlers
     register_admin_handlers(application)
 
-    from src.handlers.group_management import register_group_handlers
-    register_group_handlers(application)
+    # Module optionnel : communauté (sondages, karma) et gestion/modération de groupes
+    if settings.ENABLE_COMMUNITY:
+        from src.handlers.community import register_community_handlers
+        from src.handlers.group_management import register_group_handlers
+        from src.handlers.group_utils import register_group_utils_handlers
+
+        register_community_handlers(application)
+        register_group_utils_handlers(application)
+        register_group_handlers(application)
+        logger.info("Module Communauté activé")
 
     logger.info(
-        "Bot Telegram initialisé (mode=%s, middlewares=4, handlers=phase3+4+5+6+7+8)",
+        "Bot Telegram initialisé (mode=%s, communauté=%s)",
         "webhook" if settings.use_webhook else "polling",
+        "activée" if settings.ENABLE_COMMUNITY else "désactivée",
     )
 
     return application

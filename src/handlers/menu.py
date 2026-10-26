@@ -80,14 +80,7 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # Pour s'assurer qu'il prend bien le titre
     text = t("menu.main.title", lang)
 
-    # Menu partagé avec l'onboarding + accès rapide pour ajouter le bot à un groupe ou un canal
-    keyboard = InlineKeyboardMarkup([
-        *main_menu_keyboard(lang).inline_keyboard,
-        [
-            InlineKeyboardButton("👥 Ajouter à un groupe", callback_data="group:add"),
-            InlineKeyboardButton("📢 Ajouter à un canal", callback_data="channel:add"),
-        ],
-    ])
+    keyboard = main_menu_keyboard(lang)
 
     await send_or_edit_menu(update, context, text, keyboard)
 
@@ -126,9 +119,8 @@ async def show_community_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton(t("community.polls", lang), callback_data="community:polls"),
-            InlineKeyboardButton(t("community.karma", lang), callback_data="community:karma"),
+            InlineKeyboardButton(t("community.karma", lang), callback_data="community:leaderboard"),
         ],
-        [InlineKeyboardButton(t("community.rules", lang), callback_data="community:rules")],
         [InlineKeyboardButton(t("common.home", lang), callback_data=CB_HOME)],
     ])
 
@@ -147,17 +139,14 @@ async def show_productivity_menu(update: Update, context: ContextTypes.DEFAULT_T
 
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton(t("productivity.new_task", lang), callback_data="prod:new_task"),
-            InlineKeyboardButton(t("productivity.my_tasks", lang), callback_data="prod:my_tasks"),
+            InlineKeyboardButton(t("productivity.new_task", lang), callback_data="prod:task_new"),
+            InlineKeyboardButton(t("productivity.my_tasks", lang), callback_data="prod:tasks"),
         ],
         [
-            InlineKeyboardButton(t("productivity.new_note", lang), callback_data="prod:new_note"),
-            InlineKeyboardButton(t("productivity.my_notes", lang), callback_data="prod:my_notes"),
+            InlineKeyboardButton(t("productivity.new_note", lang), callback_data="prod:note_new"),
+            InlineKeyboardButton(t("productivity.my_notes", lang), callback_data="prod:notes"),
         ],
-        [
-            InlineKeyboardButton("🍅 Focus", callback_data="prod:timer_menu"),
-            InlineKeyboardButton("🌐 Translate", callback_data="prod:translate"),
-        ],
+        [InlineKeyboardButton("🍅 Focus", callback_data="prod:focus")],
         [InlineKeyboardButton(t("common.home", lang), callback_data=CB_HOME)],
     ])
 
@@ -195,25 +184,22 @@ def register_menu_handlers(application) -> None:
     """Enregistre les handlers de navigation du menu principal."""
     application.add_handler(CallbackQueryHandler(show_main_menu, pattern=f"^{CB_HOME}$"))
     application.add_handler(CallbackQueryHandler(show_support_menu, pattern=f"^{CB_MODULE_SUPPORT}$"))
-    application.add_handler(CallbackQueryHandler(show_community_menu, pattern=f"^{CB_MODULE_COMMUNITY}$"))
     application.add_handler(CallbackQueryHandler(show_productivity_menu, pattern=f"^{CB_MODULE_PRODUCTIVITY}$"))
     application.add_handler(CallbackQueryHandler(show_developers_menu, pattern=f"^{CB_MODULE_DEVELOPERS}$"))
 
-    # Callbacks pour ajouter le bot à des groupes/canaux
-    from src.handlers.group_utils import add_to_channel_command, add_to_group_command
+    if get_settings().ENABLE_COMMUNITY:
+        application.add_handler(CallbackQueryHandler(show_community_menu, pattern=f"^{CB_MODULE_COMMUNITY}$"))
 
-    application.add_handler(CallbackQueryHandler(
-        lambda u, c: add_to_group_command(u, c),
-        pattern=r"^group:add$"
-    ))
-    application.add_handler(CallbackQueryHandler(
-        lambda u, c: add_to_channel_command(u, c),
-        pattern=r"^channel:add$"
-    ))
+        # Callbacks pour ajouter le bot à des groupes/canaux
+        from src.handlers.group_utils import add_to_channel_command, add_to_group_command
 
-    # Callbacks pour les fonctionnalités avancées
-    # Admin - déjà géré par register_admin_handlers()
-    # Groupes - déjà géré par register_group_handlers()
-    # Développeurs - déjà géré par register_real_dev_handlers()
+        application.add_handler(CallbackQueryHandler(
+            lambda u, c: add_to_group_command(u, c),
+            pattern=r"^group:add$"
+        ))
+        application.add_handler(CallbackQueryHandler(
+            lambda u, c: add_to_channel_command(u, c),
+            pattern=r"^channel:add$"
+        ))
 
     logger.info("Handlers menu enregistrés")

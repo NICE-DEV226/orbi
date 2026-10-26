@@ -42,7 +42,7 @@ menu:
 # ── Profile ──
 profile:
   title: "👤 **ملفي الشخصي**"
-  info: "📝 **الاسم**: {name}\n🌐 **اللغة**: {lang}\n👑 **الدور**: {role}\n📅 **تاريخ الانضمام**: {joined}\n🎧 **التذاكر**: {tickets}\n⭐ **الكارما**: {karma}"
+  info: "📝 **الاسم**: {name}\n🌐 **اللغة**: {lang}\n👑 **الدور**: {role}\n📅 **تاريخ الانضمام**: {joined}\n🎧 **التذاكر**: {tickets}"
   change_language: "✏️ تغيير اللغة"
   notifications: "🔔 الإشعارات"
   timezone: "🕐 المنطقة الزمنية"

@@ -42,7 +42,7 @@ menu:
 # ── Profile ──
 profile:
   title: "👤 **My Profile**"
-  info: "📝 **Name**: {name}\n🌐 **Language**: {lang}\n👑 **Role**: {role}\n📅 **Joined**: {joined}\n🎧 **Tickets**: {tickets}\n⭐ **Karma**: {karma}"
+  info: "📝 **Name**: {name}\n🌐 **Language**: {lang}\n👑 **Role**: {role}\n📅 **Joined**: {joined}\n🎧 **Tickets**: {tickets}"
   change_language: "✏️ Change Language"
   notifications: "🔔 Notifications"
   timezone: "🕐 Timezone"

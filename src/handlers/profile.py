@@ -19,6 +19,7 @@ from src.bot.keyboards import (
     CB_PROFILE_TIMEZONE,
     profile_keyboard,
 )
+from src.core.config import get_settings
 from src.core.i18n import t
 from src.core.i18n import t as translate_func
 from src.models.user import NotificationPreferences, User
@@ -32,6 +33,13 @@ ROLE_LABELS = {
     "en": {"user": "User", "agent": "Agent", "admin": "Administrator", "superadmin": "Super Admin"},
     "ar": {"user": "مستخدم", "agent": "وكيل", "admin": "مسؤول", "superadmin": "مسؤول أعلى"},
 }
+
+
+def _karma_line(lang: str, db_user: User) -> str:
+    """Le karma n'existe que si le module Communauté est activé."""
+    if not get_settings().ENABLE_COMMUNITY:
+        return ""
+    return f"\n{t('community.karma', lang)} : {db_user.karma_points}"
 
 
 async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -62,8 +70,9 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         role=role_label,
         joined=joined,
         tickets=str(db_user.total_tickets),
-        karma=str(db_user.karma_points),
     )
+
+    text += _karma_line(lang, db_user)
 
     if update.callback_query:
         await update.callback_query.edit_message_text(text, reply_markup=profile_keyboard(lang))
@@ -132,8 +141,9 @@ async def language_changed_from_profile(update: Update, context: ContextTypes.DE
         role=role_label,
         joined=joined,
         tickets=str(db_user.total_tickets),
-        karma=str(db_user.karma_points),
     )
+
+    text += _karma_line(new_lang, db_user)
 
     await query.edit_message_text(text, reply_markup=profile_keyboard(new_lang))
 
@@ -173,7 +183,9 @@ async def show_notifications(update: Update, context: ContextTypes.DEFAULT_TYPE)
         },
     }
 
-    labels = notif_labels.get(lang, notif_labels["fr"])
+    labels = dict(notif_labels.get(lang, notif_labels["fr"]))
+    if not get_settings().ENABLE_COMMUNITY:
+        labels.pop(NotificationPreferences.COMMUNITY_ANNOUNCEMENTS, None)
     buttons = []
     for notif_type, label in labels.items():
         is_on = notif_type in enabled
@@ -311,25 +323,22 @@ async def show_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         "fr": (
             f"📊 **Mes Statistiques**\n\n"
             f"🎧 Tickets ouverts : **{db_user.total_tickets}**\n"
-            f"⭐ Points karma : **{db_user.karma_points}**\n"
             f"📅 Membre depuis : **{db_user.created_at.strftime('%d/%m/%Y')}**"
         ),
         "en": (
             f"📊 **My Statistics**\n\n"
             f"🎧 Tickets opened: **{db_user.total_tickets}**\n"
-            f"⭐ Karma points: **{db_user.karma_points}**\n"
             f"📅 Member since: **{db_user.created_at.strftime('%Y-%m-%d')}**"
         ),
         "ar": (
             f"📊 **إحصائياتي**\n\n"
             f"🎧 التذاكر: **{db_user.total_tickets}**\n"
-            f"⭐ نقاط الكارما: **{db_user.karma_points}**\n"
             f"📅 عضو منذ: **{db_user.created_at.strftime('%Y-%m-%d')}**"
         ),
     }
 
     await query.edit_message_text(
-        stats_text.get(lang, stats_text["fr"]),
+        stats_text.get(lang, stats_text["fr"]) + _karma_line(lang, db_user),
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton(t("common.back", lang), callback_data=CB_MODULE_PROFILE)]
         ]),

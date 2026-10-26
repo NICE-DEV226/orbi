@@ -41,21 +41,31 @@ MONGODB_DB=orbi
 REDIS_URL=redis://redis:6379/0
 ```
 
-### 4. Paiements
+### 4. Orbi Dev (agents de code distants)
 
-Les paiements en ligne (Stripe, Orange Money, Wave) sont retirés pour le moment : les commandes restent « en attente de paiement ».
+Orbi Dev chiffre les clés fournisseur : générez une clé de chiffrement et placez-la dans `.env`.
 
-### 5. Configuration Services Optionnels
-
-#### OpenAI (pour transcription vocale) :
-```env
-OPENAI_API_KEY=sk-...
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-#### Taux de change :
 ```env
-EXCHANGE_RATES_API_KEY=votre_cle_api
+SECRETS_ENCRYPTION_KEY=<la clé générée>
 ```
+
+Sans cette clé, aucune clé fournisseur ne peut être enregistrée (l'application l'indique explicitement). Pour la rotation, listez plusieurs clés séparées par des virgules : la première chiffre, toutes déchiffrent.
+
+Connexion au dashboard : dans le bot, ouvrez le panneau administrateur (réservé aux rôles `admin`/`superadmin`) puis « Obtenir un lien Dashboard » ; le lien est à usage unique et valable 10 minutes.
+
+### 5. Module Communauté (optionnel)
+
+Désactivé par défaut. Pour l'activer (sondages, karma, modération des groupes) :
+
+```env
+ENABLE_COMMUNITY=true
+```
+
+Attention : la modération lit le texte de **tous** les messages des groupes où le bot est présent.
 
 ## 🔧 Démarrage Rapide
 
@@ -78,7 +88,8 @@ Points d'exploitation :
 - `GET /livez` (process vivant, utilisé par le HEALTHCHECK Docker) et `GET /health` (readiness MongoDB + Redis).
 - `GET /metrics` (Prometheus) exige `Authorization: Bearer $METRICS_API_TOKEN` ; sans token configuré, il répond 503.
 - Le premier superadmin est créé depuis `ADMIN_CHAT_ID` uniquement s'il n'existe aucun superadmin ; un redémarrage ne modifie jamais les rôles.
-- LibreTranslate est optionnel : `docker compose --profile translate up -d`.
+- Orbi Dev : `SECRETS_ENCRYPTION_KEY` est requise pour enregistrer une clé fournisseur ; le suivi des exécutions tourne en arrière-plan (`ORBI_DEV_REFRESH_INTERVAL`).
+- Le module Communauté est désactivé par défaut (`ENABLE_COMMUNITY`).
 - MongoDB et Redis ne sont pas authentifiés et restent sur le réseau Docker interne : ne publiez pas leurs ports.
 - Dépendances figées par `uv.lock` : après avoir modifié `pyproject.toml`, lancez `uv lock` et commitez le résultat.
 
@@ -105,8 +116,8 @@ uv sync
 # MongoDB : mongod
 # Redis : redis-server
 
-# 3. Lancez le bot
-python -m src.main
+# 3. Lancez l'application
+uvicorn src.main:app --reload
 ```
 
 ## 🛡️ Sécurité
@@ -115,7 +126,7 @@ python -m src.main
 - **Jamais** partager votre `TELEGRAM_BOT_TOKEN`
 - **Jamais** commit votre fichier `.env`
 - **Jamais** utiliser des clés de production en développement
-- Changez le `JWT_SECRET` pour une chaîne aléatoire longue
+- Changez le `JWT_SECRET` pour une chaîne aléatoire d'au moins 32 caractères (la production refuse de démarrer sinon)
 
 ### Génération de secrets sécurisés :
 ```bash
@@ -137,9 +148,8 @@ curl http://localhost:8000/health
 1. Envoyez `/start` à votre bot sur Telegram
 2. Vous devriez recevoir le message de bienvenue
 
-### Dashboard API :
-- Ouvrez `http://localhost:8000/docs` dans votre navigateur
-- Testez les endpoints avec l'interface Swagger
+### Documentation de l'API :
+- Hors production, `http://localhost:8000/docs` expose l'interface Swagger
 
 ## 🔧 Dépannage
 

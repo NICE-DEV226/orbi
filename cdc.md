@@ -1,3 +1,5 @@
+> **Document historique (v4.0, mars 2026).** Il décrit le périmètre initial d'un assistant Telegram universel et n'est plus à jour : le module **Commerce/paiements a été supprimé**, **Communauté est optionnel**, et la direction du produit est **Orbi Dev**. La référence actuelle est la [spécification](docs/ORBI_SPECIFICATION.md) et la [feuille de route](docs/ROADMAP.md).
+
 ORBI
 Assistant Universel Telegram
 @OrbiBot  ·  Français  ·  English  ·  العربية

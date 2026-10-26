@@ -37,10 +37,8 @@ class Settings(BaseSettings):
     # ── Redis ──
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    # ── JWT ──
+    # ── Secret applicatif (jetons CSRF du dashboard) ──
     JWT_SECRET: str = "change-me-in-production"
-    JWT_ALGORITHM: str = "HS256"
-    JWT_EXPIRATION_MINUTES: int = 60 * 24  # 24h
 
     # ── Tokens API (Bearer) — vides = routes correspondantes refusées ──
     ADMIN_API_TOKEN: str = ""
@@ -54,12 +52,10 @@ class Settings(BaseSettings):
     # ── GitHub ──
     GITHUB_WEBHOOK_SECRET: str = ""
 
-    # ── OpenAI (Whisper) ──
-    OPENAI_API_KEY: str = ""
-
-    # ── APIs externes ──
-    EXCHANGE_RATES_API_KEY: str = ""
-    LIBRETRANSLATE_URL: str = "http://libretranslate:5000"
+    # ── Modules optionnels ──
+    # Communauté (sondages, karma, modération de groupes). Désactivée par défaut : la modération lit le texte
+    # de tous les messages des groupes où le bot est présent, à n'activer que si c'est voulu.
+    ENABLE_COMMUNITY: bool = False
 
     # ── Logging ──
     LOG_LEVEL: str = "INFO"
