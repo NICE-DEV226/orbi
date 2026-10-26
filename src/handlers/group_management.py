@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 from telegram import ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackQueryHandler, ChatMemberHandler, ContextTypes, MessageHandler, filters
 
+from src.bot.screen import edit_screen
 from src.core.text import esc
 from src.models.community import GroupConfig, ModerationAction, ModerationLog
 
@@ -137,7 +138,7 @@ Que souhaitez-vous configurer ?
     """
 
     if update.callback_query:
-        await update.callback_query.edit_message_text(text, reply_markup=keyboard)
+        await edit_screen(update.callback_query, text, reply_markup=keyboard)
     else:
         await update.effective_message.reply_text(text, reply_markup=keyboard)
 
@@ -179,7 +180,7 @@ La modération automatique est maintenant **{status}**.
     """
 
     if update.callback_query:
-        await update.callback_query.edit_message_text(text, reply_markup=keyboard)
+        await edit_screen(update.callback_query, text, reply_markup=keyboard)
     else:
         await update.effective_message.reply_text(text, reply_markup=keyboard)
 
@@ -209,7 +210,7 @@ async def show_group_rules(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     """
 
     if update.callback_query:
-        await update.callback_query.edit_message_text(text, reply_markup=keyboard)
+        await edit_screen(update.callback_query, text, reply_markup=keyboard)
     else:
         await update.effective_message.reply_text(text, reply_markup=keyboard)
 

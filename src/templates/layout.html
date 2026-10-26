@@ -9,6 +9,7 @@
   <!-- htmx durci : pas d'eval, pas de <script> dans les fragments, pas de copie des pages dans le stockage local -->
   <meta name="htmx-config" content='{"allowEval": false, "allowScriptTags": false, "historyCacheSize": 0, "includeIndicatorStyles": false}'>
   <title>{% block title %}Orbi{% endblock %}</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/orbi.css?v={{ asset_v }}">
   <!-- Mini App Telegram : sans effet dans un navigateur ordinaire -->
   <script src="https://telegram.org/js/telegram-web-app.js?64"></script>

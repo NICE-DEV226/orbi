@@ -104,6 +104,15 @@ class TestStaticAssets:
         r = await aclient.get(path)
         assert r.status_code == 200 and kind in r.headers["content-type"]
 
+    async def test_every_page_declares_an_existing_favicon(self, aclient):
+        """Sans icône déclarée, le navigateur réclame /favicon.ico et reçoit un 404 à chaque ouverture."""
+        cookies, _ = await login()
+        assert 'rel="icon" href="/static/favicon.svg"' in (await aclient.get("/admin/login")).text
+        for path in ("/dev/", "/dev/projects", "/admin/"):
+            html = (await aclient.get(path, cookies=cookies)).text
+            assert 'rel="icon" href="/static/favicon.svg"' in html, path
+        assert (await aclient.get("/static/favicon.svg")).status_code == 200
+
     @pytest.mark.parametrize("path", ["/static/../main.py", "/static/%2e%2e/main.py", "/static/../../.env"])
     async def test_no_path_traversal(self, aclient, path):
         assert (await aclient.get(path)).status_code == 404

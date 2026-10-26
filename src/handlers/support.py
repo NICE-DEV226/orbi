@@ -17,6 +17,7 @@ from telegram.ext import (
 )
 
 from src.bot.keyboards import CB_HOME, CB_MODULE_SUPPORT
+from src.bot.screen import edit_screen
 from src.core.i18n import t
 from src.core.text import esc
 from src.models.ticket import SLA_SECONDS, TicketCategory
@@ -61,7 +62,8 @@ async def start_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     open_count = await count_open_tickets(db_user.telegram_id)
     if open_count >= MAX_OPEN_TICKETS:
         if query:
-            await query.edit_message_text(
+            await edit_screen(
+                query,
                 t("support.ticket_limit", lang, count=str(open_count)),
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton(t("common.back", lang), callback_data=CB_MODULE_SUPPORT)]
@@ -85,7 +87,8 @@ async def start_new_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         [InlineKeyboardButton(t("common.cancel", lang), callback_data="ticket_cancel")],
     ])
 
-    await query.edit_message_text(
+    await edit_screen(
+        query,
         t("support.category_select", lang),
         reply_markup=keyboard,
     )
@@ -104,7 +107,8 @@ async def category_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     category = query.data.split(":")[1]  # ticket_cat:billing → billing
     context.user_data["_ticket_category"] = category
 
-    await query.edit_message_text(
+    await edit_screen(
+        query,
         t("support.subject_prompt", lang),
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton(t("common.cancel", lang), callback_data="ticket_cancel")]
@@ -229,7 +233,8 @@ async def ticket_confirmed(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             "other": t("support.category_other", lang),
         }
 
-        await query.edit_message_text(
+        await edit_screen(
+            query,
             t("support.ticket_created", lang,
                 ticket_id=ticket.ticket_id,
                 category=cat_labels.get(category.value, category.value),
@@ -243,7 +248,8 @@ async def ticket_confirmed(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         )
 
     except TicketLimitExceededError as e:
-        await query.edit_message_text(
+        await edit_screen(
+            query,
             t("support.ticket_limit", lang, count=str(e.count)),
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton(t("common.back", lang), callback_data=CB_MODULE_SUPPORT)]
@@ -252,7 +258,8 @@ async def ticket_confirmed(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     except Exception as e:
         logger.error("Erreur création ticket: %s", e, exc_info=True)
-        await query.edit_message_text(
+        await edit_screen(
+            query,
             t("common.error", lang),
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton(t("common.home", lang), callback_data=CB_HOME)]
@@ -287,7 +294,7 @@ async def ticket_cancelled(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         [InlineKeyboardButton(t("common.home", lang), callback_data=CB_HOME)],
     ])
 
-    await query.edit_message_text(text, reply_markup=keyboard)
+    await edit_screen(query, text, reply_markup=keyboard)
     return ConversationHandler.END
 
 
@@ -310,7 +317,8 @@ async def show_my_tickets(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     if not tickets:
         no_tickets = {"fr": "📋 Vous n'avez aucun ticket.", "en": "📋 You have no tickets.", "ar": "📋 ليس لديك تذاكر."}
-        await query.edit_message_text(
+        await edit_screen(
+            query,
             no_tickets.get(lang, no_tickets["fr"]),
             reply_markup=InlineKeyboardMarkup([
                 [
@@ -347,7 +355,8 @@ async def show_my_tickets(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     header = {"fr": "📋 <b>Mes Tickets</b>\n\n", "en": "📋 <b>My Tickets</b>\n\n", "ar": "📋 <b>تذاكري</b>\n\n"}
     text = header.get(lang, header["fr"]) + "\n".join(lines)
 
-    await query.edit_message_text(
+    await edit_screen(
+        query,
         text,
         reply_markup=InlineKeyboardMarkup(buttons),
     )
@@ -366,7 +375,8 @@ async def view_ticket_detail(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     ticket = await get_ticket(ticket_id)
     if not ticket:
-        await query.edit_message_text(
+        await edit_screen(
+            query,
             t("errors.not_found", lang),
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton(t("common.back", lang), callback_data="support:my_tickets")]
@@ -420,7 +430,7 @@ async def view_ticket_detail(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     buttons.append([InlineKeyboardButton(t("common.back", lang), callback_data="support:my_tickets")])
 
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+    await edit_screen(query, text, reply_markup=InlineKeyboardMarkup(buttons))
 
 
 # ─────────────────────────────────────
@@ -441,7 +451,8 @@ async def start_reply(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     prompt = {"fr": "✏️ Écrivez votre réponse :", "en": "✏️ Write your reply:", "ar": "✏️ اكتب ردك:"}
 
-    await query.edit_message_text(
+    await edit_screen(
+        query,
         prompt.get(lang, prompt["fr"]),
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton(t("common.cancel", lang), callback_data=f"ticket_view:{ticket_id}")]
@@ -499,13 +510,15 @@ async def resolve_ticket_handler(update: Update, context: ContextTypes.DEFAULT_T
             [InlineKeyboardButton(t("common.home", lang), callback_data=CB_HOME)],
         ])
 
-        await query.edit_message_text(
+        await edit_screen(
+            query,
             t("support.ticket_closed", lang, ticket_id=ticket_id) + "\n\n" +
             t("notifications.csat_request", lang, ticket_id=ticket_id),
             reply_markup=csat_keyboard,
         )
     else:
-        await query.edit_message_text(
+        await edit_screen(
+            query,
             t("errors.not_found", lang),
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton(t("common.home", lang), callback_data=CB_HOME)]
@@ -534,7 +547,8 @@ async def handle_csat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if ticket:
         await save_csat_rating(ticket, rating)
 
-    await query.edit_message_text(
+    await edit_screen(
+        query,
         t("notifications.csat_thanks", lang),
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton(t("common.home", lang), callback_data=CB_HOME)]

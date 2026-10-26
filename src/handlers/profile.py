@@ -19,6 +19,7 @@ from src.bot.keyboards import (
     CB_PROFILE_TIMEZONE,
     profile_keyboard,
 )
+from src.bot.screen import edit_screen
 from src.core.config import get_settings
 from src.core.i18n import t
 from src.core.i18n import t as translate_func
@@ -55,7 +56,7 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     if not db_user:
         if update.callback_query:
-            await update.callback_query.edit_message_text(translate_func("common.error", lang))
+            await edit_screen(update.callback_query, translate_func("common.error", lang))
         else:
             await update.effective_message.reply_text(translate_func("common.error", lang))
         return
@@ -76,7 +77,7 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     text += _karma_line(lang, db_user)
 
     if update.callback_query:
-        await update.callback_query.edit_message_text(text, reply_markup=profile_keyboard(lang))
+        await edit_screen(update.callback_query, text, reply_markup=profile_keyboard(lang))
     else:
         await update.effective_message.reply_text(text, reply_markup=profile_keyboard(lang))
 
@@ -101,7 +102,8 @@ async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         [InlineKeyboardButton(t("common.cancel", lang), callback_data=CB_MODULE_PROFILE)],
     ])
 
-    await query.edit_message_text(
+    await edit_screen(
+        query,
         t("profile.change_language", lang),
         reply_markup=keyboard,
     )
@@ -146,7 +148,7 @@ async def language_changed_from_profile(update: Update, context: ContextTypes.DE
 
     text += _karma_line(new_lang, db_user)
 
-    await query.edit_message_text(text, reply_markup=profile_keyboard(new_lang))
+    await edit_screen(query, text, reply_markup=profile_keyboard(new_lang))
 
 
 async def show_notifications(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -200,7 +202,8 @@ async def show_notifications(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     buttons.append([InlineKeyboardButton(t("common.back", lang), callback_data=CB_MODULE_PROFILE)])
 
-    await query.edit_message_text(
+    await edit_screen(
+        query,
         t("profile.notifications", lang),
         reply_markup=InlineKeyboardMarkup(buttons),
     )
@@ -250,7 +253,8 @@ async def show_timezone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
     context.user_data["_awaiting_timezone"] = True
 
-    await query.edit_message_text(
+    await edit_screen(
+        query,
         tz_labels.get(lang, tz_labels["fr"]),
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton(t("common.cancel", lang), callback_data=CB_MODULE_PROFILE)]
@@ -338,7 +342,8 @@ async def show_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         ),
     }
 
-    await query.edit_message_text(
+    await edit_screen(
+        query,
         stats_text.get(lang, stats_text["fr"]) + _karma_line(lang, db_user),
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton(t("common.back", lang), callback_data=CB_MODULE_PROFILE)]
@@ -381,7 +386,7 @@ async def show_morning_brief_settings(update: Update, context: ContextTypes.DEFA
         [InlineKeyboardButton(t("common.back", lang), callback_data=CB_MODULE_PROFILE)],
     ])
 
-    await query.edit_message_text(text.get(lang, text["fr"]), reply_markup=keyboard)
+    await edit_screen(query, text.get(lang, text["fr"]), reply_markup=keyboard)
 
 
 def register_profile_handlers(application) -> None:

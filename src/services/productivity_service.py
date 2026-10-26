@@ -10,7 +10,7 @@ import re
 from datetime import UTC, datetime
 
 from src.core.redis import get_redis
-from src.models.productivity import Note, Task, TaskPriority
+from src.models.productivity import Note, Task, TaskPriority, TaskStatus
 
 logger = logging.getLogger("orbi.services.productivity")
 
@@ -76,7 +76,6 @@ async def create_task(
         priority=priority,
         due_date=due_date,
         group_id=group_id,
-        has_reminder=due_date is not None,
     )
     await task.insert()
     logger.info("Tâche créée: %s (user=%d)", task.id, user_id)
@@ -87,7 +86,7 @@ async def get_user_tasks(user_id: int, limit: int = 10, include_completed: bool 
     query = Task.find(Task.user_telegram_id == user_id)
 
     if not include_completed:
-        query = query.find(Task.is_completed == False)  # noqa: E712
+        query = query.find(Task.status != TaskStatus.COMPLETED)
 
     return await query.sort("priority", "due_date").limit(limit).to_list()
 
@@ -101,8 +100,9 @@ async def get_task(task_id: str) -> Task | None:
 
 async def toggle_task_completion(task: Task) -> Task:
     """Bascule l'état (terminé/non terminé) d'une tâche."""
-    task.is_completed = not task.is_completed
-    task.completed_at = datetime.now(UTC) if task.is_completed else None
+    done = task.status != TaskStatus.COMPLETED
+    task.status = TaskStatus.COMPLETED if done else TaskStatus.ACTIVE
+    task.completed_at = datetime.now(UTC) if done else None
     task.updated_at = datetime.now(UTC)
     await task.save()
     return task
@@ -114,10 +114,11 @@ async def delete_task(task: Task) -> None:
 async def get_pending_reminders() -> list[Task]:
     """Récupère les tâches avec échéance imminente (pour APScheduler)."""
     now = datetime.now(UTC)
-    # Cherche les tâches non terminées, avec rappel activé, et dont la date d'échéance est passée
+    # Tâches actives dont l'échéance est passée et dont le rappel du jour n'a pas encore été envoyé
     return await Task.find(
-        Task.is_completed == False,  # noqa: E712
-        Task.has_reminder == True,  # noqa: E712
+        Task.status == TaskStatus.ACTIVE,
+        Task.reminder_day_sent == False,  # noqa: E712
+        Task.due_date != None,  # noqa: E711
         Task.due_date <= now,
     ).to_list()
 
