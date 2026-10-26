@@ -1,0 +1,48 @@
+{# Anneau d'orbite : la forme porte l'état (arc qui tourne = en cours, anneau fermé et coche = terminé,
+   anneau rompu = échec, point sur l'anneau = à vérifier). Décoratif : le libellé est toujours écrit à côté. #}
+{% macro ring(status, large=False) -%}
+{%- set s = status_info(status) -%}
+<svg class="ring tone-{{ s.tone }}{% if large %} ring-lg{% endif %}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+  {%- if s.value == 'running' %}
+  <circle class="track" cx="12" cy="12" r="9"/><circle class="arc" cx="12" cy="12" r="9" stroke-dasharray="14 42.5"/>
+  {%- elif s.value == 'succeeded' %}
+  <circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16.5 9"/>
+  {%- elif s.value == 'failed' %}
+  <circle cx="12" cy="12" r="9" stroke-dasharray="44 12.5" transform="rotate(-62 12 12)"/><path d="M9.6 9.6l4.8 4.8M14.4 9.6l-4.8 4.8"/>
+  {%- elif s.value in ('needs_attention', 'awaiting_approval') %}
+  <circle cx="12" cy="12" r="9"/><circle class="dot" cx="18.4" cy="5.6" r="3.1"/>
+  {%- elif s.value == 'queued' %}
+  <circle cx="12" cy="12" r="9" stroke-dasharray="2.2 4.4"/>
+  {%- elif s.value == 'cancel_requested' %}
+  <circle class="track" cx="12" cy="12" r="9"/><circle class="arc" cx="12" cy="12" r="9" stroke-dasharray="8 48.5"/>
+  {%- elif s.value == 'cancelled' %}
+  <circle cx="12" cy="12" r="9"/><path d="M8.5 12h7"/>
+  {%- else %}
+  <circle cx="12" cy="12" r="9" stroke-dasharray="34 22.5"/><path d="M12 7.5V12l3 2"/>
+  {%- endif %}
+</svg>
+{%- endmacro %}
+
+{% macro mark(cls='') -%}
+<svg class="{{ cls }}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+  <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/>
+  <circle cx="17.7" cy="6.3" r="3" fill="var(--signal)"/>
+</svg>
+{%- endmacro %}
+
+{% macro icon(name, cls='') -%}
+<svg class="icon {{ cls }}" aria-hidden="true" focusable="false"><use href="#i-{{ name }}"/></svg>
+{%- endmacro %}
+
+{# Phrase d'état d'une exécution, pour les listes #}
+{% macro run_state(ex) -%}
+{%- if ex.status.value == 'running' -%}en cours depuis {{ ex.created_at|duration }}
+{%- elif ex.status.value == 'succeeded' -%}terminé {{ ex.finished_at|ago }}
+{%- elif ex.status.value == 'failed' -%}a échoué {{ ex.finished_at|ago }}
+{%- elif ex.status.value == 'cancelled' -%}annulé {{ ex.finished_at|ago }}
+{%- elif ex.status.value == 'timed_out' -%}arrêté, trop long
+{%- elif ex.status.value == 'needs_attention' -%}suivi interrompu, à vérifier
+{%- elif ex.status.value == 'awaiting_approval' -%}attend votre accord
+{%- elif ex.status.value == 'cancel_requested' -%}annulation en cours
+{%- else -%}en attente de démarrage{%- endif -%}
+{%- endmacro %}

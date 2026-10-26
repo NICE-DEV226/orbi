@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Header, Response
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from src.core.config import get_settings
 from src.core.database import close_db, init_db
@@ -173,8 +174,8 @@ def create_app() -> FastAPI:
     from src.web.dev import router as web_dev_router
     from src.web.router import router as web_dashboard_router
 
-    # Montage optionnel de statiques si nécessaires un jour
-    # app.mount("/static", StaticFiles(directory="src/static"), name="static")
+    # Ressources du dashboard (CSS, police, htmx) : auto-hébergées, aucune dépendance à un CDN
+    app.mount("/static", StaticFiles(directory="src/static"), name="static")
 
     app.include_router(web_auth_router, prefix="/admin")
     app.include_router(web_dashboard_router)

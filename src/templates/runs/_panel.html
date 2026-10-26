@@ -1,0 +1,66 @@
+{% from "_macros.html" import ring, icon %}
+{# Panneau d'une exécution. Il se rafraîchit seul tant que l'exécution est active, puis cesse de s'interroger. #}
+{% set s = status_info(execution.status) %}
+<div id="run-panel"{% if active %} hx-get="/dev/executions/{{ execution.id }}/panel" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+  <div class="run-head">
+    {{ ring(execution.status, large=True) }}
+    <div>
+      <h1>{{ s.label }}</h1>
+      <p class="muted">
+        {% if execution.status.value == 'running' %}L'agent travaille depuis {{ execution.created_at|duration }}
+        {% elif execution.status.value == 'succeeded' %}A travaillé pendant {{ execution.created_at|duration(execution.finished_at) }}
+        {% else %}{{ s.sentence }}{% endif %}
+      </p>
+    </div>
+  </div>
+
+  <div class="ask">
+    <p class="label">Demande, {{ project }}</p>
+    <p class="prose">{{ task.prompt }}</p>
+  </div>
+
+  {% set pr = execution.pr_url|safe_link %}
+  {% if execution.status.value == 'succeeded' %}
+  <section class="sheet" aria-labelledby="result-title">
+    <h2 id="result-title">{% if pr %}Une pull request est prête{% else %}Travail terminé{% endif %}</h2>
+    {% if execution.result_summary %}<p class="summary prose">{{ execution.result_summary }}</p>{% endif %}
+    {% if pr %}<a class="btn btn-primary btn-block" style="margin-top:1rem" href="{{ pr }}" target="_blank" rel="noopener noreferrer" hx-boost="false">{{ icon('external') }} Ouvrir la pull request</a>{% endif %}
+    {% if execution.branch %}<p class="branch">{{ icon('branch', 'icon-sm') }} <code>{{ execution.branch }}</code></p>{% endif %}
+  </section>
+  {% elif execution.error_message %}
+  <section class="sheet fail" aria-labelledby="result-title">
+    <h2 id="result-title">Ce qui s'est passé</h2>
+    <p class="summary prose">{{ execution.error_message }}</p>
+  </section>
+  {% endif %}
+
+  <div class="actions">
+    {% if active %}
+    <form method="post" action="/dev/executions/{{ execution.id }}/refresh" hx-post="/dev/executions/{{ execution.id }}/refresh" hx-target="#run-panel" hx-swap="outerHTML" hx-boost="false">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="btn btn-quiet" type="submit">{{ icon('refresh') }} Actualiser</button>
+    </form>
+    <form method="post" action="/dev/executions/{{ execution.id }}/cancel" hx-post="/dev/executions/{{ execution.id }}/cancel" hx-target="#run-panel" hx-swap="outerHTML" hx-confirm="Demander l'arrêt de cette exécution ?" hx-boost="false">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="btn btn-danger" type="submit">{{ icon('stop') }} Arrêter</button>
+    </form>
+    {% elif terminal %}
+    <form method="post" action="/dev/tasks/{{ task.id }}/retry" hx-disabled-elt="find button">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="btn {% if execution.status.value in ('failed', 'timed_out') %}btn-primary{% else %}btn-quiet{% endif %}" type="submit">{{ icon('retry') }} Nouvelle tentative</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <section aria-labelledby="log-title">
+    <h2 id="log-title" class="log-title">Journal</h2>
+    <ol class="log" style="--node: var({{ node_var }})">
+      {% for e in events %}
+      <li>
+        <div class="when">{{ e.created_at|ago }}</div>
+        <div>{{ e.message }}</div>
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+</div>

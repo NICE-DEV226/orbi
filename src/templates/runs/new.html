@@ -1,0 +1,42 @@
+{% extends "layout.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Nouvelle tâche · Orbi{% endblock %}
+{% block depth %}detail{% endblock %}
+{% block content %}
+<a class="back" href="/dev/">{{ icon('chevron') }} Tâches</a>
+<header class="page-head"><h1>Nouvelle tâche</h1></header>
+
+{% if error %}<div class="alert" role="alert">{{ error }}</div>{% endif %}
+
+{% if not projects or not integrations %}
+<div class="stack">
+  <p>Il manque deux choses avant de lancer un agent :</p>
+  <ul class="rows">
+    <li><a class="row plain" href="/dev/projects"><div><div class="row-title">{% if projects %}Projet ajouté{% else %}Ajouter un projet{% endif %}</div><div class="row-meta">Le dépôt GitHub sur lequel l'agent travaille.</div></div>{{ icon('chevron', 'icon-sm') }}</a></li>
+    <li><a class="row plain" href="/dev/integrations"><div><div class="row-title">{% if integrations %}Fournisseur connecté{% else %}Connecter un fournisseur{% endif %}</div><div class="row-meta">L'agent de code qui fera le travail.</div></div>{{ icon('chevron', 'icon-sm') }}</a></li>
+  </ul>
+</div>
+{% else %}
+<form method="post" action="/dev/tasks" hx-disabled-elt="find button[type=submit]">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="field">
+    <label for="project_id">Projet</label>
+    <select id="project_id" name="project_id" required>
+      {% for p in projects %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label for="integration_id">Agent</label>
+    <select id="integration_id" name="integration_id" required>
+      {% for i in integrations %}<option value="{{ i.id }}">{{ i.label if i.label else i.provider|provider_name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label for="prompt">Ce que l'agent doit faire</label>
+    <textarea id="prompt" name="prompt" maxlength="8000" required placeholder="Ex. Ajoute la pagination sur l'endpoint /users et mets à jour les tests.">{{ prompt }}</textarea>
+    <p class="hint">L'agent travaille sur une nouvelle branche et propose une pull request. Rien n'est fusionné ni déployé automatiquement.</p>
+  </div>
+  <button class="btn btn-primary btn-block" type="submit">Lancer l'agent</button>
+</form>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "layout.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Réglages · Orbi{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>Réglages</h1>
+    <p class="sub">Connecté en tant que {{ admin.display_name }}, rôle {{ admin.role }}.</p>
+  </div>
+</header>
+<ul class="rows">
+  <li><a class="row plain" href="/dev/integrations"><div><div class="row-title">Connexions</div><div class="row-meta">Les clés des fournisseurs d'agents de code.</div></div>{{ icon('chevron', 'icon-sm') }}</a></li>
+  <li><a class="row plain" href="/admin/users"><div><div class="row-title">Utilisateurs</div><div class="row-meta">Qui utilise le bot, avec quel rôle.</div></div>{{ icon('chevron', 'icon-sm') }}</a></li>
+  <li><a class="row plain" href="/admin/system"><div><div class="row-title">État du système</div><div class="row-meta">Base de données, cache et activité.</div></div>{{ icon('chevron', 'icon-sm') }}</a></li>
+</ul>
+<form method="post" action="/admin/logout" hx-boost="false" style="margin-top:2rem">
+  <button class="btn btn-quiet" type="submit">{{ icon('logout') }} Se déconnecter</button>
+</form>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% from "_macros.html" import ring, icon, run_state %}
+{# Liste des tâches par groupe. Elle se rafraîchit seule tant qu'une exécution est en cours, puis s'arrête. #}
+<div id="runs"{% if polling %} hx-get="/dev/runs" hx-trigger="every 4s" hx-swap="outerHTML"{% endif %}>
+  {% for key, rows in groups %}
+  <section class="group" aria-labelledby="g-{{ key }}">
+    <h2 id="g-{{ key }}">{{ GROUP_TITLES[key] }} <span class="count">{{ rows|length }}</span></h2>
+    <ul class="rows">
+      {% for r in rows %}
+      <li>
+        <a class="row" href="/dev/executions/{{ r.execution.id }}">
+          {{ ring(r.execution.status) }}
+          <div>
+            <div class="row-title">{{ r.task.prompt }}</div>
+            <div class="row-meta">{{ r.project }}, {{ run_state(r.execution) }}</div>
+          </div>
+          <span class="row-end">{{ icon('chevron', 'icon-sm') }}</span>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% else %}
+  <div class="empty">
+    <h2>Aucune tâche pour l'instant</h2>
+    {% if not has_projects %}
+    <p>Commencez par ajouter le dépôt sur lequel un agent doit travailler.</p>
+    <a class="btn btn-primary" href="/dev/projects">{{ icon('folder') }} Ajouter un projet</a>
+    {% elif not has_connections %}
+    <p>Connectez un fournisseur d'agent de code pour pouvoir lui confier du travail.</p>
+    <a class="btn btn-primary" href="/dev/integrations">{{ icon('key') }} Connecter un fournisseur</a>
+    {% else %}
+    <p>Décrivez ce que vous voulez changer dans un projet : un agent s'en charge et vous propose une pull request.</p>
+    <a class="btn btn-primary" href="/dev/tasks/new">{{ icon('plus') }} Créer une tâche</a>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>

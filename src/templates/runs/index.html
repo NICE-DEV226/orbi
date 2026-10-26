@@ -1,0 +1,13 @@
+{% extends "layout.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Tâches · Orbi{% endblock %}
+{% block content %}
+<header class="page-head">
+  <div>
+    <h1>Tâches</h1>
+    <p class="sub">{{ summary }}</p>
+  </div>
+  <a class="btn btn-primary" href="/dev/tasks/new">{{ icon('plus') }} Nouvelle tâche</a>
+</header>
+{% include "runs/_list.html" %}
+{% endblock %}

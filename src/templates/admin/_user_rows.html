@@ -1,0 +1,16 @@
+{% for user in users %}
+<li>
+  <div class="row plain">
+    <div>
+      <div class="row-title">{{ user.first_name }} {{ user.last_name or '' }}</div>
+      <div class="row-meta">{% if user.username %}@{{ user.username }}, {% endif %}identifiant {{ user.telegram_id }}, inscrit {{ user.created_at|ago }}</div>
+    </div>
+    <div class="row-end">
+      {% if user.is_banned %}<span class="tag bad">Banni</span>{% endif %}
+      <span class="tag {% if user.role.value in ('admin', 'superadmin') %}signal{% endif %}">{{ user.role }}</span>
+    </div>
+  </div>
+</li>
+{% else %}
+<li><p class="empty" style="padding:1.5rem 0">Aucun utilisateur ne correspond.</p></li>
+{% endfor %}

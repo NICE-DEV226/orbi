@@ -1,0 +1,13 @@
+{% extends "layout.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Utilisateurs · Orbi{% endblock %}
+{% block content %}
+<header class="page-head"><div><h1>Utilisateurs</h1><p class="sub">Les 50 plus récents{% if query %}, filtrés sur « {{ query }} »{% endif %}.</p></div></header>
+<form class="search" role="search" method="get" action="/admin/users" hx-boost="false">
+  <label class="visually-hidden" for="q">Rechercher un utilisateur</label>
+  <input id="q" type="search" name="q" value="{{ query }}" placeholder="Nom, @pseudo ou identifiant"
+         hx-get="/admin/users" hx-trigger="input changed delay:300ms, search" hx-target="#user-rows" hx-swap="innerHTML" hx-push-url="false">
+  <button class="btn btn-quiet" type="submit">{{ icon('search') }}<span class="visually-hidden">Rechercher</span></button>
+</form>
+<ul id="user-rows" class="rows">{% include "admin/_user_rows.html" %}</ul>
+{% endblock %}
