@@ -1,18 +1,15 @@
 <div align="center">
   <img src="logo.png" alt="Orbi Logo" width="400"/>
 
-  # Orbi — Assistant Universel Telegram
+  # Orbi — piloter ses agents de code depuis Telegram et le web
 
-  **Bot Telegram intelligent × API REST × Dashboard Admin**
+  **Bot Telegram × Dashboard d'administration × Orbi Dev (agents de code distants)**
 
-  [![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python&logoColor=white)](https://python.org)
-  [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+  [![Python](https://img.shields.io/badge/Python-3.12%20→%203.14-blue?logo=python&logoColor=white)](https://python.org)
+  [![FastAPI](https://img.shields.io/badge/FastAPI-0.1xx-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
   [![MongoDB](https://img.shields.io/badge/MongoDB-7.0-47A248?logo=mongodb&logoColor=white)](https://mongodb.com)
   [![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)](https://redis.io)
   [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docker.com)
-  [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
-
-  *Support client · E-commerce · Communauté · Productivité · API Développeurs*
 
 </div>
 
@@ -20,178 +17,35 @@
 
 ## Présentation
 
-**Orbi** est une plateforme hybride pensée pour les marchés africains (XOF, Orange Money, Wave) et au-delà. Elle centralise en un seul bot Telegram :
+Orbi est un projet open source qui permet de **lancer et suivre des tâches de développement confiées à un agent de code distant** (premier fournisseur : [Cursor Cloud Agents](docs/connectors/cursor.md)) depuis un navigateur mobile, avec un bot Telegram pour le support et les outils du quotidien.
 
-- Un **système de support** avec tickets, SLA et satisfaction client (CSAT)
-- Une **boutique en ligne** avec catalogue multilingue et passerelles de paiement
-- Des outils de **productivité personnelle** (tâches, rappels, notes, Pomodoro)
-- Un espace **communautaire** (sondages, karma, modération automatique)
-- Un portail **développeur** avec API Keys, webhooks sortants et sandbox
-- Un **dashboard d'administration** web temps réel
+> **État du projet.** Le parcours Orbi Dev est implémenté et testé de bout en bout avec un fournisseur *factice*. Il n'a **pas encore été essayé avec un compte fournisseur réel** et l'interface n'a pas été vérifiée visuellement sur un téléphone. Voir [la feuille de route](docs/ROADMAP.md).
 
-Tout cela en **3 langues** : Français, Anglais, Arabe — automatiquement détectées et persistées.
-
----
-
-## Fonctionnalités
-
-### 🎧 Support & Ticketing
-- Création de tickets guidée par conversation (catégorie → sujet → description)
-- Détection automatique de priorité par mots-clés et catégorie
-- **SLA** : Urgent (1h), Haute (4h), Moyenne (24h), Basse (72h)
-- Alertes SLA en temps réel à l'admin (APScheduler, toutes les 5 min)
-- Enquêtes de satisfaction **CSAT** (1-5 étoiles) avec rappels automatiques
-- Escalade vers un agent humain
-
-### 🛍️ E-commerce
-- Catalogue multilingue (FR/EN/AR) avec images Telegram
-- Panier éphémère stocké dans **Redis**
-- Codes promo (pourcentage, montant fixe, livraison gratuite)
-- Checkout via **Stripe**, **Orange Money** et **Wave**
-- Suivi de commande en temps réel avec historique des statuts
-- Notification de disponibilité produit (alerte stock)
-
-### 👥 Communauté
-- **Sondages interactifs** avec résultats en temps réel
-- Système de **karma** avec classement
-- **Modération automatique** : anti-spam, anti-flood, filtrage liens et mentions
-- Messages de bienvenue personnalisables et règles de groupe
-
-### ⚡ Productivité
-- Gestionnaire de **tâches** avec priorités et dates d'échéance
-- **Rappels** ponctuels et récurrents
-- **Notes** personnelles avec extraction automatique de hashtags et transcription vocale (Whisper)
-- **Timer Pomodoro** via Redis
-- **Traduction** (LibreTranslate), **conversion de devises** et **calculatrice**
-
-### 👨‍💻 API Développeurs
-- Génération de **clés API** avec scopes granulaires
-- **Webhooks sortants** signés HMAC-SHA256 avec retry automatique
-- **Réception GitHub webhooks** (push, PR, issues…)
-- Mode **Sandbox** pour les tests
-- Logs complets des appels API
-
-### 🖥️ Dashboard Admin Web
-- KPIs temps réel (utilisateurs actifs, tickets ouverts, commandes du jour)
-- Gestion des utilisateurs avec recherche
-- File d'attente du support avec détail des tickets
-- Interface de diffusion de messages (broadcast)
-- Authentification sécurisée via **JWT**
-
----
-
-## Architecture technique
-
-```
-Orbi/
-├── src/
-│   ├── main.py                    # Entry point FastAPI + lifespan
-│   ├── core/
-│   │   ├── config.py              # Settings pydantic-settings
-│   │   ├── database.py            # Connexion MongoDB / Beanie
-│   │   ├── redis.py               # Connexion Redis
-│   │   ├── i18n.py                # Chargement YAML traductions
-│   │   ├── logging.py             # Logging structuré
-│   │   └── performance.py         # Index MongoDB, cache, connection pooling
-│   ├── bot/
-│   │   ├── app.py                 # Création bot (webhook/polling)
-│   │   ├── keyboards.py           # Inline keyboards centralisés
-│   │   └── middlewares/           # Logging → Auth → i18n → Rate Limit
-│   ├── handlers/                  # 15+ handlers Telegram (phases 3-8)
-│   ├── models/                    # Documents Beanie MongoDB
-│   │   ├── user.py                # User, UserRole, NotificationPreferences
-│   │   ├── ticket.py              # Ticket, SLA, CSAT
-│   │   ├── commerce.py            # Product, Order, PromoCode
-│   │   ├── community.py           # Poll, KarmaLog, GroupConfig
-│   │   ├── productivity.py        # Task, Reminder, Note
-│   │   └── developer.py           # ApiKey, WebhookConfig, ApiRequestLog…
-│   ├── services/                  # Logique métier
-│   │   ├── ticket_service.py
-│   │   ├── commerce_service.py
-│   │   ├── cart_service.py
-│   │   ├── community_service.py
-│   │   ├── productivity_service.py
-│   │   ├── developer_service.py
-│   │   ├── notification_service.py
-│   │   └── scheduler.py           # APScheduler jobs
-│   ├── api/                       # REST API routers
-│   │   ├── admin.py               # /api/v1/admin/*
-│   │   └── dev.py                 # /api/v1/dev/*
-│   ├── web/                       # Dashboard HTML
-│   │   ├── router.py              # Vues Jinja2
-│   │   └── auth.py                # Auth JWT web
-│   ├── locales/                   # Traductions YAML
-│   │   ├── fr.yml
-│   │   ├── en.yml
-│   │   └── ar.yml
-│   └── templates/                 # Templates Jinja2
-│       ├── base.html
-│       ├── dashboard.html
-│       ├── users.html
-│       ├── tickets.html
-│       ├── broadcasts.html
-│       └── login.html
-├── tests/
-│   ├── conftest.py
-│   ├── test_basic.py
-│   ├── test_api.py
-│   └── test_middlewares.py
-├── docker-compose.yml
-├── Dockerfile
-├── pyproject.toml
-└── .env.example
-```
-
-### Flux des middlewares bot
-
-Chaque message Telegram passe par 4 middlewares exécutés en `group=-10` (avant tous les handlers) :
-
-```
-Message entrant
-      │
-      ▼
-  LoggingMiddleware      → Log de la requête entrante
-      │
-      ▼
-  AuthMiddleware         → Chargement/création User en DB, vérif. ban
-      │   ✗ banni → ApplicationHandlerStop
-      ▼
-  I18nMiddleware         → Injection langue + t() dans context.user_data
-      │
-      ▼
-  RateLimitMiddleware    → Sliding window Redis (30 req / 60s)
-      │   ✗ dépassé → ApplicationHandlerStop
-      ▼
-  Handler métier
-```
-
----
-
-## Stack
-
-| Composant | Technologie | Version |
+| Module | Contenu | Où |
 |---|---|---|
-| Langage | Python | 3.12 |
-| Framework Web | FastAPI + Uvicorn | 0.115 / 0.30 |
-| Bot Telegram | python-telegram-bot | 21.x |
-| ODM MongoDB | Beanie + PyMongo (API asynchrone) | 2.2 / 4.13 |
-| Cache | Redis (aioredis + hiredis) | 5.x |
-| Scheduler | APScheduler | 3.10 |
-| Paiements | Stripe | 10-11.x |
-| Templates | Jinja2 | 3.1 |
-| Auth | python-jose + passlib/bcrypt | — |
-| Config | pydantic-settings | 2.5 |
-| Monitoring | prometheus-client | 0.20 |
-| Linter | ruff | 0.6 |
-| Tests | pytest + pytest-asyncio + httpx | — |
+| **Orbi Dev** | Projets, clés fournisseur chiffrées, tâches, exécutions suivies (état, historique, pull request, annulation, nouvelle tentative) | Web : `/dev/` |
+| **Support** | Tickets guidés par conversation, SLA, satisfaction (CSAT), alertes aux admins | Bot Telegram |
+| **Productivité** | Tâches, notes, minuteur de concentration | Bot Telegram |
+| **Outils développeur** | Événements GitHub reçus, journal d'erreurs, statistiques d'infrastructure | Bot Telegram (admins) |
+| **Dashboard admin** | Utilisateurs, tickets, indicateurs, lien de connexion généré depuis le bot | Web : `/admin/` |
+| **Communauté** *(optionnelle)* | Sondages, karma, modération de groupes | Bot Telegram — désactivée par défaut |
+
+Interface du bot en **français, anglais et arabe**.
+
+### Le module Communauté est optionnel
+
+Il est **désactivé par défaut** (`ENABLE_COMMUNITY=false`) : sa modération lit le texte de tous les messages des groupes où le bot est présent, ce qui ne doit être activé que de façon délibérée. Désactivé, ses commandes, boutons et handlers n'existent pas dans le bot.
 
 ---
 
-## Prérequis
+## Orbi Dev en bref
 
-- **Docker** et **Docker Compose**
-- Un **token de bot Telegram** (via [@BotFather](https://t.me/BotFather))
-- (Optionnel) Clés Stripe, Orange Money, Wave, OpenAI (Whisper)
+1. Un administrateur se connecte au dashboard (lien magique envoyé par le bot).
+2. Il enregistre un **projet** (URL https du dépôt) et connecte une **clé fournisseur** : elle est vérifiée, puis chiffrée (Fernet) dans une collection séparée, jamais réaffichée.
+3. Il crée une **tâche** : l'agent travaille sur une branche et propose une **pull request**. Rien n'est fusionné ni déployé automatiquement.
+4. L'exécution est suivie en arrière-plan ; l'état vit en base, donc recharger la page ou perdre la connexion ne perd rien et ne relance rien.
+
+Garanties de conception ([ADR-0003](docs/adr/0003-durable-execution-model.md)) : identifiants durables créés avant tout appel réseau, lancement idempotent, résultat incertain réconcilié par lecture (jamais relancé à l'aveugle), retries bornés, transitions d'état validées et atomiques.
 
 ---
 
@@ -200,165 +54,117 @@ Message entrant
 ### Avec Docker (recommandé)
 
 ```bash
-# 1. Cloner le dépôt
-git clone https://github.com/NICE-DEV226/orbi.git
-cd orbi
-
-# 2. Configurer les variables d'environnement
-cp .env.example .env
-# Éditer .env et renseigner TELEGRAM_BOT_TOKEN, ADMIN_CHAT_ID, etc.
-
-# 3. Lancer l'infrastructure complète
+cp .env.example .env        # renseignez au minimum TELEGRAM_BOT_TOKEN et JWT_SECRET (32 caractères)
 docker compose up --build -d
-
-# 4. Vérifier que tout tourne
 docker compose logs -f bot
 ```
 
-Le script `docker-entrypoint.sh` attribue automatiquement le rôle `superadmin` à `ADMIN_CHAT_ID` au premier démarrage.
+Le port 8000 n'écoute que sur `127.0.0.1` : placez un reverse proxy HTTPS devant. Détails d'exploitation : [SETUP_GUIDE.md](SETUP_GUIDE.md).
 
 ### En développement local
 
 ```bash
-# Installer les dépendances verrouillées (uv crée .venv ; requis en Python 3.14, voir docs/adr/0006-python-3.14.md)
+# Dépendances verrouillées (uv est requis en Python 3.14, voir docs/adr/0006-python-3.14.md)
 uv sync --all-extras
-source .venv/bin/activate  # Windows : .venv\Scripts\activate
+source .venv/bin/activate
 
-# Démarrer MongoDB et Redis (via Docker ou en local)
-docker run -d -p 27017:27017 mongo:7.0
-docker run -d -p 6379:6379 redis:7-alpine
+# MongoDB et Redis
+docker run -d --rm -p 127.0.0.1:27017:27017 mongo:7.0.45
+docker run -d --rm -p 127.0.0.1:6379:6379 redis:7.4-alpine
 
-# Configurer les variables d'environnement
 cp .env.example .env
-
-# Lancer l'application
 uvicorn src.main:app --reload
 ```
 
 ---
 
-## Variables d'environnement
+## Configuration
 
-| Variable | Description | Requis |
+Variables principales (liste complète dans [.env.example](.env.example)) :
+
+| Variable | Rôle | Requis |
 |---|---|---|
-| `TELEGRAM_BOT_TOKEN` | Token du bot Telegram | ✅ |
-| `ADMIN_CHAT_ID` | Telegram ID de l'administrateur | ✅ |
-| `MONGODB_URI` | URI de connexion MongoDB | ✅ |
-| `REDIS_URL` | URL Redis | ✅ |
-| `JWT_SECRET` | Clé secrète JWT dashboard | ✅ |
-| `TELEGRAM_WEBHOOK_URL` | URL publique pour les webhooks (prod) | — |
-| `TELEGRAM_WEBHOOK_SECRET` | Secret de validation webhook | — |
-| `OPENAI_API_KEY` | Clé OpenAI (transcription vocale Whisper) | — |
-| `EXCHANGE_RATES_API_KEY` | Clé API taux de change | — |
-| `LIBRETRANSLATE_URL` | URL LibreTranslate | — |
+| `TELEGRAM_BOT_TOKEN` | Token du bot ([@BotFather](https://t.me/BotFather)) | ✅ |
+| `JWT_SECRET` | Secret applicatif (jetons CSRF du dashboard), 32 caractères minimum en production | ✅ en prod |
+| `MONGODB_URI`, `MONGODB_DB`, `REDIS_URL` | Connexions aux services | ✅ |
+| `ADMIN_CHAT_ID` | Telegram ID du premier superadmin (créé seulement s'il n'en existe aucun) | recommandé |
+| `SECRETS_ENCRYPTION_KEY` | Clé(s) Fernet qui chiffrent les clés fournisseur (plusieurs séparées par des virgules = rotation) | pour Orbi Dev |
+| `ADMIN_API_TOKEN`, `DEV_API_TOKEN`, `METRICS_API_TOKEN` | Jetons Bearer des API `/api/v1/admin`, `/api/v1/dev`, `/metrics` ; absents = routes refusées (503) | — |
+| `GITHUB_WEBHOOK_SECRET` | Secret du webhook GitHub ; absent = webhook refusé | — |
+| `TELEGRAM_WEBHOOK_URL`, `TELEGRAM_WEBHOOK_SECRET` | Mode webhook en production | — |
+| `ENABLE_COMMUNITY` | Active le module Communauté | — (`false`) |
+| `ORBI_DEV_REFRESH_INTERVAL` | Intervalle de suivi des exécutions, en secondes (0 = désactivé) | — (`30`) |
 | `ENVIRONMENT` | `development` / `staging` / `production` | — |
-| `LOG_LEVEL` | Niveau de log (`INFO`, `DEBUG`…) | — |
 
-Voir `.env.example` pour la liste complète.
+La configuration de production est **fail-closed** : démarrage refusé si `JWT_SECRET` est faible ou si `TELEGRAM_WEBHOOK_URL` est défini sans secret.
 
 ---
 
-## Endpoints API
+## Routes
 
-| Méthode | Endpoint | Description |
+| Méthode | Route | Description |
 |---|---|---|
-| `GET` | `/health` | Health check (MongoDB, Redis) |
-| `GET` | `/docs` | Swagger UI (dev seulement) |
-| `GET` | `/redoc` | ReDoc |
-| `GET` | `/api/v1/admin/users` | Liste paginée des utilisateurs |
-| `GET` | `/api/v1/admin/tickets` | File de tickets (filtrable) |
-| `POST` | `/api/v1/admin/broadcast` | Diffusion de message |
-| `POST` | `/webhook/github` | Webhook événements GitHub |
-| `GET` | `/admin/` | Dashboard (authentification requise) |
-| `GET` | `/admin/users` | Gestion utilisateurs |
-| `GET` | `/admin/tickets` | Gestion tickets |
-| `GET` | `/admin/broadcasts` | Diffusion messages |
+| `GET` | `/livez` | Le processus répond (utilisé par le HEALTHCHECK Docker) |
+| `GET` | `/health` | Disponibilité de MongoDB et Redis |
+| `GET` | `/metrics` | Métriques Prometheus (jeton Bearer) |
+| `GET` | `/api/v1/admin/users`, `/tickets` | Lecture seule (jeton Bearer) |
+| `GET` | `/api/v1/dev/health/stats`, `/errors/unresolved` | Infrastructure et erreurs (jeton Bearer) |
+| `POST` | `/webhook/telegram`, `/webhook/github` | Webhooks entrants (secret vérifié) |
+| `GET` | `/admin/` , `/admin/users`, `/admin/tickets` | Dashboard (session administrateur) |
+| `GET` | `/dev/…` | Interface mobile Orbi Dev (session administrateur, CSRF sur toute écriture) |
 
 ---
 
-## Lancer les tests
+## Tests
+
+Les tests utilisent un **vrai MongoDB** (Redis est simulé) :
 
 ```bash
-# Tous les tests
-pytest
-
-# Avec couverture
-pytest --cov=src --cov-report=html
-
-# Tests unitaires seulement
-pytest -m unit
-
-# Verbose
-pytest -v
+docker run -d --rm --name orbi_test_mongo -p 127.0.0.1:27017:27017 mongo:7.0.45
+TELEGRAM_BOT_TOKEN=test uv run pytest
 ```
+
+La CI (GitHub Actions) exécute ruff, la suite sur Python 3.12 / 3.13 / 3.14, un audit des dépendances verrouillées et la construction de l'image Docker.
 
 ---
 
-## Infrastructure Docker
+## Architecture
 
-```yaml
-services:
-  bot:           # FastAPI + Bot Telegram — port 8000
-  mongodb:       # MongoDB 7.0
-  redis:         # Redis 7 Alpine
-  libretranslate # Traduction locale (optionnel)
+```
+src/
+├── main.py              # Application FastAPI, cycle de vie, webhooks, /health /livez /metrics
+├── core/                # Config, MongoDB (Beanie/PyMongo async), Redis, i18n, logs, sécurité, métriques
+├── bot/                 # Application Telegram, claviers, middlewares (logs → auth → i18n → rate limit)
+├── handlers/            # Support, productivité, profil, menus, admin, outils développeur, communauté (optionnel)
+├── services/            # Tickets, productivité, notifications, planification, développeur, communauté
+├── models/              # Documents Beanie (utilisateurs, tickets, productivité, logs, communauté)
+├── orbi_dev/            # Orbi Dev : modèles, machine à états, chiffrement, orchestration, connecteurs, worker
+│   └── connectors/      # Contrat de connecteur, Cursor Cloud Agents, fournisseur factice (hors production)
+├── web/                 # Authentification par lien magique, dashboard, interface Orbi Dev, CSRF
+├── api/                 # API Bearer admin et développeur
+├── templates/           # Gabarits Jinja2
+└── locales/             # Traductions fr / en / ar
 ```
 
-Tous les services disposent d'un **healthcheck** et d'une politique de redémarrage automatique (`restart: always`).
+Chaque message du bot traverse 4 middlewares (`group=-10`) : journalisation, authentification (création de l'utilisateur, bannissements), langue, limitation de débit (fenêtre glissante Redis, 30 requêtes / 60 s).
+
+### Données MongoDB
+
+`users`, `tickets`, `tasks`, `reminders`, `notes`, `api_logs`, `error_logs`, `github_webhook_logs`, et pour Orbi Dev : `orbi_dev_projects`, `orbi_dev_integrations`, `orbi_dev_integration_secrets` (clés chiffrées), `orbi_dev_tasks`, `orbi_dev_executions`, `orbi_dev_events`, `orbi_dev_audit`. Module Communauté : `polls`, `karma_logs`, `moderation_logs`, `group_configs`.
+
+> Les anciennes collections du module boutique supprimé (`products`, `orders`, `promo_codes`) et des écrans développeur supprimés (`api_keys`, `webhook_configs`, `webhook_deliveries`, `api_request_logs`) ne sont **pas** supprimées automatiquement des bases existantes.
 
 ---
 
-## Modèles de données MongoDB
+## Documentation
 
-| Collection | Document | Description |
-|---|---|---|
-| `users` | `User` | Profils Telegram, rôles, préférences |
-| `tickets` | `Ticket` | Tickets support avec SLA et CSAT |
-| `products` | `Product` | Catalogue multilingue |
-| `orders` | `Order` | Commandes avec historique statuts |
-| `promo_codes` | `PromoCode` | Codes promotionnels |
-| `polls` | `Poll` | Sondages communautaires |
-| `karma_logs` | `KarmaLog` | Attributions de karma |
-| `group_configs` | `GroupConfig` | Configuration des groupes Telegram |
-| `tasks` | `Task` | Tâches personnelles |
-| `reminders` | `Reminder` | Rappels one-shot |
-| `notes` | `Note` | Notes avec hashtags et audio |
-| `api_keys` | `ApiKey` | Clés API développeurs |
-| `webhook_configs` | `WebhookConfig` | Webhooks sortants |
-| `webhook_deliveries` | `WebhookDelivery` | Logs de livraison webhooks |
-| `api_request_logs` | `ApiRequestLog` | Logs requêtes API |
-| `error_logs` | `ErrorLog` | Erreurs applicatives |
-| `github_webhook_logs` | `GithubWebhookLog` | Événements GitHub reçus |
-
----
-
-## Commandes utiles
-
-```bash
-# Logs du bot en temps réel
-docker compose logs -f bot
-
-# Accéder au shell MongoDB
-docker exec -it orbi_mongo mongosh
-
-# Accéder au shell Redis
-docker exec -it orbi_redis redis-cli
-
-# Linter
-ruff check src/
-
-# Formater le code
-ruff format src/
-```
+- [Spécification](docs/ORBI_SPECIFICATION.md) · [Feuille de route](docs/ROADMAP.md) · [Audit initial](docs/AUDIT_INITIAL.md) · [Inventaire des modules](docs/LEGACY_MODULES.md)
+- Décisions d'architecture : [ADR-0001 à 0006](docs/README.md)
+- [Connecteur Cursor](docs/connectors/cursor.md) — configuration, mapping, hypothèses et limites
+- [`cdc.md`](cdc.md) — cahier des charges historique (v4.0), en partie obsolète
 
 ---
 
 ## Licence
 
-Ce projet est distribué sous licence **MIT**. Voir le fichier [LICENSE](LICENSE) pour plus de détails.
-
----
-
-<div align="center">
-  Fait avec ❤️ — <strong>Orbi</strong> · Assistant Universel Telegram
-</div>
+**Aucune licence n'est encore déclarée dans ce dépôt** (pas de fichier `LICENSE`) : en l'absence de licence, le code reste protégé par défaut et ne peut pas être réutilisé librement. À choisir par le propriétaire du projet.

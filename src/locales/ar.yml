@@ -34,7 +34,6 @@ menu:
   main:
     title: "📋 **القائمة الرئيسية**\n\nاختر وحدة:"
     support: "🎧 الدعم"
-    shop: "🛍️ المتجر"
     community: "👥 المجتمع"
     productivity: "⚡ الإنتاجية"
     developers: "👨‍💻 المطورون"
@@ -43,7 +42,7 @@ menu:
 # ── Profile ──
 profile:
   title: "👤 **ملفي الشخصي**"
-  info: "📝 **الاسم**: {name}\n🌐 **اللغة**: {lang}\n👑 **الدور**: {role}\n📅 **تاريخ الانضمام**: {joined}\n📊 **الطلبات**: {orders}\n🎧 **التذاكر**: {tickets}\n⭐ **الكارما**: {karma}"
+  info: "📝 **الاسم**: {name}\n🌐 **اللغة**: {lang}\n👑 **الدور**: {role}\n📅 **تاريخ الانضمام**: {joined}\n🎧 **التذاكر**: {tickets}"
   change_language: "✏️ تغيير اللغة"
   notifications: "🔔 الإشعارات"
   timezone: "🕐 المنطقة الزمنية"
@@ -79,32 +78,6 @@ support:
   escalation_continue: "← المتابعة بمفردي"
 
 # ── Commerce ──
-commerce:
-  menu_title: "🛍️ **المتجر**\n\nاكتشف منتجاتنا:"
-  catalog: "📦 الكتالوج"
-  my_orders: "📦 طلباتي"
-  cart: "🛒 عربتي"
-  search: "🔍 بحث"
-  add_to_cart: "🛒 أضف إلى السلة"
-  add_favorite: "❤️ أضف إلى المفضلة"
-  notify_available: "🔔 أعلمني عند توفر المنتَج"
-  out_of_stock: "نفذت الكمية"
-  product_unavailable: "⚠️ هذا المنتج لم يعد متوفرًا."
-  cart_empty: "🛒 عربة التسوق فارغة."
-  cart_title: "🛒 **عربة التسوق**\n\n{items}\n\n💰 **الإجمالي**: {total}"
-  checkout: "🛒 الدفع"
-  clear_cart: "🗑️ إفراغ العربة"
-  promo_code: "🎟️ لدي رمز ترويجي"
-  promo_invalid: "❌ رمز ترويجي غير صالح أو منتهي الصلاحية."
-  promo_applied: "✅ تم تطبيق الرمز الترويجي! الخصم: -{discount}"
-  payment_select: "💳 اختر طريقة الدفع الخاصة بك:"
-  payment_stripe: "💳 الدفع بالبطاقة"
-  payment_orange: "📱 أورنج موني"
-  payment_wave: "🌊 ويف"
-  order_confirmed: "✅ تم تأكيد الطلب **{order_id}**!\n\n📦 **العناصر**: {items}\n💰 **الإجمالي**: {total}\n💳 **الدفع**: {provider}"
-  order_cancelled: "❌ تم إلغاء الطلب **{order_id}**. ستتم معالجة الاسترداد خلال {delay}."
-  track_order: "📦 تتبع طلبي"
-
 # ── Community ──
 community:
   menu_title: "👥 **المجتمع**\n\nتفاعل مع الأعضاء الآخرين:"
@@ -130,17 +103,13 @@ productivity:
 
 # ── Developers ──
 developers:
-  menu_title: "👨‍💻 **المطورون**\n\nإدارة تكاملات API الخاصة بك:"
-  api_keys: "🔑 مفاتيح API الخاصة بي"
-  webhooks: "🔗 الـ Webhooks الخاصة بي"
-  sandbox: "🧪 بيئة الاختبار"
-  logs: "📊 سجلات API"
+  menu_title: "👨‍💻 **المطورون**\n\nمراقبة البنية التحتية:"
+  webhooks: "🔗 أحداث GitHub"
+  logs: "📊 الأخطاء"
   stats: "📈 الإحصائيات"
-  docs: "📖 وثائق API"
 
 # ── Notifications ──
 notifications:
-  order_status: "📦 **تحديث الطلب {order_id}**\n\nالحالة الجديدة: {status}"
   ticket_status: "🎧 **تحديث التذكرة {ticket_id}**\n\nالحالة الجديدة: {status}"
   csat_request: "⭐ **قيم تجربتك**\n\nتم حل التذكرة **{ticket_id}**. كيف تقيم الدعم الذي تلقيته؟"
   csat_thanks: "🙏 شكرًا لتقييمك!"

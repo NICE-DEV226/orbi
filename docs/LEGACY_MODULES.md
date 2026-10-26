@@ -16,6 +16,17 @@
 
 Mesures du 23 octobre 2026 sur `master` (après les lots sécurité, qualité et infra), environnement propre : 72 tests passent, ruff sans erreur, `pip-audit` sans vulnérabilité connue. La couverture est mesurée avec `pytest --cov=src` (MongoDB et Redis simulés). Le bot Telegram a été construit hors ligne avec un faux token (`create_bot_application`) : la construction réussit, 5 commandes (`/start`, `/ping`, `/test`, `/addgroup`, `/addchannel`) et 78 handlers au groupe 0 sont enregistrés, sans commande dupliquée.
 
+## Décisions du responsable du projet (2026-10-26)
+
+| Module | Décision | État |
+|---|---|---|
+| Commerce / catalogue / panier / paiements | **Retirer** | Fait : code, modèles, menus, traductions, indicateurs supprimés (les anciennes collections MongoDB ne sont pas supprimées) |
+| Communauté / sondages / karma / modération | **Garder en option** | Fait : module désactivé par défaut (`ENABLE_COMMUNITY`), stubs et boutons orphelins retirés |
+| Code mort, factice ou inerte | **Retirer** | Fait : `demo.py`, `admin.py`, `test.py`, panneau développeur creux, endpoints sans effet, KPI/graphique/pagination inventés, boutons inertes |
+| Support, Productivité, Orbi Dev, i18n, scheduler | Conservés | Menu Productivité corrigé (les 6 boutons pointaient vers des callbacks inexistants) |
+
+Les recommandations du tableau ci-dessous datent du 2026-10-23 ; les lignes concernées par ces décisions sont désormais historiques.
+
 **Limites :** aucun handler n'a été exercé contre l'API Telegram réelle, ni contre un vrai MongoDB (mongomock n'est pas MongoDB). Une couverture de 0 % signifie « aucune preuve automatisée », pas « cassé ». Les colonnes « Recommandation » sont des propositions argumentées ; les décisions appartiennent au responsable du projet.
 
 ## Inventaire avec preuves

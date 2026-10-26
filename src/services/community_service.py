@@ -112,7 +112,7 @@ async def add_karma(
     reason: str | None = None,
 ) -> None:
     """Ajoute (ou retire) des points de Karma à un utilisateur."""
-    target_user.karma += amount
+    target_user.karma_points += amount
     target_user.touch()
     await target_user.save()
 
@@ -130,7 +130,7 @@ async def add_karma(
 
 async def get_top_karma_users(limit: int = 10) -> list[User]:
     """Récupère le classement des utilisateurs par Karma."""
-    return await User.find().sort(-User.karma).limit(limit).to_list()
+    return await User.find().sort(-User.karma_points).limit(limit).to_list()
 
 
 # ─────────────────────────────────────

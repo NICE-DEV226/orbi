@@ -8,10 +8,8 @@ from datetime import datetime
 
 import pytest
 
-from src.models.commerce import Order, OrderStatus, Product
 from src.models.ticket import Ticket, TicketCategory, TicketPriority, TicketStatus
 from src.models.user import User, UserRole
-from src.services.commerce_service import generate_order_id, get_catalog_page
 from src.services.ticket_service import generate_ticket_id
 
 
@@ -24,21 +22,6 @@ def mock_user():
         first_name="Test",
         language="fr",
         role=UserRole.USER
-    )
-
-
-@pytest.fixture
-def mock_product():
-    """Fixture pour un produit de test."""
-    return Product(
-        name_fr="Produit Test",
-        name_en="Test Product",
-        name_ar="منتج اختبار",
-        description_fr="Description du produit test",
-        price=99.99,
-        stock=10,
-        category="test",
-        is_active=True
     )
 
 
@@ -135,83 +118,6 @@ class TestTicketModel:
         assert priority == TicketPriority.MEDIUM
 
 
-class TestCommerceModels:
-    """Tests pour les modèles Commerce."""
-
-    def test_product_creation(self, mock_product):
-        """Test la création d'un produit."""
-        assert mock_product.name_fr == "Produit Test"
-        assert mock_product.name_en == "Test Product"
-        assert mock_product.name_ar == "منتج اختبار"
-        assert mock_product.price == 99.99
-        assert mock_product.stock == 10
-        assert mock_product.is_available
-
-    def test_product_availability(self, mock_product):
-        """Test la disponibilité des produits."""
-        # Produit disponible
-        assert mock_product.is_available
-
-        # Plus de stock
-        mock_product.stock = 0
-        assert not mock_product.is_available
-
-        # Produit désactivé
-        mock_product.stock = 5
-        mock_product.is_active = False
-        assert not mock_product.is_available
-
-    def test_product_multilingual(self, mock_product):
-        """Test les méthodes multilingues."""
-        assert mock_product.get_name("fr") == "Produit Test"
-        assert mock_product.get_name("en") == "Test Product"
-        assert mock_product.get_name("ar") == "منتج اختبار"
-        assert mock_product.get_name("es") == "Produit Test"  # fallback to fr
-
-        assert mock_product.get_description("fr") == "Description du produit test"
-
-    def test_order_creation(self):
-        """Test la création d'une commande."""
-        order = Order(
-            order_id="ORD-2024-00001",
-            user_telegram_id=123456789,
-            user_name="Test User",
-            items=[
-                {
-                    "product_id": "prod_1",
-                    "name": "Produit Test",
-                    "price": 99.99,
-                    "quantity": 2
-                }
-            ],
-            subtotal=199.98,
-            total=199.98,
-            currency="XOF"
-        )
-
-        assert order.order_id == "ORD-2024-00001"
-        assert order.status == OrderStatus.PENDING_PAYMENT
-        assert len(order.items) == 1
-        assert order.subtotal == 199.98
-        assert order.total == 199.98
-
-    def test_order_status_history(self):
-        """Test l'historique des statuts de commande."""
-        order = Order(
-            order_id="ORD-2024-00001",
-            user_telegram_id=123456789,
-            user_name="Test User"
-        )
-
-        # Ajouter un changement de statut
-        order.add_status_change(OrderStatus.PAID, "Paiement reçu")
-
-        assert order.status == OrderStatus.PAID
-        assert len(order.status_history) == 1
-        assert order.status_history[0]["status"] == "paid"
-        assert order.status_history[0]["note"] == "Paiement reçu"
-
-
 class TestTicketService:
     """Tests pour le service Ticket."""
 
@@ -227,46 +133,6 @@ class TestTicketService:
         # Vérifier que l'année est correcte
         current_year = datetime.now().strftime("%Y")
         assert current_year in ticket_id
-
-
-class TestCommerceService:
-    """Tests pour le service Commerce."""
-
-    @pytest.mark.asyncio
-    async def test_generate_order_id(self):
-        """Test la génération d'ID de commande."""
-        order_id = await generate_order_id()
-
-        # Vérifier le format ORD-YYYY-NNNNN
-        assert order_id.startswith("ORD-")
-        assert len(order_id) == 14  # ORD-YYYY-NNNNN
-
-        # Vérifier que l'année est correcte
-        current_year = datetime.now().strftime("%Y")
-        assert current_year in order_id
-
-    @pytest.mark.asyncio
-    async def test_get_catalog_page(self):
-        """Test la pagination du catalogue."""
-        for i in range(1, 4):
-            await Product(
-                name_fr=f"Produit {i}",
-                name_en=f"Product {i}",
-                name_ar=f"منتج {i}",
-                price=10.0 * i,
-                stock=5,
-                category="test",
-                is_active=True,
-            ).insert()
-        await Product(
-            name_fr="Inactif", name_en="Inactive", name_ar="x", price=1.0, stock=1, category="test", is_active=False
-        ).insert()
-
-        products, total = await get_catalog_page(page=0)
-
-        assert total == 3
-        assert len(products) == 3
-        assert all(p.is_active for p in products)
 
 
 class TestConfiguration:

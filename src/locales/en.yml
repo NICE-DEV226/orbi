@@ -34,7 +34,6 @@ menu:
   main:
     title: "📋 **Main Menu**\n\nChoose a module:"
     support: "🎧 Support"
-    shop: "🛍️ Shop"
     community: "👥 Community"
     productivity: "⚡ Productivity"
     developers: "👨‍💻 Developers"
@@ -43,7 +42,7 @@ menu:
 # ── Profile ──
 profile:
   title: "👤 **My Profile**"
-  info: "📝 **Name**: {name}\n🌐 **Language**: {lang}\n👑 **Role**: {role}\n📅 **Joined**: {joined}\n📊 **Orders**: {orders}\n🎧 **Tickets**: {tickets}\n⭐ **Karma**: {karma}"
+  info: "📝 **Name**: {name}\n🌐 **Language**: {lang}\n👑 **Role**: {role}\n📅 **Joined**: {joined}\n🎧 **Tickets**: {tickets}"
   change_language: "✏️ Change Language"
   notifications: "🔔 Notifications"
   timezone: "🕐 Timezone"
@@ -79,32 +78,6 @@ support:
   escalation_continue: "← Continue alone"
 
 # ── Commerce ──
-commerce:
-  menu_title: "🛍️ **Shop**\n\nDiscover our products:"
-  catalog: "📦 Catalog"
-  my_orders: "📦 My Orders"
-  cart: "🛒 My Cart"
-  search: "🔍 Search"
-  add_to_cart: "🛒 Add to Cart"
-  add_favorite: "❤️ Add to Favorites"
-  notify_available: "🔔 Notify when available"
-  out_of_stock: "Out of Stock"
-  product_unavailable: "⚠️ This product is no longer available."
-  cart_empty: "🛒 Your cart is empty."
-  cart_title: "🛒 **My Cart**\n\n{items}\n\n💰 **Total**: {total}"
-  checkout: "🛒 Checkout"
-  clear_cart: "🗑️ Clear Cart"
-  promo_code: "🎟️ I have a promo code"
-  promo_invalid: "❌ Invalid or expired promo code."
-  promo_applied: "✅ Promo code applied! Discount: -{discount}"
-  payment_select: "💳 Choose your payment method:"
-  payment_stripe: "💳 Pay by Card"
-  payment_orange: "📱 Orange Money"
-  payment_wave: "🌊 Wave"
-  order_confirmed: "✅ Order **{order_id}** confirmed!\n\n📦 **Items**: {items}\n💰 **Total**: {total}\n💳 **Payment**: {provider}"
-  order_cancelled: "❌ Order **{order_id}** has been cancelled. Refund will be processed within {delay}."
-  track_order: "📦 Track My Order"
-
 # ── Community ──
 community:
   menu_title: "👥 **Community**\n\nInteract with other members:"
@@ -130,17 +103,13 @@ productivity:
 
 # ── Developers ──
 developers:
-  menu_title: "👨‍💻 **Developers**\n\nManage your API integrations:"
-  api_keys: "🔑 My API Keys"
-  webhooks: "🔗 My Webhooks"
-  sandbox: "🧪 Sandbox"
-  logs: "📊 API Logs"
+  menu_title: "👨‍💻 **Developers**\n\nInfrastructure monitoring:"
+  webhooks: "🔗 GitHub events"
+  logs: "📊 Errors"
   stats: "📈 Statistics"
-  docs: "📖 API Documentation"
 
 # ── Notifications ──
 notifications:
-  order_status: "📦 **Order Update {order_id}**\n\nNew Status: {status}"
   ticket_status: "🎧 **Ticket Update {ticket_id}**\n\nNew Status: {status}"
   csat_request: "⭐ **Rate Your Experience**\n\nTicket **{ticket_id}** has been resolved. How would you rate the support received?"
   csat_thanks: "🙏 Thank you for your feedback!"

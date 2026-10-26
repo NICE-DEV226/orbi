@@ -9,7 +9,6 @@
                 <input type="text" class="form-control bg-dark text-light border-secondary" placeholder="Rechercher..." name="q" value="{{ query | default('') }}">
                 <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
             </div>
-            <button type="button" class="btn btn-sm btn-outline-secondary">Exporter CSV</button>
         </form>
     </div>
 </div>
@@ -25,7 +24,6 @@
                     <th scope="col">Langue</th>
                     <th scope="col">Statut</th>
                     <th scope="col">Date Inscription</th>
-                    <th scope="col" class="text-end">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -50,19 +48,10 @@
                         {% endif %}
                     </td>
                     <td>{{ user.created_at.strftime('%d/%m/%Y') }}</td>
-                    <td class="text-end">
-                        <button class="btn btn-sm btn-outline-light"><i class="bi bi-eye"></i></button>
-                        <button class="btn btn-sm btn-outline-warning mx-1"><i class="bi bi-pencil"></i></button>
-                        {% if user.is_banned %}
-                        <button class="btn btn-sm btn-outline-success"><i class="bi bi-check-circle"></i></button>
-                        {% else %}
-                        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-slash-circle"></i></button>
-                        {% endif %}
-                    </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="text-center py-4 text-muted">
+                    <td colspan="6" class="text-center py-4 text-muted">
                         Aucun utilisateur trouvé.
                     </td>
                 </tr>
@@ -71,17 +60,7 @@
         </table>
     </div>
     <div class="card-footer border-secondary d-flex justify-content-between align-items-center">
-        <span class="text-muted small">Affichage : {{ users|length }} utilisateurs</span>
-        
-        <nav aria-label="Pagination">
-            <ul class="pagination pagination-sm mb-0">
-                <li class="page-item disabled"><a class="page-link bg-dark text-muted border-secondary" href="#">Précédent</a></li>
-                <li class="page-item active" aria-current="page"><a class="page-link bg-primary border-primary" href="#">1</a></li>
-                <li class="page-item"><a class="page-link bg-dark text-light border-secondary" href="#">2</a></li>
-                <li class="page-item"><a class="page-link bg-dark text-light border-secondary" href="#">3</a></li>
-                <li class="page-item"><a class="page-link bg-dark text-light border-secondary" href="#">Suivant</a></li>
-            </ul>
-        </nav>
+        <span class="text-muted small">Affichage : {{ users|length }} utilisateur(s) les plus récents (50 maximum)</span>
     </div>
 </div>
 {% endblock %}

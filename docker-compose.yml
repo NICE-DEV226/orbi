@@ -26,9 +26,7 @@ services:
       - ORBI_DEV_REFRESH_INTERVAL=${ORBI_DEV_REFRESH_INTERVAL:-30}
       - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET:-}
       - ADMIN_CHAT_ID=${ADMIN_CHAT_ID:-0}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - EXCHANGE_RATES_API_KEY=${EXCHANGE_RATES_API_KEY:-}
-      - LIBRETRANSLATE_URL=${LIBRETRANSLATE_URL:-http://libretranslate:5000}
+      - ENABLE_COMMUNITY=${ENABLE_COMMUNITY:-false}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     # Exposé sur la boucle locale par défaut : placer un reverse proxy HTTPS devant.
     ports:
@@ -72,22 +70,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    logging: *default-logging
-    networks:
-      - orbi_network
-
-  # Traduction locale, optionnelle : `docker compose --profile translate up`
-  libretranslate:
-    image: libretranslate/libretranslate:v1.9.6
-    container_name: orbi_translate
-    profiles: ["translate"]
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/languages', timeout=5)"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 300s
     logging: *default-logging
     networks:
       - orbi_network

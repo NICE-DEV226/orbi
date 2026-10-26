@@ -17,10 +17,10 @@ from src.bot.keyboards import (
     CB_MODULE_COMMUNITY,
     CB_MODULE_DEVELOPERS,
     CB_MODULE_PRODUCTIVITY,
-    CB_MODULE_PROFILE,
-    CB_MODULE_SHOP,
     CB_MODULE_SUPPORT,
+    main_menu_keyboard,
 )
+from src.core.config import get_settings
 from src.core.i18n import t
 
 logger = logging.getLogger("orbi.handlers.menu")
@@ -80,27 +80,7 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # Pour s'assurer qu'il prend bien le titre
     text = t("menu.main.title", lang)
 
-    # Ajouter un bouton pour ajouter le bot à un groupe
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(t("menu.main.support", lang), callback_data=CB_MODULE_SUPPORT),
-            InlineKeyboardButton(t("menu.main.shop", lang), callback_data=CB_MODULE_SHOP),
-        ],
-        [
-            InlineKeyboardButton(t("menu.main.community", lang), callback_data=CB_MODULE_COMMUNITY),
-            InlineKeyboardButton(t("menu.main.productivity", lang), callback_data=CB_MODULE_PRODUCTIVITY),
-        ],
-        [
-            InlineKeyboardButton(t("menu.main.developers", lang), callback_data=CB_MODULE_DEVELOPERS),
-        ],
-        [
-            InlineKeyboardButton(t("menu.main.profile", lang), callback_data=CB_MODULE_PROFILE),
-        ],
-        [
-            InlineKeyboardButton("👥 Ajouter à un groupe", callback_data="group:add"),
-            InlineKeyboardButton("📢 Ajouter à un canal", callback_data="channel:add"),
-        ],
-    ])
+    keyboard = main_menu_keyboard(lang)
 
     await send_or_edit_menu(update, context, text, keyboard)
 
@@ -126,31 +106,6 @@ async def show_support_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     await send_or_edit_menu(update, context, text, keyboard)
 
 
-async def show_shop_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Affiche le sous-menu Boutique avec le logo."""
-    if update.callback_query:
-        await update.callback_query.answer()
-    if not context.user_data:
-        return
-    lang = context.user_data.get("lang", "fr")
-
-    text = f"🛒 <b>{t('commerce.menu_title', lang)}</b>"
-
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(t("commerce.catalog", lang), callback_data="shop:catalog"),
-            InlineKeyboardButton(t("commerce.my_orders", lang), callback_data="shop:my_orders"),
-        ],
-        [
-            InlineKeyboardButton(t("commerce.cart", lang), callback_data="shop:cart"),
-            InlineKeyboardButton(t("commerce.search", lang), callback_data="shop:search"),
-        ],
-        [InlineKeyboardButton(t("common.home", lang), callback_data=CB_HOME)],
-    ])
-
-    await send_or_edit_menu(update, context, text, keyboard)
-
-
 async def show_community_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Affiche le sous-menu Communauté avec le logo."""
     if update.callback_query:
@@ -164,9 +119,8 @@ async def show_community_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton(t("community.polls", lang), callback_data="community:polls"),
-            InlineKeyboardButton(t("community.karma", lang), callback_data="community:karma"),
+            InlineKeyboardButton(t("community.karma", lang), callback_data="community:leaderboard"),
         ],
-        [InlineKeyboardButton(t("community.rules", lang), callback_data="community:rules")],
         [InlineKeyboardButton(t("common.home", lang), callback_data=CB_HOME)],
     ])
 
@@ -185,17 +139,14 @@ async def show_productivity_menu(update: Update, context: ContextTypes.DEFAULT_T
 
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton(t("productivity.new_task", lang), callback_data="prod:new_task"),
-            InlineKeyboardButton(t("productivity.my_tasks", lang), callback_data="prod:my_tasks"),
+            InlineKeyboardButton(t("productivity.new_task", lang), callback_data="prod:task_new"),
+            InlineKeyboardButton(t("productivity.my_tasks", lang), callback_data="prod:tasks"),
         ],
         [
-            InlineKeyboardButton(t("productivity.new_note", lang), callback_data="prod:new_note"),
-            InlineKeyboardButton(t("productivity.my_notes", lang), callback_data="prod:my_notes"),
+            InlineKeyboardButton(t("productivity.new_note", lang), callback_data="prod:note_new"),
+            InlineKeyboardButton(t("productivity.my_notes", lang), callback_data="prod:notes"),
         ],
-        [
-            InlineKeyboardButton("🍅 Focus", callback_data="prod:timer_menu"),
-            InlineKeyboardButton("🌐 Translate", callback_data="prod:translate"),
-        ],
+        [InlineKeyboardButton("🍅 Focus", callback_data="prod:focus")],
         [InlineKeyboardButton(t("common.home", lang), callback_data=CB_HOME)],
     ])
 
@@ -212,21 +163,19 @@ async def show_developers_menu(update: Update, context: ContextTypes.DEFAULT_TYP
 
     text = f"🛠️ <b>{t('developers.menu_title', lang)}</b>\n\n<i>Espace administrateur / Développeur</i>"
 
-    keyboard = InlineKeyboardMarkup([
+    rows = [
+        [InlineKeyboardButton(t("developers.webhooks", lang), callback_data="dev:github")],
         [
-            InlineKeyboardButton(t("developers.api_keys", lang), callback_data="dev:api_keys"),
-            InlineKeyboardButton(t("developers.webhooks", lang), callback_data="dev:github"),
-        ],
-        [
-            InlineKeyboardButton(t("developers.sandbox", lang), callback_data="dev:sandbox"),
             InlineKeyboardButton(t("developers.logs", lang), callback_data="dev:logs"),
-        ],
-        [
             InlineKeyboardButton(t("developers.stats", lang), callback_data="dev:stats"),
-            InlineKeyboardButton(t("developers.docs", lang), callback_data="dev:docs"),
         ],
-        [InlineKeyboardButton(t("common.home", lang), callback_data=CB_HOME)],
-    ])
+    ]
+    # Telegram n'accepte que des liens https pour les boutons URL
+    base_url = get_settings().BASE_URL.rstrip("/")
+    if base_url.startswith("https://"):
+        rows.append([InlineKeyboardButton("🤖 Orbi Dev (web)", url=f"{base_url}/dev/")])
+    rows.append([InlineKeyboardButton(t("common.home", lang), callback_data=CB_HOME)])
+    keyboard = InlineKeyboardMarkup(rows)
 
     await send_or_edit_menu(update, context, text, keyboard)
 
@@ -235,26 +184,22 @@ def register_menu_handlers(application) -> None:
     """Enregistre les handlers de navigation du menu principal."""
     application.add_handler(CallbackQueryHandler(show_main_menu, pattern=f"^{CB_HOME}$"))
     application.add_handler(CallbackQueryHandler(show_support_menu, pattern=f"^{CB_MODULE_SUPPORT}$"))
-    application.add_handler(CallbackQueryHandler(show_shop_menu, pattern=f"^{CB_MODULE_SHOP}$"))
-    application.add_handler(CallbackQueryHandler(show_community_menu, pattern=f"^{CB_MODULE_COMMUNITY}$"))
     application.add_handler(CallbackQueryHandler(show_productivity_menu, pattern=f"^{CB_MODULE_PRODUCTIVITY}$"))
     application.add_handler(CallbackQueryHandler(show_developers_menu, pattern=f"^{CB_MODULE_DEVELOPERS}$"))
 
-    # Callbacks pour ajouter le bot à des groupes/canaux
-    from src.handlers.group_utils import add_to_channel_command, add_to_group_command
+    if get_settings().ENABLE_COMMUNITY:
+        application.add_handler(CallbackQueryHandler(show_community_menu, pattern=f"^{CB_MODULE_COMMUNITY}$"))
 
-    application.add_handler(CallbackQueryHandler(
-        lambda u, c: add_to_group_command(u, c),
-        pattern=r"^group:add$"
-    ))
-    application.add_handler(CallbackQueryHandler(
-        lambda u, c: add_to_channel_command(u, c),
-        pattern=r"^channel:add$"
-    ))
+        # Callbacks pour ajouter le bot à des groupes/canaux
+        from src.handlers.group_utils import add_to_channel_command, add_to_group_command
 
-    # Callbacks pour les fonctionnalités avancées
-    # Admin - déjà géré par register_admin_handlers()
-    # Groupes - déjà géré par register_group_handlers()
-    # Développeurs - déjà géré par register_real_dev_handlers()
+        application.add_handler(CallbackQueryHandler(
+            lambda u, c: add_to_group_command(u, c),
+            pattern=r"^group:add$"
+        ))
+        application.add_handler(CallbackQueryHandler(
+            lambda u, c: add_to_channel_command(u, c),
+            pattern=r"^channel:add$"
+        ))
 
     logger.info("Handlers menu enregistrés")

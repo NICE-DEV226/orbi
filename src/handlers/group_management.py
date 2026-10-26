@@ -68,10 +68,6 @@ async def handle_bot_added_to_group(update: Update, context: ContextTypes.DEFAUL
             InlineKeyboardButton("⚙️ Configuration", callback_data=f"group:config:{chat.id}"),
             InlineKeyboardButton("📋 Règles", callback_data=f"group:rules:{chat.id}"),
         ],
-        [
-            InlineKeyboardButton("👥 Modération", callback_data=f"group:moderation:{chat.id}"),
-            InlineKeyboardButton("📊 Statistiques", callback_data=f"group:stats:{chat.id}"),
-        ]
     ])
 
     await context.bot.send_message(
@@ -121,17 +117,10 @@ async def show_group_config(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("👋 Message de bienvenue", callback_data=f"group:welcome:{chat_id}"),
             InlineKeyboardButton("📋 Règles du groupe", callback_data=f"group:rules:{chat_id}"),
-        ],
-        [
             InlineKeyboardButton("🔧 Modération auto", callback_data=f"group:auto_mod:{chat_id}"),
-            InlineKeyboardButton("⚡ Karma", callback_data=f"group:karma:{chat_id}"),
         ],
-        [
-            InlineKeyboardButton("🔨 Outils admin", callback_data=f"group:tools:{chat_id}"),
-            InlineKeyboardButton("❌ Retour", callback_data="mod:home"),
-        ]
+        [InlineKeyboardButton("❌ Retour", callback_data="nav:home")],
     ])
 
     status = "✅ Activé" if group_config.auto_moderation_enabled else "❌ Désactivé"
@@ -171,7 +160,7 @@ async def toggle_auto_moderation(update: Update, context: ContextTypes.DEFAULT_T
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("⚙️ Retour à la config", callback_data=f"group:config:{chat_id}")],
-        [InlineKeyboardButton("❌ Retour au menu", callback_data="mod:home")]
+        [InlineKeyboardButton("❌ Retour au menu", callback_data="nav:home")]
     ])
 
     text = f"""
@@ -207,8 +196,6 @@ async def show_group_rules(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✏️ Modifier les règles", callback_data=f"group:edit_rules:{chat_id}")],
-        [InlineKeyboardButton("📢 Annoncer les règles", callback_data=f"group:announce_rules:{chat_id}")],
         [InlineKeyboardButton("⚙️ Retour à la config", callback_data=f"group:config:{chat_id}")],
     ])
 
@@ -339,14 +326,5 @@ def register_group_handlers(application) -> None:
     application.add_handler(CallbackQueryHandler(show_group_config, pattern=r"^group:config:\d+$"))
     application.add_handler(CallbackQueryHandler(toggle_auto_moderation, pattern=r"^group:auto_mod:\d+$"))
     application.add_handler(CallbackQueryHandler(show_group_rules, pattern=r"^group:rules:\d+$"))
-
-    # Handlers temporaires pour les callbacks non implémentés
-    application.add_handler(CallbackQueryHandler(
-        lambda u, c: c.bot.send_message(
-            chat_id=u.effective_chat.id,
-            text="🔧 Fonctionnalité en développement"
-        ),
-        pattern=r"^group:(welcome|edit_rules|announce_rules|karma|tools|stats):\d+$"
-    ))
 
     logger.info("Handlers groupe/canal enregistrés")

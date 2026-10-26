@@ -20,7 +20,6 @@ class UserRole(StrEnum):
 
 class NotificationPreferences(StrEnum):
     """Types de notifications configurables."""
-    ORDER_CONFIRMATIONS = "order_confirmations"
     TICKET_REPLIES = "ticket_replies"
     COMMUNITY_ANNOUNCEMENTS = "community_announcements"
     MORNING_BRIEF = "morning_brief"
@@ -50,7 +49,6 @@ class User(Document):
     # ── Notifications ──
     enabled_notifications: list[str] = Field(
         default_factory=lambda: [
-            NotificationPreferences.ORDER_CONFIRMATIONS,
             NotificationPreferences.TICKET_REPLIES,
             NotificationPreferences.COMMUNITY_ANNOUNCEMENTS,
             NotificationPreferences.MORNING_BRIEF,
@@ -60,7 +58,6 @@ class User(Document):
     morning_brief_hour: int = Field(default=9, ge=0, le=23)
 
     # ── Statistiques ──
-    total_orders: int = 0
     total_tickets: int = 0
     karma_points: int = 0
 

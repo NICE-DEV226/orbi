@@ -3,16 +3,6 @@
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom border-secondary">
     <h1 class="h2">Centre de Support</h1>
-    <div class="btn-toolbar mb-2 mb-md-0">
-        <div class="btn-group me-2">
-            <button type="button" class="btn btn-sm btn-outline-warning">Tickets Ouverts</button>
-            <button type="button" class="btn btn-sm btn-outline-success">Résolus</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary">Tous</button>
-        </div>
-        <button type="button" class="btn btn-sm btn-outline-primary">
-            <i class="bi bi-funnel"></i> Filtrer
-        </button>
-    </div>
 </div>
 
 <div class="row g-4">
@@ -33,7 +23,7 @@
                     <p class="mb-1 text-truncate text-muted small">{{ ticket.description }}</p>
                     <div class="d-flex justify-content-between align-items-center">
                         <span class="badge bg-{{ 'danger' if ticket.priority == 'high' else 'warning' if ticket.priority == 'medium' else 'info' }}">{{ ticket.priority }}</span>
-                        <span class="badge bg-secondary">@{{ ticket.user_id }}</span>
+                        <span class="badge bg-secondary">@{{ ticket.user_telegram_id }}</span>
                     </div>
                 </a>
                 {% else %}
@@ -49,10 +39,6 @@
         <div class="card bg-dark border-secondary h-100">
             <div class="card-header border-secondary d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Ticket #{{ selected_ticket.id | string | truncate(8, True, '') }}</h5>
-                <div>
-                    <button class="btn btn-sm btn-outline-success me-1"><i class="bi bi-check2-all"></i> Marquer Résolu</button>
-                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x-circle"></i> Fermer</button>
-                </div>
             </div>
             
             <div class="card-body" style="max-height: 50vh; overflow-y: auto;">
@@ -64,14 +50,14 @@
                         <span class="badge bg-{{ 'danger' if selected_ticket.priority == 'high' else 'warning' if selected_ticket.priority == 'medium' else 'info' }}">Priorité: {{ selected_ticket.priority }}</span>
                         <span class="badge bg-primary">Statut: {{ selected_ticket.status }}</span>
                     </div>
-                    <p class="text-muted mb-0">Créé le {{ selected_ticket.created_at.strftime('%d/%m/%Y à %H:%M') }} par User ID: <code>{{ selected_ticket.user_id }}</code></p>
+                    <p class="text-muted mb-0">Créé le {{ selected_ticket.created_at.strftime('%d/%m/%Y à %H:%M') }} par User ID: <code>{{ selected_ticket.user_telegram_id }}</code></p>
                 </div>
 
                 <!-- Messages -->
                 <div class="mb-3">
                     <div class="d-flex flex-row justify-content-start mb-3">
                         <div class="bg-secondary bg-opacity-25 p-3 rounded-3" style="max-width: 85%;">
-                            <p class="small mb-1 text-muted">💬 Client (Il y a {{ (now() - selected_ticket.created_at).seconds // 60 }} min)</p>
+                            <p class="small mb-1 text-muted">💬 Client</p>
                             <p class="mb-0 text-light">{{ selected_ticket.description }}</p>
                         </div>
                     </div>
@@ -88,22 +74,13 @@
                     {% endfor %}
                 </div>
             </div>
-            
-            <div class="card-footer border-secondary">
-                <form action="/admin/tickets/{{ selected_ticket.id }}/reply" method="POST">
-                    <div class="input-group">
-                        <textarea class="form-control bg-dark text-light border-secondary" name="message" placeholder="Votre réponse sera envoyée sur Telegram..." rows="2" required></textarea>
-                        <button class="btn btn-primary" type="submit"><i class="bi bi-send-fill"></i></button>
-                    </div>
-                </form>
-            </div>
         </div>
         {% else %}
         <div class="card bg-dark border-secondary h-100 d-flex justify-content-center align-items-center">
             <div class="text-center text-muted">
                 <i class="bi bi-inboxes display-1 opacity-50 mb-3 block"></i>
                 <h5>Sélectionnez un ticket pour afficher les détails</h5>
-                <p>La discussion en temps réel s'affichera ici.</p>
+                <p>La conversation s'affichera ici.</p>
             </div>
         </div>
         {% endif %}

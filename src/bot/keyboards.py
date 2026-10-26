@@ -5,6 +5,7 @@ Point centralisé pour éviter les chaînes magiques dans les handlers.
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
+from src.core.config import get_settings
 from src.core.i18n import t
 
 # ─────────────────────────────────────
@@ -22,7 +23,6 @@ CB_LANG_AR = "lang:ar"
 
 # Menu principal — Modules
 CB_MODULE_SUPPORT = "mod:support"
-CB_MODULE_SHOP = "mod:shop"
 CB_MODULE_COMMUNITY = "mod:community"
 CB_MODULE_PRODUCTIVITY = "mod:productivity"
 CB_MODULE_DEVELOPERS = "mod:developers"
@@ -56,21 +56,23 @@ def language_selector_keyboard() -> InlineKeyboardMarkup:
 
 
 def main_menu_keyboard(lang: str) -> InlineKeyboardMarkup:
-    """Clavier du menu principal avec les 5 modules + profil."""
+    """Clavier du menu principal. Le module Communauté n'apparaît que s'il est activé (ENABLE_COMMUNITY)."""
+    support = InlineKeyboardButton(t("menu.main.support", lang), callback_data=CB_MODULE_SUPPORT)
+    productivity = InlineKeyboardButton(t("menu.main.productivity", lang), callback_data=CB_MODULE_PRODUCTIVITY)
+    developers = InlineKeyboardButton(t("menu.main.developers", lang), callback_data=CB_MODULE_DEVELOPERS)
+    profile = InlineKeyboardButton(t("menu.main.profile", lang), callback_data=CB_MODULE_PROFILE)
+
+    if not get_settings().ENABLE_COMMUNITY:
+        return InlineKeyboardMarkup([[support, productivity], [developers], [profile]])
+
+    community = InlineKeyboardButton(t("menu.main.community", lang), callback_data=CB_MODULE_COMMUNITY)
     return InlineKeyboardMarkup([
+        [support, community],
+        [productivity, developers],
+        [profile],
         [
-            InlineKeyboardButton(t("menu.main.support", lang), callback_data=CB_MODULE_SUPPORT),
-            InlineKeyboardButton(t("menu.main.shop", lang), callback_data=CB_MODULE_SHOP),
-        ],
-        [
-            InlineKeyboardButton(t("menu.main.community", lang), callback_data=CB_MODULE_COMMUNITY),
-            InlineKeyboardButton(t("menu.main.productivity", lang), callback_data=CB_MODULE_PRODUCTIVITY),
-        ],
-        [
-            InlineKeyboardButton(t("menu.main.developers", lang), callback_data=CB_MODULE_DEVELOPERS),
-        ],
-        [
-            InlineKeyboardButton(t("menu.main.profile", lang), callback_data=CB_MODULE_PROFILE),
+            InlineKeyboardButton("👥 Ajouter à un groupe", callback_data="group:add"),
+            InlineKeyboardButton("📢 Ajouter à un canal", callback_data="channel:add"),
         ],
     ])
 
