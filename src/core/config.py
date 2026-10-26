@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     # de tous les messages des groupes où le bot est présent, à n'activer que si c'est voulu.
     ENABLE_COMMUNITY: bool = False
 
+    # ── Mini App Telegram ──
+    # Ancienneté maximale (secondes) de l'initData envoyée par Telegram pour ouvrir une session web.
+    TELEGRAM_INITDATA_MAX_AGE: int = 3600
+
     # ── Logging ──
     LOG_LEVEL: str = "INFO"
 
@@ -71,6 +75,11 @@ class Settings(BaseSettings):
             if self.TELEGRAM_WEBHOOK_URL and not self.TELEGRAM_WEBHOOK_SECRET:
                 raise ValueError("TELEGRAM_WEBHOOK_SECRET est requis quand TELEGRAM_WEBHOOK_URL est défini")
         return self
+
+    @property
+    def public_https(self) -> bool:
+        """Telegram n'accepte les Mini Apps et les boutons-liens que sur une URL https publique."""
+        return self.BASE_URL.startswith("https://")
 
     @property
     def cookie_secure(self) -> bool:

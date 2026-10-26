@@ -17,6 +17,9 @@
             </div>
             {% endif %}
 
+            <div id="tg-status" class="alert alert-info" hidden>Connexion via Telegram…</div>
+            <div id="tg-error" class="alert alert-danger" hidden></div>
+
             <div class="mb-4">
                 <i class="bi bi-shield-lock display-1 text-secondary"></i>
             </div>
@@ -31,7 +34,7 @@
                 <strong>Comment se connecter ?</strong>
                 <ol class="mt-2 mb-0">
                     <li>Ouvrez le Bot Telegram Orbi</li>
-                    <li>Tapez la commande <code>/web</code></li>
+                    <li>Envoyez la commande <code>/web</code> (réservée aux administrateurs)</li>
                     <li>Cliquez sur le lien unique qui vous sera généré !</li>
                 </ol>
             </div>
@@ -45,4 +48,36 @@
     </div>
 
 </div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Mini App Telegram : si la page est ouverte depuis Telegram, la connexion est automatique (initData signée vérifiée côté serveur) -->
+<script src="https://telegram.org/js/telegram-web-app.js?64"></script>
+<script>
+(function () {
+    var tg = window.Telegram && window.Telegram.WebApp;
+    if (!tg || !tg.initData) { return; }  // navigateur ordinaire : lien magique
+    tg.ready();
+    document.getElementById("tg-status").hidden = false;
+    var next = {{ (next or "/dev/") | tojson }};
+    fetch("/admin/telegram-login", {
+        method: "POST", credentials: "same-origin",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({initData: tg.initData, next: next})
+    }).then(function (r) {
+        return r.json().then(function (d) { return {ok: r.ok, d: d}; });
+    }).then(function (res) {
+        if (res.ok) { location.replace(res.d.redirect); return; }
+        document.getElementById("tg-status").hidden = true;
+        var box = document.getElementById("tg-error");
+        box.textContent = res.d.detail || "Connexion refusée.";
+        box.hidden = false;
+    }).catch(function () {
+        document.getElementById("tg-status").hidden = true;
+        var box = document.getElementById("tg-error");
+        box.textContent = "Réseau indisponible, réessayez.";
+        box.hidden = false;
+    });
+})();
+</script>
 {% endblock %}

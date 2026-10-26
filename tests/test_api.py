@@ -3,6 +3,8 @@ Tests d'intégration de l'API FastAPI (MongoDB réel et Redis simulé, voir conf
 Health check, docs, API protégées, authentification web et gestion d'erreurs.
 """
 
+import re
+
 import httpx
 
 from src.core.config import get_settings
@@ -155,8 +157,8 @@ class TestBotToDashboardLogin:
 
         await request_magic_link(update, context)
 
-        keyboard = update.callback_query.edit_message_text.call_args.kwargs["reply_markup"]
-        login_url = keyboard.inline_keyboard[0][0].url
+        text = update.callback_query.edit_message_text.call_args.args[0]
+        login_url = re.search(r"https?://\S+/admin/auth/[0-9a-f-]+", text).group(0)
         path = "/" + login_url.split("/", 3)[3]
 
         response = await aclient.get(path)

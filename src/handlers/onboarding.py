@@ -60,7 +60,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         text = t("onboarding.welcome_back", lang, name=name)
 
     from src.handlers.menu import send_or_edit_menu
-    await send_or_edit_menu(update, context, text, main_menu_keyboard(lang))
+    await send_or_edit_menu(update, context, text, main_menu_keyboard(lang, is_admin=bool(db_user and db_user.is_admin)))
 
 
 async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -95,7 +95,7 @@ async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     text = t("onboarding.welcome", lang, name=name)
 
     from src.handlers.menu import send_or_edit_menu
-    await send_or_edit_menu(update, context, text, main_menu_keyboard(lang))
+    await send_or_edit_menu(update, context, text, main_menu_keyboard(lang, is_admin=bool(db_user and db_user.is_admin)))
 
 
 def register_onboarding_handlers(application) -> None:

@@ -40,7 +40,7 @@ Il est **désactivé par défaut** (`ENABLE_COMMUNITY=false`) : sa modération l
 
 ## Orbi Dev en bref
 
-1. Un administrateur se connecte au dashboard (lien magique envoyé par le bot).
+1. Un administrateur ouvre l'interface **depuis Telegram** (bouton « Orbi Dev », Mini App, connexion automatique) ou depuis un navigateur avec le lien magique de `/web`. Les Mini Apps exigent une URL https publique ([ADR-0007](docs/adr/0007-telegram-mini-app.md)).
 2. Il enregistre un **projet** (URL https du dépôt) et connecte une **clé fournisseur** : elle est vérifiée, puis chiffrée (Fernet) dans une collection séparée, jamais réaffichée.
 3. Il crée une **tâche** : l'agent travaille sur une branche et propose une **pull request**. Rien n'est fusionné ni déployé automatiquement.
 4. L'exécution est suivie en arrière-plan ; l'état vit en base, donc recharger la page ou perdre la connexion ne perd rien et ne relance rien.
@@ -92,6 +92,7 @@ Variables principales (liste complète dans [.env.example](.env.example)) :
 | `ADMIN_API_TOKEN`, `DEV_API_TOKEN`, `METRICS_API_TOKEN` | Jetons Bearer des API `/api/v1/admin`, `/api/v1/dev`, `/metrics` ; absents = routes refusées (503) | — |
 | `GITHUB_WEBHOOK_SECRET` | Secret du webhook GitHub ; absent = webhook refusé | — |
 | `TELEGRAM_WEBHOOK_URL`, `TELEGRAM_WEBHOOK_SECRET` | Mode webhook en production | — |
+| `BASE_URL` | URL publique de l'application ; **https requis** pour la Mini App et les boutons-liens | pour la Mini App |
 | `ENABLE_COMMUNITY` | Active le module Communauté | — (`false`) |
 | `ORBI_DEV_REFRESH_INTERVAL` | Intervalle de suivi des exécutions, en secondes (0 = désactivé) | — (`30`) |
 | `ENVIRONMENT` | `development` / `staging` / `production` | — |

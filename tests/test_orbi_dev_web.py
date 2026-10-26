@@ -50,7 +50,7 @@ class TestAccess:
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get(path)
         assert response.status_code == 303
-        assert response.headers["location"] == "/admin/login"
+        assert response.headers["location"].startswith("/admin/login")
 
     async def test_non_admin_session_is_refused(self):
         client, _, _ = await login(role="user")
