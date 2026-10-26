@@ -45,7 +45,6 @@ def _get_document_models() -> list:
     Retourne la liste de tous les modèles Beanie enregistrés.
     Point central d'enregistrement de tous les documents MongoDB.
     """
-    from src.models.commerce import Order, Product, PromoCode
     from src.models.community import GroupConfig, KarmaLog, ModerationLog, Poll
     from src.models.developer import (
         ApiKey,
@@ -72,9 +71,6 @@ def _get_document_models() -> list:
     return [
         User,
         Ticket,
-        Product,
-        Order,
-        PromoCode,
         Poll,
         KarmaLog,
         ModerationLog,

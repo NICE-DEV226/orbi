@@ -96,10 +96,6 @@ async def create_bot_application() -> Application:
     from src.handlers.support import register_support_handlers
     register_support_handlers(application)
 
-    # Phase 5 : Commerce
-    from src.handlers.commerce import register_commerce_handlers
-    register_commerce_handlers(application)
-
     # Phase 6 : Communauté
     from src.handlers.community import register_community_handlers
     register_community_handlers(application)

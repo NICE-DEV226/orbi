@@ -17,9 +17,8 @@ from src.bot.keyboards import (
     CB_MODULE_COMMUNITY,
     CB_MODULE_DEVELOPERS,
     CB_MODULE_PRODUCTIVITY,
-    CB_MODULE_PROFILE,
-    CB_MODULE_SHOP,
     CB_MODULE_SUPPORT,
+    main_menu_keyboard,
 )
 from src.core.i18n import t
 
@@ -80,22 +79,9 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # Pour s'assurer qu'il prend bien le titre
     text = t("menu.main.title", lang)
 
-    # Ajouter un bouton pour ajouter le bot à un groupe
+    # Menu partagé avec l'onboarding + accès rapide pour ajouter le bot à un groupe ou un canal
     keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(t("menu.main.support", lang), callback_data=CB_MODULE_SUPPORT),
-            InlineKeyboardButton(t("menu.main.shop", lang), callback_data=CB_MODULE_SHOP),
-        ],
-        [
-            InlineKeyboardButton(t("menu.main.community", lang), callback_data=CB_MODULE_COMMUNITY),
-            InlineKeyboardButton(t("menu.main.productivity", lang), callback_data=CB_MODULE_PRODUCTIVITY),
-        ],
-        [
-            InlineKeyboardButton(t("menu.main.developers", lang), callback_data=CB_MODULE_DEVELOPERS),
-        ],
-        [
-            InlineKeyboardButton(t("menu.main.profile", lang), callback_data=CB_MODULE_PROFILE),
-        ],
+        *main_menu_keyboard(lang).inline_keyboard,
         [
             InlineKeyboardButton("👥 Ajouter à un groupe", callback_data="group:add"),
             InlineKeyboardButton("📢 Ajouter à un canal", callback_data="channel:add"),
@@ -119,31 +105,6 @@ async def show_support_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         [
             InlineKeyboardButton(t("support.new_ticket", lang), callback_data="support:new_ticket"),
             InlineKeyboardButton(t("support.my_tickets", lang), callback_data="support:my_tickets"),
-        ],
-        [InlineKeyboardButton(t("common.home", lang), callback_data=CB_HOME)],
-    ])
-
-    await send_or_edit_menu(update, context, text, keyboard)
-
-
-async def show_shop_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Affiche le sous-menu Boutique avec le logo."""
-    if update.callback_query:
-        await update.callback_query.answer()
-    if not context.user_data:
-        return
-    lang = context.user_data.get("lang", "fr")
-
-    text = f"🛒 <b>{t('commerce.menu_title', lang)}</b>"
-
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(t("commerce.catalog", lang), callback_data="shop:catalog"),
-            InlineKeyboardButton(t("commerce.my_orders", lang), callback_data="shop:my_orders"),
-        ],
-        [
-            InlineKeyboardButton(t("commerce.cart", lang), callback_data="shop:cart"),
-            InlineKeyboardButton(t("commerce.search", lang), callback_data="shop:search"),
         ],
         [InlineKeyboardButton(t("common.home", lang), callback_data=CB_HOME)],
     ])
@@ -235,7 +196,6 @@ def register_menu_handlers(application) -> None:
     """Enregistre les handlers de navigation du menu principal."""
     application.add_handler(CallbackQueryHandler(show_main_menu, pattern=f"^{CB_HOME}$"))
     application.add_handler(CallbackQueryHandler(show_support_menu, pattern=f"^{CB_MODULE_SUPPORT}$"))
-    application.add_handler(CallbackQueryHandler(show_shop_menu, pattern=f"^{CB_MODULE_SHOP}$"))
     application.add_handler(CallbackQueryHandler(show_community_menu, pattern=f"^{CB_MODULE_COMMUNITY}$"))
     application.add_handler(CallbackQueryHandler(show_productivity_menu, pattern=f"^{CB_MODULE_PRODUCTIVITY}$"))
     application.add_handler(CallbackQueryHandler(show_developers_menu, pattern=f"^{CB_MODULE_DEVELOPERS}$"))

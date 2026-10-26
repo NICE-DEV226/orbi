@@ -49,7 +49,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     name = db_user.display_name
 
     # Vérifier si c'est la première fois qu'il utilise /start
-    total_interactions = (db_user.total_orders or 0) + (db_user.total_tickets or 0)
+    total_interactions = db_user.total_tickets or 0
 
     if total_interactions == 0:
         # Premier vrai contact avec langue déjà définie

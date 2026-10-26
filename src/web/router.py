@@ -10,9 +10,10 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from src.models.commerce import Order
 from src.models.ticket import Ticket
 from src.models.user import User
+from src.orbi_dev.models import Execution
+from src.orbi_dev.state import ACTIVE_STATUSES
 from src.web.auth import require_admin
 
 router = APIRouter(prefix="/admin", tags=["Dashboard Web"])
@@ -23,22 +24,21 @@ templates = Jinja2Templates(directory="src/templates")
 async def dashboard_home(request: Request, admin: User = Depends(require_admin)):
     """Affiche la page d'accueil du dashboard avec les KPIs."""
 
-    now = datetime.now(UTC)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-
-    # Calcul des KPIs
-    active_users = await User.find(User.is_banned == False).count()  # noqa: E712
+    # Calcul des KPIs (tous issus de la base)
+    users = await User.find(User.is_banned == False).count()  # noqa: E712
     open_tickets = await Ticket.find({"status": {"$in": ["open", "in_progress"]}}).count()
-    orders_today = await Order.find(Order.created_at >= today_start).count()
+    active_executions = await Execution.find(
+        {"status": {"$in": [s.value for s in ACTIVE_STATUSES]}}
+    ).count()
+    pull_requests = await Execution.find({"pr_url": {"$ne": None}}).count()
 
-    # Historique de la semaine
     recent_tickets = await Ticket.find().sort("-created_at").limit(5).to_list()
 
     kpis = {
-        "active_users": active_users,
+        "users": users,
         "open_tickets": open_tickets,
-        "orders_today": orders_today,
-        "revenue_7d": "1250.00" # TODO: Calcul réel sur les Order payées
+        "active_executions": active_executions,
+        "pull_requests": pull_requests,
     }
 
     return templates.TemplateResponse(request, "dashboard.html", {

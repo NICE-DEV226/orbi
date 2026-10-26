@@ -44,12 +44,6 @@ class PerformanceOptimizer:
             ("sla_deadline", 1)
         ])
 
-        # Index pour les commandes
-        await db.orders.create_index([("order_id", 1)], unique=True)
-        await db.orders.create_index([("user_telegram_id", 1)])
-        await db.orders.create_index([("status", 1)])
-        await db.orders.create_index([("created_at", -1)])
-        await db.orders.create_index([("payment_provider", 1)])
 
         # Index pour les produits
         await db.products.create_index([("category", 1)])

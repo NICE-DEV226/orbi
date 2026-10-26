@@ -3,25 +3,16 @@
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom border-secondary">
     <h1 class="h2">Dashboard</h1>
-    <div class="btn-toolbar mb-2 mb-md-0">
-        <div class="btn-group me-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary">Exporter CSV</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary">Paramètres</button>
-        </div>
-        <button type="button" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1">
-            <i class="bi bi-calendar3"></i> Cette semaine
-        </button>
-    </div>
 </div>
 
-<!-- KPIs -->
+<!-- KPIs (toutes les valeurs viennent de la base) -->
 <div class="row g-4 mb-4">
     <div class="col-12 col-sm-6 col-xl-3">
         <div class="stat-card d-flex align-items-center">
             <i class="bi bi-people text-primary stat-icon"></i>
             <div class="ms-3">
-                <h6 class="text-muted mb-0">Utilisateurs Actifs</h6>
-                <h2 class="mb-0 fw-bold">{{ kpis.active_users | default("0") }}</h2>
+                <h6 class="text-muted mb-0">Utilisateurs (non bannis)</h6>
+                <h2 class="mb-0 fw-bold">{{ kpis.users }}</h2>
             </div>
         </div>
     </div>
@@ -29,107 +20,50 @@
         <div class="stat-card d-flex align-items-center">
             <i class="bi bi-headset text-warning stat-icon"></i>
             <div class="ms-3">
-                <h6 class="text-muted mb-0">Tickets Ouverts</h6>
-                <h2 class="mb-0 fw-bold">{{ kpis.open_tickets | default("0") }}</h2>
+                <h6 class="text-muted mb-0">Tickets ouverts</h6>
+                <h2 class="mb-0 fw-bold">{{ kpis.open_tickets }}</h2>
             </div>
         </div>
     </div>
     <div class="col-12 col-sm-6 col-xl-3">
         <div class="stat-card d-flex align-items-center">
-            <i class="bi bi-bag-check text-success stat-icon"></i>
+            <i class="bi bi-robot text-success stat-icon"></i>
             <div class="ms-3">
-                <h6 class="text-muted mb-0">Commandes du jour</h6>
-                <h2 class="mb-0 fw-bold">{{ kpis.orders_today | default("0") }}</h2>
+                <h6 class="text-muted mb-0">Exécutions Orbi Dev en cours</h6>
+                <h2 class="mb-0 fw-bold">{{ kpis.active_executions }}</h2>
             </div>
         </div>
     </div>
     <div class="col-12 col-sm-6 col-xl-3">
         <div class="stat-card d-flex align-items-center">
-            <i class="bi bi-currency-dollar text-info stat-icon"></i>
+            <i class="bi bi-git text-info stat-icon"></i>
             <div class="ms-3">
-                <h6 class="text-muted mb-0">Revenus 7j</h6>
-                <h2 class="mb-0 fw-bold">${{ kpis.revenue_7d | default("0.00") }}</h2>
+                <h6 class="text-muted mb-0">Pull requests proposées</h6>
+                <h2 class="mb-0 fw-bold">{{ kpis.pull_requests }}</h2>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Charts Section -->
-<div class="row g-4">
-    <div class="col-12 col-xl-8">
-        <div class="card bg-dark border-secondary h-100">
-            <div class="card-header border-secondary d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Activité Utilisateurs (30 Jours)</h5>
-            </div>
-            <div class="card-body">
-                <canvas id="activityChart" width="100%" height="40"></canvas>
-            </div>
-        </div>
+<div class="card bg-dark border-secondary">
+    <div class="card-header border-secondary">
+        <h5 class="mb-0">Derniers tickets</h5>
     </div>
-    
-    <div class="col-12 col-xl-4">
-        <div class="card bg-dark border-secondary h-100">
-            <div class="card-header border-secondary">
-                <h5 class="mb-0">Derniers Tickets</h5>
+    <div class="list-group list-group-flush rounded-bottom">
+        {% for ticket in recent_tickets %}
+        <a href="/admin/tickets?id={{ ticket.id }}" class="list-group-item list-group-item-action bg-dark text-light border-secondary">
+            <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1 text-truncate">{{ ticket.subject }}</h6>
+                <small class="text-muted">{{ ticket.created_at.strftime('%d/%m %H:%M') }}</small>
             </div>
-            <div class="card-body p-0">
-                <div class="list-group list-group-flush rounded-bottom">
-                    {% for ticket in recent_tickets %}
-                    <a href="/admin/tickets#{{ ticket.id }}" class="list-group-item list-group-item-action bg-dark text-light border-secondary">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1 text-truncate">{{ ticket.subject }}</h6>
-                            <small class="text-muted">{{ ticket.created_at.strftime('%H:%M') }}</small>
-                        </div>
-                        <p class="mb-1 text-muted small">Par @{{ ticket.user_id }} — Priorité: <span class="badge bg-{{ 'danger' if ticket.priority == 'high' else 'warning' if ticket.priority == 'medium' else 'info' }}">{{ ticket.priority }}</span></p>
-                    </a>
-                    {% else %}
-                    <div class="p-4 text-center text-muted">Aucu ticket récent.</div>
-                    {% endfor %}
-                </div>
-            </div>
-            <div class="card-footer border-secondary text-center">
-                <a href="/admin/tickets" class="text-decoration-none">Voir tous les tickets</a>
-            </div>
-        </div>
+            <p class="mb-1 text-muted small">Par @{{ ticket.user_id }} — Priorité : <span class="badge bg-{{ 'danger' if ticket.priority == 'high' else 'warning' if ticket.priority == 'medium' else 'info' }}">{{ ticket.priority }}</span></p>
+        </a>
+        {% else %}
+        <div class="p-4 text-center text-muted">Aucun ticket récent.</div>
+        {% endfor %}
+    </div>
+    <div class="card-footer border-secondary text-center">
+        <a href="/admin/tickets" class="text-decoration-none">Voir tous les tickets</a>
     </div>
 </div>
-
-<!-- Initialisation Chart.js -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const ctx = document.getElementById('activityChart').getContext('2d');
-    
-    // Données d'exemple - Seront remplacées par l'API JSON dynamique plus tard
-    const activityChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'],
-            datasets: [{
-                label: 'Messages',
-                data: [120, 190, 300, 250, 200, 350, 400],
-                borderColor: '#0d6efd',
-                backgroundColor: 'rgba(13, 110, 253, 0.1)',
-                borderWidth: 2,
-                fill: true,
-                tension: 0.4
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { display: false }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: { color: '#333' }
-                },
-                x: {
-                    grid: { display: false }
-                }
-            }
-        }
-    });
-});
-</script>
 {% endblock %}

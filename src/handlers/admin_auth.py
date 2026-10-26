@@ -141,20 +141,20 @@ async def show_admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if not db_user or db_user.role not in ["admin", "superadmin"]:
         return
 
-    # Calculer les statistiques
-    from src.models.commerce import Order
+    # Statistiques réelles (aucune valeur inventée)
     from src.models.ticket import Ticket
     from src.models.user import User as UserModel
+    from src.orbi_dev.models import Execution
+    from src.orbi_dev.state import ACTIVE_STATUSES
 
     total_users = await UserModel.count()
-    total_tickets = await Ticket.count()
-    total_orders = await Order.count()
-
-    # Utilisateurs actifs (derniers 7 jours)
+    banned_users = await UserModel.find(UserModel.is_banned == True).count()  # noqa: E712
     week_ago = datetime.now(UTC) - timedelta(days=7)
-    active_users = await UserModel.find(
-        UserModel.last_active_at >= week_ago
-    ).count()
+    active_users = await UserModel.find(UserModel.last_active_at >= week_ago).count()
+    total_tickets = await Ticket.count()
+    open_tickets = await Ticket.find({"status": {"$in": ["open", "in_progress"]}}).count()
+    active_executions = await Execution.find({"status": {"$in": [st.value for st in ACTIVE_STATUSES]}}).count()
+    pull_requests = await Execution.find({"pr_url": {"$ne": None}}).count()
 
     lang = context.user_data.get("lang", "fr")
 
@@ -169,22 +169,15 @@ async def show_admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 👥 **Utilisateurs**
 • Total : `{total_users}`
 • Actifs (7j) : `{active_users}`
-• Bannis : `0`
+• Bannis : `{banned_users}`
 
 🎧 **Support**
 • Tickets total : `{total_tickets}`
-• Ouverts : `0`
-• En attente : `0`
+• Ouverts : `{open_tickets}`
 
-🛒 **Commerce**
-• Commandes total : `{total_orders}`
-• Aujourd'hui : `0`
-• Revenu total : `0 XOF`
-
-⚡ **Performance**
-• Uptime : `99.9%`
-• Latence : `45ms`
-• Memory : `256MB`
+🤖 **Orbi Dev**
+• Exécutions en cours : `{active_executions}`
+• Pull requests proposées : `{pull_requests}`
 
 *Dernière actualisation : {datetime.now(UTC).strftime("%H:%M:%S")}*
     """

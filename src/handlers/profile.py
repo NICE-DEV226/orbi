@@ -61,7 +61,6 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         lang_code=LANG_LABELS.get(db_user.language, db_user.language),
         role=role_label,
         joined=joined,
-        orders=str(db_user.total_orders),
         tickets=str(db_user.total_tickets),
         karma=str(db_user.karma_points),
     )
@@ -132,7 +131,6 @@ async def language_changed_from_profile(update: Update, context: ContextTypes.DE
         lang=LANG_LABELS.get(new_lang, new_lang),
         role=role_label,
         joined=joined,
-        orders=str(db_user.total_orders),
         tickets=str(db_user.total_tickets),
         karma=str(db_user.karma_points),
     )
@@ -156,21 +154,18 @@ async def show_notifications(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # Labels par type de notification
     notif_labels = {
         "fr": {
-            NotificationPreferences.ORDER_CONFIRMATIONS: "📦 Confirmations commandes",
             NotificationPreferences.TICKET_REPLIES: "🎧 Réponses tickets",
             NotificationPreferences.COMMUNITY_ANNOUNCEMENTS: "📢 Annonces communauté",
             NotificationPreferences.MORNING_BRIEF: "🌅 Morning Brief",
             NotificationPreferences.TASK_REMINDERS: "⏰ Rappels tâches",
         },
         "en": {
-            NotificationPreferences.ORDER_CONFIRMATIONS: "📦 Order confirmations",
             NotificationPreferences.TICKET_REPLIES: "🎧 Ticket replies",
             NotificationPreferences.COMMUNITY_ANNOUNCEMENTS: "📢 Community announcements",
             NotificationPreferences.MORNING_BRIEF: "🌅 Morning Brief",
             NotificationPreferences.TASK_REMINDERS: "⏰ Task reminders",
         },
         "ar": {
-            NotificationPreferences.ORDER_CONFIRMATIONS: "📦 تأكيدات الطلبات",
             NotificationPreferences.TICKET_REPLIES: "🎧 ردود التذاكر",
             NotificationPreferences.COMMUNITY_ANNOUNCEMENTS: "📢 إعلانات المجتمع",
             NotificationPreferences.MORNING_BRIEF: "🌅 ملخص الصباح",
@@ -315,21 +310,18 @@ async def show_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     stats_text = {
         "fr": (
             f"📊 **Mes Statistiques**\n\n"
-            f"📦 Commandes passées : **{db_user.total_orders}**\n"
             f"🎧 Tickets ouverts : **{db_user.total_tickets}**\n"
             f"⭐ Points karma : **{db_user.karma_points}**\n"
             f"📅 Membre depuis : **{db_user.created_at.strftime('%d/%m/%Y')}**"
         ),
         "en": (
             f"📊 **My Statistics**\n\n"
-            f"📦 Orders placed: **{db_user.total_orders}**\n"
             f"🎧 Tickets opened: **{db_user.total_tickets}**\n"
             f"⭐ Karma points: **{db_user.karma_points}**\n"
             f"📅 Member since: **{db_user.created_at.strftime('%Y-%m-%d')}**"
         ),
         "ar": (
             f"📊 **إحصائياتي**\n\n"
-            f"📦 الطلبات: **{db_user.total_orders}**\n"
             f"🎧 التذاكر: **{db_user.total_tickets}**\n"
             f"⭐ نقاط الكارما: **{db_user.karma_points}**\n"
             f"📅 عضو منذ: **{db_user.created_at.strftime('%Y-%m-%d')}**"

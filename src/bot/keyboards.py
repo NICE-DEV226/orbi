@@ -22,7 +22,6 @@ CB_LANG_AR = "lang:ar"
 
 # Menu principal — Modules
 CB_MODULE_SUPPORT = "mod:support"
-CB_MODULE_SHOP = "mod:shop"
 CB_MODULE_COMMUNITY = "mod:community"
 CB_MODULE_PRODUCTIVITY = "mod:productivity"
 CB_MODULE_DEVELOPERS = "mod:developers"
@@ -56,17 +55,14 @@ def language_selector_keyboard() -> InlineKeyboardMarkup:
 
 
 def main_menu_keyboard(lang: str) -> InlineKeyboardMarkup:
-    """Clavier du menu principal avec les 5 modules + profil."""
+    """Clavier du menu principal avec les modules + profil."""
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton(t("menu.main.support", lang), callback_data=CB_MODULE_SUPPORT),
-            InlineKeyboardButton(t("menu.main.shop", lang), callback_data=CB_MODULE_SHOP),
-        ],
-        [
             InlineKeyboardButton(t("menu.main.community", lang), callback_data=CB_MODULE_COMMUNITY),
-            InlineKeyboardButton(t("menu.main.productivity", lang), callback_data=CB_MODULE_PRODUCTIVITY),
         ],
         [
+            InlineKeyboardButton(t("menu.main.productivity", lang), callback_data=CB_MODULE_PRODUCTIVITY),
             InlineKeyboardButton(t("menu.main.developers", lang), callback_data=CB_MODULE_DEVELOPERS),
         ],
         [
