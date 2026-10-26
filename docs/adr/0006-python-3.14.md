@@ -22,6 +22,10 @@ Utiliser Python 3.14 en **corrigeant uniquement la métadonnée** de Beanie 2.2.
 - Les 308 tests (dont ceux qui exercent les vrais index uniques, les mises à jour atomiques et le parcours Orbi Dev) passent sur **3.12, 3.13 et 3.14**, contre un vrai MongoDB, installés depuis le lockfile.
 - L'image Docker construite sur `python:3.14.9-slim` démarre et passe les contrôles de santé (voir la PR).
 
+## Conséquence pratique
+
+Sur Python 3.14, **`pip install` échoue** (pip applique la borne `<3.14` de Beanie et ignore la correction de `uv`). Le projet s'installe avec `uv sync` (lockfile) : c'est ce que font le `Dockerfile` et la CI, qui teste ainsi exactement les versions verrouillées. `pip` reste possible en 3.12 et 3.13.
+
 ## Risques et limites
 
 - **Non supporté par les mainteneurs.** Un défaut propre à 3.14 serait à notre charge. Les tests couvrent ce que le projet utilise ; ils ne couvrent pas les modules de Beanie que nous n'importons pas (notamment les **migrations Beanie** : ne pas les utiliser en 3.14 tant que #1321 n'est pas résolu).

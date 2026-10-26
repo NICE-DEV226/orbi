@@ -220,10 +220,9 @@ Le script `docker-entrypoint.sh` attribue automatiquement le rôle `superadmin` 
 ### En développement local
 
 ```bash
-# Créer l'environnement virtuel et installer les dépendances
-python -m venv .venv
-source .venv/Scripts/activate  # Windows : .venv\Scripts\activate
-pip install -e ".[dev]"
+# Installer les dépendances verrouillées (uv crée .venv ; requis en Python 3.14, voir docs/adr/0006-python-3.14.md)
+uv sync --all-extras
+source .venv/bin/activate  # Windows : .venv\Scripts\activate
 
 # Démarrer MongoDB et Redis (via Docker ou en local)
 docker run -d -p 27017:27017 mongo:7.0

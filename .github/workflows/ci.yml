@@ -37,25 +37,27 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
-          cache: pip
-          cache-dependency-path: pyproject.toml
 
       - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
 
       - name: Lockfile is up to date
         run: uv lock --check
 
-      - name: Install dependencies
-        run: pip install -e ".[dev]"
+      # uv (et non pip) : le lockfile corrige la métadonnée de Beanie pour Python 3.14 (ADR-0006)
+      # et garantit que la CI teste exactement les versions verrouillées.
+      - name: Install locked dependencies
+        run: uv sync --frozen --all-extras --python ${{ matrix.python }}
 
       - name: Lint (ruff)
-        run: ruff check src tests
+        run: uv run --frozen ruff check src tests
 
       - name: Tests (pytest)
         env:
           TELEGRAM_BOT_TOKEN: ci-test-token
           MONGODB_TEST_URI: mongodb://127.0.0.1:27017
-        run: pytest --cov=src --cov-report=term-missing
+        run: uv run --frozen pytest --cov=src --cov-report=term-missing
 
   audit:
     runs-on: ubuntu-latest
@@ -63,14 +65,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v7
 
+      # Audite les versions réellement verrouillées (celles de la production), pas ce que pip résoudrait aujourd'hui.
       - name: Dependency vulnerability audit
         run: |
-          pip install -e . pip-audit
-          pip-audit --skip-editable
+          uv export --frozen --no-hashes --no-emit-project > requirements.txt
+          uvx pip-audit -r requirements.txt --no-deps --disable-pip
 
   docker:
     runs-on: ubuntu-latest
