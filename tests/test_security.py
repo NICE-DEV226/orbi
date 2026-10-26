@@ -139,3 +139,29 @@ class TestProductionConfig:
 class TestWebHardening:
     async def test_logout_requires_post(self, aclient):
         assert (await aclient.get("/admin/logout", follow_redirects=False)).status_code == 405
+
+
+class TestEmptyEnvValues:
+    def test_blank_variables_fall_back_to_defaults(self, monkeypatch):
+        """Un .env en cours de remplissage (ADMIN_CHAT_ID=, TELEGRAM_WEBHOOK_URL=) ne doit pas faire planter le démarrage."""
+        from src.core.config import Settings
+
+        monkeypatch.setenv("ADMIN_CHAT_ID", "")
+        monkeypatch.setenv("TELEGRAM_WEBHOOK_URL", "")
+        monkeypatch.setenv("ORBI_DEV_REFRESH_INTERVAL", "")
+
+        settings = Settings(_env_file=None)
+
+        assert settings.ADMIN_CHAT_ID == 0
+        assert settings.TELEGRAM_WEBHOOK_URL == ""
+        assert settings.ORBI_DEV_REFRESH_INTERVAL == 30
+
+    def test_blank_bot_token_is_reported_as_missing(self, monkeypatch):
+        from pydantic import ValidationError
+
+        from src.core.config import Settings
+
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "")
+
+        with pytest.raises(ValidationError, match="TELEGRAM_BOT_TOKEN"):
+            Settings(_env_file=None)
