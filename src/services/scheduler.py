@@ -8,6 +8,8 @@ import logging
 from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from src.core.text import esc
+
 logger = logging.getLogger("orbi.services.scheduler")
 
 _scheduler: AsyncIOScheduler | None = None
@@ -94,7 +96,7 @@ async def _task_reminders_job() -> None:
                 [InlineKeyboardButton("📝 Voir mes tâches", callback_data="prod:tasks")]
             ])
 
-            text = f"⏰ <b>Rappel de tâche</b>\n\nLa tâche <b>{task.title}</b> est arrivée à échéance."
+            text = f"⏰ <b>Rappel de tâche</b>\n\nLa tâche <b>{esc(task.title)}</b> est arrivée à échéance."
 
             await send_notification(bot, task.user_telegram_id, text, reply_markup=keyboard)
 
@@ -127,9 +129,9 @@ async def _check_sla_job() -> None:
                         (
                             f"🎫 Ticket: <b>{ticket.ticket_id}</b>\n"
                             f"📂 Catégorie: {ticket.category}\n"
-                            f"📝 Sujet: {ticket.subject}\n"
+                            f"📝 Sujet: {esc(ticket.subject)}\n"
                             f"⏰ Priorité: {ticket.priority}\n"
-                            f"👤 Utilisateur: {ticket.user_name}\n"
+                            f"👤 Utilisateur: {esc(ticket.user_name)}\n"
                             f"⏱️ Deadline: {ticket.sla_deadline}"
                         ),
                     )

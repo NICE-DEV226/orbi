@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 from telegram import ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackQueryHandler, ChatMemberHandler, ContextTypes, MessageHandler, filters
 
+from src.core.text import esc
 from src.models.community import GroupConfig, ModerationAction, ModerationLog
 
 logger = logging.getLogger("orbi.handlers.group")
@@ -128,7 +129,7 @@ async def show_group_config(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     text = f"""
 ⚙️ **Configuration du Groupe**
 
-📛 *Nom* : {group_config.chat_title}
+📛 *Nom* : {esc(group_config.chat_title)}
 🆔 *ID* : `{chat_id}`
 🔧 *Modération auto* : {status}
 
@@ -202,7 +203,7 @@ async def show_group_rules(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     text = f"""
 📋 **Règles du Groupe**
 
-{group_config.rules_text or "Aucune règle définie"}
+{esc(group_config.rules_text) if group_config.rules_text else "Aucune règle définie"}
 
 *Les règles sont visibles par tous les membres du groupe.*
     """

@@ -18,6 +18,7 @@ from telegram.ext import (
 
 from src.bot.keyboards import CB_HOME, CB_MODULE_PRODUCTIVITY
 from src.core.i18n import t
+from src.core.text import esc
 from src.models.productivity import TaskPriority
 from src.models.user import User
 from src.services.productivity_service import (
@@ -133,7 +134,7 @@ async def show_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         prio_icons = {TaskPriority.LOW: "🟢", TaskPriority.MEDIUM: "🟡", TaskPriority.HIGH: "🔴"}
         for tsk in tasks:
             icon = prio_icons.get(tsk.priority, "🟡")
-            text += f"{icon} {tsk.title[:30]}\n"
+            text += f"{icon} {esc(tsk.title[:30])}\n"
             buttons.append([
                 InlineKeyboardButton(f"✅ Terminer: {tsk.title[:20]}", callback_data=f"task_toggle:{tsk.id}"),
                 InlineKeyboardButton("🗑️", callback_data=f"task_del:{tsk.id}"),
@@ -235,7 +236,7 @@ async def show_notes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         for n in notes:
             date_str = n.created_at.strftime("%d/%m")
             tags = " ".join([f"#{t}" for t in n.hashtags])
-            text += f"▪️ [{date_str}] {n.content[:50]}... {tags}\n"
+            text += f"▪️ [{date_str}] {esc(n.content[:50])}... {esc(tags)}\n"
     else:
         text += "<i>Aucune note enregistrée.</i>\n"
 

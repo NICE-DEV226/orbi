@@ -17,6 +17,7 @@ from src.bot.keyboards import (
     main_menu_keyboard,
 )
 from src.core.i18n import t
+from src.core.text import esc
 from src.models.user import User
 
 logger = logging.getLogger("orbi.handlers.onboarding")
@@ -46,7 +47,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     lang = db_user.language
     context.user_data["lang"] = lang
     context.user_data["_onboarded"] = True
-    name = db_user.display_name
+    name = esc(db_user.display_name)
 
     # Vérifier si c'est la première fois qu'il utilise /start
     total_interactions = db_user.total_tickets or 0
@@ -88,7 +89,7 @@ async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     context.user_data["t"] = lambda key, **kwargs: t(key, lang, **kwargs)
     context.user_data["_onboarded"] = True
 
-    name = db_user.display_name if db_user else update.effective_user.first_name
+    name = esc(db_user.display_name if db_user else update.effective_user.first_name)
 
     # Bienvenue dans la nouvelle langue + menu
     text = t("onboarding.welcome", lang, name=name)
