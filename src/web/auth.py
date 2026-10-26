@@ -4,6 +4,7 @@ Système de connexion par "Magic Link" (Token à usage unique généré via Tele
 """
 
 import re
+import sys
 import uuid
 from urllib.parse import quote
 
@@ -40,6 +41,10 @@ def safe_next(value: str | None) -> str:
     return DEFAULT_AFTER_LOGIN
 
 
+# L'attribut Partitioned n'est géré nativement par http.cookies (donc par Starlette) qu'à partir de Python 3.14.
+_NATIVE_PARTITIONED = sys.version_info >= (3, 14)
+
+
 def set_session_cookie(response, session_id: str, *, embedded: bool = False) -> None:
     """
     Pose le cookie de session. `embedded` : ouverture depuis une Mini App, que Telegram Web charge dans une iframe
@@ -55,8 +60,15 @@ def set_session_cookie(response, session_id: str, *, embedded: bool = False) -> 
         httponly=True,
         secure=True if cross_site else settings.cookie_secure,
         samesite="none" if cross_site else "lax",
-        partitioned=cross_site,
+        partitioned=cross_site and _NATIVE_PARTITIONED,
     )
+    if cross_site and not _NATIVE_PARTITIONED:
+        # Python < 3.14 : on ajoute l'attribut à la main sur l'en-tête que Starlette vient de produire.
+        prefix = f"{COOKIE_NAME}=".encode()
+        response.raw_headers = [
+            (name, value + b"; Partitioned") if name == b"set-cookie" and value.startswith(prefix) else (name, value)
+            for name, value in response.raw_headers
+        ]
 
 
 async def create_web_session(user: User) -> str:

@@ -152,6 +152,7 @@ class TestBotToDashboardLogin:
         update = MagicMock()
         update.callback_query.answer = AsyncMock()
         update.callback_query.edit_message_text = AsyncMock()
+        update.effective_chat.type = "private"
         context = MagicMock()
         context.user_data = {"db_user": admin, "lang": "fr"}
 

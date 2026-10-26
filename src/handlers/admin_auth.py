@@ -8,7 +8,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import CallbackQueryHandler, CommandHandler, ContextTypes
+from telegram.ext import CallbackQueryHandler, CommandHandler, ContextTypes, filters
 
 from src.bot.keyboards import orbi_dev_button
 from src.core.config import get_settings
@@ -28,6 +28,16 @@ async def request_magic_link(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.callback_query.answer()
 
     if not context.user_data:
+        return
+
+    # Le lien donne accès au dashboard : jamais dans un groupe ou un canal, où tous les membres le verraient.
+    chat = update.effective_chat
+    if chat is not None and chat.type != "private":
+        message = "🔒 Cette commande n'est disponible qu'en message privé avec le bot."
+        if update.callback_query:
+            await update.callback_query.answer(message, show_alert=True)
+        elif update.effective_message:
+            await update.effective_message.reply_text(message)
         return
 
     db_user = context.user_data.get("db_user")
@@ -199,8 +209,8 @@ def register_admin_handlers(application) -> None:
     """Enregistre les handlers d'administration."""
 
     # Commandes d'accès (administrateurs)
-    application.add_handler(CommandHandler("web", web_command))
-    application.add_handler(CommandHandler("admin", admin_command))
+    application.add_handler(CommandHandler("web", web_command, filters=filters.ChatType.PRIVATE))
+    application.add_handler(CommandHandler("admin", admin_command, filters=filters.ChatType.PRIVATE))
 
     # Panneau admin
     application.add_handler(CallbackQueryHandler(show_admin_panel, pattern=r"^admin:panel$"))

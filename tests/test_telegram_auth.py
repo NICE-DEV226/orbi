@@ -1,6 +1,7 @@
 """Authentification par Mini App Telegram : validation d'initData, endpoint, cookies, en-têtes, accès depuis le bot."""
 
 import json
+import sys
 import time
 from unittest.mock import AsyncMock, MagicMock
 from urllib.parse import urlencode
@@ -186,6 +187,33 @@ class TestCookieAttributes:
         assert "samesite=lax" in cookie
 
 
+class TestPartitionedCookieOnOlderPython:
+    """Python < 3.14 : Starlette lève une erreur sur `partitioned=True` ; l'attribut est ajouté à la main."""
+
+    @pytest.mark.parametrize(
+        "native",
+        [
+            pytest.param(
+                True, marks=pytest.mark.skipif(sys.version_info < (3, 14), reason="Partitioned natif : Python 3.14+")
+            ),
+            False,
+        ],
+    )
+    async def test_cookie_is_identical_whatever_the_python_version(self, aclient, token, monkeypatch, native):
+        import src.web.auth as auth
+
+        monkeypatch.setattr(auth, "_NATIVE_PARTITIONED", native)
+        monkeypatch.setenv("BASE_URL", "https://orbi.example.org")
+        get_settings.cache_clear()
+        await User(telegram_id=4242, first_name="Ada", role="admin").insert()
+
+        r = await login(aclient, sign())
+
+        assert r.status_code == 200
+        cookie = r.headers["set-cookie"].lower()
+        assert cookie.count("partitioned") == 1 and "samesite=none" in cookie and "secure" in cookie
+
+
 class TestPagesAndHeaders:
     async def test_login_redirect_keeps_the_target_page(self, aclient):
         r = await aclient.get("/dev/executions/abc")
@@ -219,9 +247,10 @@ def _context(user):
     return context
 
 
-def _update():
+def _update(chat_type: str = "private"):
     update = MagicMock()
     update.callback_query = None
+    update.effective_chat.type = chat_type
     update.effective_message.reply_text = AsyncMock()
     return update
 
@@ -252,6 +281,34 @@ class TestBotEntryPoints:
         keyboard = update.effective_message.reply_text.call_args.kwargs["reply_markup"]
         assert "http://localhost:8000/admin/auth/" in text  # lien dans le texte
         assert all(b.url is None for row in keyboard.inline_keyboard for b in row)  # pas de bouton-lien http (refusé par Telegram)
+
+    @pytest.mark.parametrize("chat_type", ["group", "supergroup", "channel"])
+    async def test_magic_link_is_never_posted_in_a_group(self, chat_type):
+        import src.core.redis as redis_module
+        from src.handlers.admin_auth import web_command
+
+        admin = await User(telegram_id=1, first_name="Root", role="superadmin").insert()
+        update = _update(chat_type)
+
+        await web_command(update, _context(admin))
+
+        text = update.effective_message.reply_text.call_args.args[0]
+        assert "/admin/auth/" not in text and "privé" in text
+        assert [k async for k in redis_module._redis.scan_iter("magic_link:*")] == []  # aucun jeton même créé
+
+    async def test_commands_are_registered_for_private_chats_only(self, monkeypatch):
+        from telegram.ext import CommandHandler
+
+        from src.bot.app import create_bot_application
+        from src.core.i18n import load_translations
+
+        monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123:fake")
+        get_settings.cache_clear()
+        load_translations()
+        app = await create_bot_application()
+        handlers = [h for hs in app.handlers.values() for h in hs if isinstance(h, CommandHandler) and h.commands & {"web", "admin"}]
+        assert len(handlers) == 2
+        assert all("private" in repr(h.filters).lower() for h in handlers)
 
     async def test_web_command_is_refused_to_non_admins(self):
         from src.handlers.admin_auth import web_command
