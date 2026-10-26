@@ -18,6 +18,8 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",
+        # Une variable laissée vide dans .env (ex. ADMIN_CHAT_ID=) vaut « non définie » et prend sa valeur par défaut.
+        env_ignore_empty=True,
     )
 
     # ── Environnement ──

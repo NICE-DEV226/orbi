@@ -75,6 +75,13 @@ async def mongo_db():
 @pytest_asyncio.fixture(autouse=True)
 async def setup_test_environment(monkeypatch, mongo_db):
     """Environnement isolé : variables de test, collections vidées, Redis simulé."""
+    # Hermétique : ni le .env du développeur ni les variables de son shell ne doivent influencer les tests.
+    from src.core.config import Settings
+
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
+    for field in Settings.model_fields:
+        monkeypatch.delenv(field, raising=False)
+
     monkeypatch.setenv("ENVIRONMENT", "development")
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test-token")
     monkeypatch.setenv("MONGODB_DB", "orbi_test")
