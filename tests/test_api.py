@@ -97,7 +97,7 @@ class TestWebAuth:
         await User(telegram_id=42, first_name="Ada", role="admin").insert()
         await redis_module._redis.setex("magic_link:tok", 300, "42")
 
-        response = await aclient.get("/admin/auth/tok")
+        response = await aclient.post("/admin/auth/tok")
 
         assert response.status_code == 303
         cookie = response.headers["set-cookie"]
@@ -109,7 +109,7 @@ class TestWebAuth:
         import src.core.redis as redis_module
 
         await redis_module._redis.setex("magic_link:tok", 300, "42")
-        await aclient.get("/admin/auth/tok")
+        await aclient.post("/admin/auth/tok")
 
         response = await aclient.get("/admin/")
 
@@ -121,16 +121,48 @@ class TestWebAuth:
         await User(telegram_id=43, first_name="Bob", role="user").insert()
         await redis_module._redis.setex("magic_link:tok2", 300, "43")
 
-        response = await aclient.get("/admin/auth/tok2")
+        response = await aclient.post("/admin/auth/tok2")
 
-        assert response.status_code == 200
+        assert response.status_code == 403
         assert "admsession" not in response.headers.get("set-cookie", "")
 
     async def test_unknown_magic_link_is_refused(self, aclient):
-        response = await aclient.get("/admin/auth/nope")
+        page = await aclient.get("/admin/auth/nope")
+        assert page.status_code == 200 and "invalide ou expiré" in page.text and "Se connecter</button>" not in page.text
 
-        assert response.status_code == 200
+        response = await aclient.post("/admin/auth/nope")
+
+        assert response.status_code == 400
         assert "admsession" not in response.headers.get("set-cookie", "")
+
+    async def test_opening_the_link_does_not_use_it_up(self, aclient):
+        """Les aperçus de lien de Telegram ouvrent la page avant l'utilisateur : un simple GET ne doit rien consommer."""
+        import src.core.redis as redis_module
+
+        await User(telegram_id=42, first_name="Ada", role="admin").insert()
+        await redis_module._redis.setex("magic_link:tok", 300, "42")
+
+        for _ in range(3):  # aperçu de Telegram, antivirus, double ouverture…
+            page = await aclient.get("/admin/auth/tok")
+            assert page.status_code == 200 and "admsession" not in page.headers.get("set-cookie", "")
+            assert 'action="/admin/auth/tok"' in page.text and "Se connecter</button>" in page.text
+            assert page.headers["cache-control"] == "no-store"
+        assert await redis_module._redis.get("magic_link:tok") is not None
+
+        assert (await aclient.post("/admin/auth/tok")).status_code == 303
+        assert (await aclient.post("/admin/auth/tok")).status_code == 400  # usage unique
+
+    async def test_two_simultaneous_clicks_cannot_both_log_in(self, aclient):
+        import asyncio
+
+        import src.core.redis as redis_module
+
+        await User(telegram_id=42, first_name="Ada", role="admin").insert()
+        await redis_module._redis.setex("magic_link:tok", 300, "42")
+
+        results = await asyncio.gather(*(aclient.post("/admin/auth/tok") for _ in range(4)))
+
+        assert sorted(r.status_code for r in results).count(303) == 1
 
 
 class TestErrorHandling:
@@ -162,7 +194,7 @@ class TestBotToDashboardLogin:
         login_url = re.search(r"https?://\S+/admin/auth/[0-9a-f-]+", text).group(0)
         path = "/" + login_url.split("/", 3)[3]
 
-        response = await aclient.get(path)
+        response = await aclient.post(path)
 
         assert response.status_code == 303
         assert "admsession=" in response.headers["set-cookie"]
@@ -193,3 +225,23 @@ class TestMagicLinkMessage:
 
         text = magic_link_text('https://x"><b>y</b>&z', clickable=True)
         assert "<b>y</b>" not in text and "&lt;b&gt;" in text
+
+
+class TestMagicLinkMessageHasNoPreview:
+    async def test_preview_is_disabled_on_the_message(self):
+        from unittest.mock import AsyncMock, MagicMock
+
+        from src.handlers.admin_auth import request_magic_link
+        from src.models.user import User
+
+        admin = await User(telegram_id=88, first_name="Root", role="superadmin").insert()
+        update = MagicMock()
+        update.callback_query = None
+        update.effective_chat.type = "private"
+        update.effective_message.reply_text = AsyncMock()
+        context = MagicMock()
+        context.user_data = {"db_user": admin, "lang": "fr"}
+
+        await request_magic_link(update, context)
+
+        assert update.effective_message.reply_text.call_args.kwargs["link_preview_options"].is_disabled is True

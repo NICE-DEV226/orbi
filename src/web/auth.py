@@ -124,32 +124,44 @@ async def login_page(request: Request):
     )
 
 
+INVALID_LINK = "Ce lien est invalide ou expiré (il est valable 10 minutes et ne sert qu'une fois)."
+
+
+def _login_page(request: Request, status_code: int = 200, **context):
+    response = templates.TemplateResponse(
+        request, "login.html", {"asset_v": ASSET_VERSION, **context}, status_code=status_code
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @router.get("/auth/{token}", include_in_schema=False)
+async def magic_link_page(token: str, request: Request):
+    """
+    Affiche le bouton de connexion, sans consommer le lien.
+
+    Telegram (et d'autres messageries) ouvrent eux-mêmes les liens d'un message pour en faire un aperçu : si un simple
+    GET suffisait à se connecter, ce passage automatique brûlerait le lien avant le clic de l'utilisateur.
+    """
+    if not await get_redis().get(f"{MAGIC_LINK_PREFIX}{token}"):
+        return _login_page(request, error=INVALID_LINK)
+    return _login_page(request, confirm_token=token)
+
+
+@router.post("/auth/{token}", include_in_schema=False)
 async def auth_magic_link(token: str, request: Request):
-    """Valide le Magic Link et pose le cookie de session."""
-    redis = get_redis()
-    telegram_id = await redis.get(f"{MAGIC_LINK_PREFIX}{token}")
-
+    """Valide le Magic Link (usage unique, retiré de façon atomique) et pose le cookie de session."""
+    telegram_id = await get_redis().getdel(f"{MAGIC_LINK_PREFIX}{token}")
     if not telegram_id:
-        return templates.TemplateResponse(
-            request, "login.html",
-            {"error": "Ce lien est invalide ou expiré (il est valable 10 minutes et ne sert qu'une fois).", "asset_v": ASSET_VERSION},
-        )
-
-    # Le token est à usage unique : on le supprime
-    await redis.delete(f"{MAGIC_LINK_PREFIX}{token}")
+        return _login_page(request, status_code=400, error=INVALID_LINK)
 
     user = await User.find_one(User.telegram_id == int(telegram_id))
     if not user or user.role not in ["admin", "superadmin"]:
-        return templates.TemplateResponse(
-            request, "login.html", {"error": "Accès réservé aux administrateurs.", "asset_v": ASSET_VERSION}
-        )
+        return _login_page(request, status_code=403, error="Accès réservé aux administrateurs.")
 
-    # Création de la session
-    session_id = await create_web_session(user)
-
+    # 303 : le navigateur rejoue la redirection en GET
     response = RedirectResponse(url=DEFAULT_AFTER_LOGIN, status_code=303)
-    set_session_cookie(response, session_id)
+    set_session_cookie(response, await create_web_session(user))
     return response
 
 

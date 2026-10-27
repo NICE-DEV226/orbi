@@ -8,7 +8,7 @@ import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, LinkPreviewOptions, Update
 from telegram.ext import CallbackQueryHandler, CommandHandler, ContextTypes, filters
 
 from src.bot.keyboards import orbi_dev_button
@@ -102,10 +102,12 @@ async def request_magic_link(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     text = magic_link_text(login_url, clickable=settings.public_https)
 
+    # Pas d'aperçu du lien : Telegram n'ouvrirait pas la page pour rien, et le lien reste protégé même s'il le fait.
+    no_preview = LinkPreviewOptions(is_disabled=True)
     if update.callback_query:
-        await edit_screen(update.callback_query, text, reply_markup=keyboard)
+        await edit_screen(update.callback_query, text, reply_markup=keyboard, link_preview_options=no_preview)
     else:
-        await update.effective_message.reply_text(text, reply_markup=keyboard)
+        await update.effective_message.reply_text(text, reply_markup=keyboard, link_preview_options=no_preview)
 
 
 async def web_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

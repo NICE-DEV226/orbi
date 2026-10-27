@@ -22,15 +22,25 @@
     <div id="tg-status" class="alert info" role="status" hidden>Connexion avec Telegram…</div>
     <div id="tg-error" class="alert" role="alert" hidden></div>
 
+    {% if confirm_token %}
+    <div class="sheet">
+      <h2>Se connecter à Orbi</h2>
+      <p class="hint" style="margin-bottom:1rem">Ce lien est personnel et ne sert qu'une fois.</p>
+      <form method="post" action="/admin/auth/{{ confirm_token }}">
+        <button class="btn btn-primary btn-block" type="submit">Se connecter</button>
+      </form>
+    </div>
+    {% else %}
     <div class="sheet">
       <h2>Se connecter</h2>
       <ol class="steps">
         <li>Ouvrez le bot Orbi dans Telegram.</li>
         <li>Envoyez <code>/web</code> : le bot répond avec un lien personnel.</li>
-        <li>Ouvrez ce lien. Il est valable 10 minutes et ne sert qu'une fois.</li>
+        <li>Ouvrez ce lien, puis touchez « Se connecter ». Il est valable 10 minutes et ne sert qu'une fois.</li>
       </ol>
       <p class="hint" style="margin-top:1rem">Dans Telegram, le bouton « Orbi Dev » du bot ouvre l'application directement, sans lien. Accès réservé aux administrateurs.</p>
     </div>
+    {% endif %}
   </div>
 </main>
 <script>
