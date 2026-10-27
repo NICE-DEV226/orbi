@@ -182,7 +182,7 @@ class TestCookieAttributes:
         await User(telegram_id=7, first_name="A", role="admin").insert()
         await redis_module._redis.setex("magic_link:tk", 300, "7")
 
-        cookie = (await aclient.get("/admin/auth/tk")).headers["set-cookie"].lower()
+        cookie = (await aclient.post("/admin/auth/tk")).headers["set-cookie"].lower()
 
         assert "samesite=lax" in cookie
 
