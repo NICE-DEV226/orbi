@@ -22,7 +22,7 @@ from src.orbi_dev import service
 from src.orbi_dev.look import progress, quote
 from src.orbi_dev.models import Execution
 from src.orbi_dev.notifier import build_keyboard, first_line
-from src.orbi_dev.present import STATUS_EMOJI, STATUS_INFO, ago, provider_name
+from src.orbi_dev.present import STATUS_ICON, STATUS_INFO, ago, provider_name
 from src.orbi_dev.state import ExecutionStatus, is_terminal
 
 logger = logging.getLogger("orbi.dev.cards")
@@ -43,7 +43,7 @@ def render_text(execution: Execution, prompt: str, project: str) -> str:
     else:
         detail = sentence
     lines = [
-        f"{STATUS_EMOJI[status]} <b>{label}</b>  {progress(status)}",
+        f"{STATUS_ICON[status]} <b>{label}</b>  {progress(status)}",
         f"<b>{esc(project)}</b> · {esc(provider_name(execution.provider))}",
         "",
         quote(esc(first_line(prompt, 160)), expandable=False),

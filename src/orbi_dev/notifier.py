@@ -24,8 +24,9 @@ from src.core.text import esc
 from src.models.user import NotificationPreferences, User
 from src.orbi_dev import service
 from src.orbi_dev.access import can_use_orbi_dev
-from src.orbi_dev.look import PRIMARY, quote
+from src.orbi_dev.look import EXTERNAL, PRIMARY, REFRESH, quote
 from src.orbi_dev.models import Execution
+from src.orbi_dev.present import STATUS_ICON, STATUS_INFO
 from src.orbi_dev.state import ExecutionStatus
 
 logger = logging.getLogger("orbi.dev.notifier")
@@ -42,10 +43,7 @@ CB_RETRY = "devx:retry:"
 CB_CHECK = "devx:check:"
 
 _HEADLINES: dict[ExecutionStatus, str] = {
-    S.SUCCEEDED: "✅ <b>Terminé</b>",
-    S.FAILED: "❌ <b>Échec</b>",
-    S.TIMED_OUT: "⏱ <b>Trop long</b>",
-    S.NEEDS_ATTENTION: "⚠️ <b>À vérifier</b>",
+    status: f"{STATUS_ICON[status]} <b>{STATUS_INFO[status][0]}</b>" for status in NOTIFY_STATUSES
 }
 _FALLBACK_DETAIL: dict[ExecutionStatus, str] = {
     S.FAILED: "L'agent n'a pas abouti.",
@@ -83,22 +81,22 @@ def build_keyboard(execution: Execution, *, with_action: bool = True) -> InlineK
     top: list[InlineKeyboardButton] = []
     if settings.public_https:
         url = f"{settings.BASE_URL.rstrip('/')}/dev/executions/{execution.id}"
-        top.append(InlineKeyboardButton("📱 Ouvrir", web_app=WebAppInfo(url=url)))
+        top.append(InlineKeyboardButton("Ouvrir", web_app=WebAppInfo(url=url)))
     pr = _safe_https(execution.pr_url)
     if pr:
-        top.append(InlineKeyboardButton("🔀 Voir la PR", url=pr))
+        top.append(InlineKeyboardButton(f"Voir la PR {EXTERNAL}", url=pr))
     provider = _safe_https(execution.external_url)
     if provider and status == S.NEEDS_ATTENTION:
-        top.append(InlineKeyboardButton("↗ Ouvrir chez le fournisseur", url=provider))
+        top.append(InlineKeyboardButton(f"Ouvrir chez le fournisseur {EXTERNAL}", url=provider))
     rows = [top] if top else []
     if not with_action:
         pass
     elif status in (S.FAILED, S.TIMED_OUT):
-        rows.append([InlineKeyboardButton("🔁 Réessayer", callback_data=f"{CB_RETRY}{execution.id}", style=PRIMARY)])
+        rows.append([InlineKeyboardButton(f"{REFRESH} Réessayer", callback_data=f"{CB_RETRY}{execution.id}", style=PRIMARY)])
     elif status == S.NEEDS_ATTENTION:
-        rows.append([InlineKeyboardButton("🔄 Vérifier maintenant", callback_data=f"{CB_CHECK}{execution.id}")])
+        rows.append([InlineKeyboardButton(f"{REFRESH} Vérifier maintenant", callback_data=f"{CB_CHECK}{execution.id}")])
     elif status in (S.QUEUED, S.RUNNING, S.CANCEL_REQUESTED):
-        rows.append([InlineKeyboardButton("🔄 Actualiser", callback_data=f"{CB_CHECK}{execution.id}")])
+        rows.append([InlineKeyboardButton(f"{REFRESH} Actualiser", callback_data=f"{CB_CHECK}{execution.id}")])
     return InlineKeyboardMarkup(rows) if rows else None
 
 

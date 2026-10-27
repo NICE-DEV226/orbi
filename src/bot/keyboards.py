@@ -91,7 +91,7 @@ def main_menu_keyboard(lang: str, is_admin: bool = False) -> InlineKeyboardMarku
 
     if is_admin:
         rows.insert(0, [
-            InlineKeyboardButton("🤖 Orbi Dev", callback_data=CB_DEV_HOME),
+            InlineKeyboardButton("‹ Orbi Dev", callback_data=CB_DEV_HOME),
             InlineKeyboardButton("🔐 Administration", callback_data="admin:panel"),
         ])
     return InlineKeyboardMarkup(rows)

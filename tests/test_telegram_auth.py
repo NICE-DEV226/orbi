@@ -317,25 +317,16 @@ class TestBotEntryPoints:
         await web_command(update, _context(User(telegram_id=2, first_name="U")))
         assert "réservé" in update.effective_message.reply_text.call_args.args[0]
 
-    async def test_mini_app_buttons_of_the_orbi_dev_home_only_on_https(self, monkeypatch):
-        from cryptography.fernet import Fernet
+    async def test_mini_app_buttons_of_orbi_dev_only_on_https(self, monkeypatch):
+        from src.handlers.dev_hub.common import web_button
+        from src.handlers.dev_hub.home import connections_button
 
-        from src.handlers.dev_hub import build_home
-        from src.orbi_dev import service
-
-        monkeypatch.setenv("SECRETS_ENCRYPTION_KEY", Fernet.generate_key().decode())
-        get_settings.cache_clear()
-        await service.create_project(7, "demo", "https://github.com/acme/demo")
-        await service.create_integration(7, "fake", "k")
-
-        async def web_apps():
-            _, markup = await build_home(7)
-            return sorted(b.web_app.url for row in markup.inline_keyboard for b in row if b.web_app)
-
-        assert await web_apps() == []  # BASE_URL http://localhost : Telegram refuserait
+        assert web_button("Application", "/dev/") is None  # BASE_URL http://localhost : Telegram refuserait
+        assert connections_button().callback_data == "dv:conn"  # repli : l'écran qui explique /web
         monkeypatch.setenv("BASE_URL", "https://orbi.example.org")
         get_settings.cache_clear()
-        assert await web_apps() == ["https://orbi.example.org/dev/", "https://orbi.example.org/dev/integrations"]
+        assert web_button("Application", "/dev/").web_app.url == "https://orbi.example.org/dev/"
+        assert connections_button().web_app.url == "https://orbi.example.org/dev/integrations"
 
     async def test_admin_menu_has_an_administration_entry_non_admin_does_not(self):
         from src.bot.keyboards import main_menu_keyboard

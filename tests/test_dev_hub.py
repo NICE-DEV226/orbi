@@ -144,14 +144,14 @@ class TestHome:
         chat = Chat(await admin(1))
         await chat.press(dev_hub.show_home, "dv:home")
         assert "Connecter un fournisseur" in chat.last
-        assert chat.last.count("⬜") == 3
+        assert chat.last.count("○") == 3
         assert "dv:newrepo" in chat.last_data()
 
     async def test_checklist_ticks_what_is_done(self):
         await service.create_integration(1, "fake", "k")
         chat = Chat(await admin(1))
         await chat.press(dev_hub.show_home, "dv:home")
-        assert "✅ Connecter un fournisseur" in chat.last and "⬜ <b>Ajouter un dépôt</b>" in chat.last  # l'étape suivante ressort
+        assert "✓ Connecter un fournisseur" in chat.last and "○ <b>Ajouter un dépôt</b>" in chat.last  # l'étape suivante ressort
 
     async def test_board_counts_active_and_attention_runs(self):
         await setup_workspace(1)
@@ -165,7 +165,7 @@ class TestHome:
         await chat.press(dev_hub.show_home, "dv:home")
         assert "<b>1</b> en cours" in chat.last and "<b>1</b> à vérifier" in chat.last
         assert "tâche succeeded" in chat.last
-        assert {"dv:new", "dv:list", "dv:projects", "nav:more"} <= set(chat.last_data())
+        assert {"dv:new", "dv:list", "dv:projects", "dv:conn", "dv:set"} <= set(chat.last_data())
 
     async def test_board_only_shows_my_runs(self):
         await admin(2)
@@ -247,7 +247,7 @@ class TestCreateTask:
         chat = Chat(await admin_user(1))
         await chat.press(dev_hub.start_task, "dv:new")
         assert "Quel projet" in chat.last
-        assert chat.last_buttons()[0] == "📁 demo2"
+        assert chat.last_buttons()[0] == "demo2"
 
     async def test_several_providers_are_offered(self):
         await admin(1)
@@ -453,11 +453,11 @@ class TestCardUpdates:
         await admin(1)
         ex = await run_with_card(ExecutionStatus.RUNNING)
         _, kb = await cards.render(ex)
-        assert "🔄 Actualiser" in [b.text for row in kb.inline_keyboard for b in row] if kb else False
+        assert "↻ Actualiser" in [b.text for row in kb.inline_keyboard for b in row] if kb else False
         done = await run_with_card_status(ex, ExecutionStatus.FAILED)
         _, kb = await cards.render(done)
         labels = [b.text for row in kb.inline_keyboard for b in row] if kb else []
-        assert "🔁 Réessayer" not in labels and "🔄 Actualiser" not in labels
+        assert "↻ Réessayer" not in labels and "↻ Actualiser" not in labels
 
     async def test_alert_is_sent_as_a_reply_to_the_card(self):
         from src.orbi_dev import notifier
@@ -506,7 +506,7 @@ class TestLook:
         chat = Chat(await admin_user(1))
         await chat.press(dev_hub.show_home, "dv:home")
         colored = {t: s for t, s in styles(chat).items() if s}
-        assert colored == {"✏️ Nouvelle tâche": "primary"}
+        assert colored == {"+ Nouvelle tâche": "primary"}
 
     async def test_launch_is_green_and_cancel_is_neutral(self):
         await setup_workspace(1)
@@ -514,7 +514,7 @@ class TestLook:
         await chat.press(dev_hub.start_task, "dv:new")
         await chat.say(dev_hub.on_text, "Fais ceci")
         colored = {t: s for t, s in styles(chat).items() if s}
-        assert colored == {"▶️ Lancer": "success"}
+        assert colored == {"Lancer": "success"}
 
     async def test_instruction_is_quoted_and_long_ones_fold(self):
         await setup_workspace(1)
@@ -542,7 +542,7 @@ class TestLook:
         ex = await run_with_card(ExecutionStatus.FAILED)
         keyboard = notifier.build_keyboard(ex)
         colored = {b.text: getattr(b, "style", None) for row in keyboard.inline_keyboard for b in row if getattr(b, "style", None)}
-        assert colored == {"🔁 Réessayer": "primary"}
+        assert colored == {"↻ Réessayer": "primary"}
 
     async def test_admin_gets_a_command_menu_on_start(self):
         await setup_workspace(1)
@@ -554,3 +554,130 @@ class TestLook:
         chat.context.bot.set_my_commands.reset_mock()
         await chat.press(dev_hub.show_home, "dv:home")  # un simple bouton ne rappelle pas Telegram
         chat.context.bot.set_my_commands.assert_not_awaited()
+
+
+def emojis_in(text: str) -> list[str]:
+    """Les emoji (plans étendus, sélecteur de variation, dingbats colorés) ; ✓ et ✕ sont des symboles de texte."""
+    return [
+        c for c in text
+        if ord(c) >= 0x1F000 or c == "\ufe0f" or 0x23E9 <= ord(c) <= 0x23FA or ord(c) in (0x2B50, 0x2B55)
+        or (0x2600 <= ord(c) <= 0x27BF and c not in "✓✕")
+    ]
+
+
+def all_text(chat: Chat) -> str:
+    return "\n".join(chat.shown) + "\n".join(
+        b.text for markup in chat.markups if markup for row in markup.inline_keyboard for b in row
+    )
+
+
+class TestStructure:
+    """Chaque écran a une issue, parle sans emoji et ne montre que les données de son propriétaire."""
+
+    async def _seed(self):
+        await admin(1)
+        await setup_workspace(1)
+        projects, integration = await service.list_projects(1), (await service.list_integrations(1))[0]
+        runs = []
+        for status in (ExecutionStatus.RUNNING, ExecutionStatus.NEEDS_ATTENTION, ExecutionStatus.SUCCEEDED,
+                       ExecutionStatus.FAILED):
+            task = await service.create_task(1, str(projects[0].id), str(integration.id), f"tâche {status.value}")
+            ex = await service.create_execution(1, str(task.id))
+            await Execution.get_pymongo_collection().update_one({"_id": ex.id}, {"$set": {"status": status.value}})
+            runs.append(await Execution.get(ex.id))
+        return projects[0], runs
+
+    async def test_no_emoji_anywhere_and_every_screen_has_a_way_back(self):
+        project, runs = await self._seed()
+        chat = Chat(await admin_user(1))
+        screens = [
+            (dev_hub.show_home, "dv:home"), (dev_hub.show_list, "dv:list"), (dev_hub.show_list, "dv:list:d"),
+            (dev_hub.show_projects, "dv:projects"), (dev_hub.show_project, f"dv:pr:{project.id}"),
+            (dev_hub.show_connections, "dv:conn"), (dev_hub.show_settings, "dv:set"),
+            (dev_hub.show_execution, f"dv:e:{runs[0].id}"), (dev_hub.start_task, "dv:new"),
+        ]
+        for handler, data in screens:
+            await chat.press(handler, data)
+            assert not emojis_in(all_text(chat)), f"emoji dans {data}"
+            if data != "dv:home":
+                assert any(b.text.startswith("‹") or b.text == "Annuler" for row in chat.markups[-1].inline_keyboard for b in row), data
+        await chat.say(dev_hub.on_text, "Fais ceci")
+        assert not emojis_in(all_text(chat))
+
+    async def test_list_has_two_tabs_with_counts_and_filters(self):
+        _, runs = await self._seed()
+        chat = Chat(await admin_user(1))
+        await chat.press(dev_hub.show_list, "dv:list")  # des tâches en cours : l'onglet « En cours » s'ouvre
+        assert chat.last_buttons()[:2] == ["● En cours 2", "Terminées 2"]
+        assert any("tâche running" in b for b in chat.last_buttons()) and not any("succeeded" in b for b in chat.last_buttons())
+        await chat.press(dev_hub.show_list, "dv:list:d")
+        assert chat.last_buttons()[:2] == ["En cours 2", "● Terminées 2"]
+        assert any("tâche succeeded" in b for b in chat.last_buttons()) and not any("running" in b for b in chat.last_buttons())
+
+    async def test_list_opens_on_finished_when_nothing_is_running(self):
+        await admin(1)
+        await setup_workspace(1)
+        project, integration = (await service.list_projects(1))[0], (await service.list_integrations(1))[0]
+        task = await service.create_task(1, str(project.id), str(integration.id), "vieille tâche")
+        ex = await service.create_execution(1, str(task.id))
+        await Execution.get_pymongo_collection().update_one({"_id": ex.id}, {"$set": {"status": "succeeded"}})
+        chat = Chat(await admin_user(1))
+        await chat.press(dev_hub.show_list, "dv:list")
+        assert chat.last_buttons()[1] == "● Terminées 1"
+
+    async def test_project_sheet_and_new_task_from_it(self):
+        project, _ = await self._seed()
+        chat = Chat(await admin_user(1))
+        await chat.press(dev_hub.show_project, f"dv:pr:{project.id}")
+        assert "demo0" in chat.last and "par défaut du dépôt" in chat.last and "<b>4</b>" in chat.last
+        await chat.press(dev_hub.new_task_in_project, f"dv:pn:{project.id}")
+        assert "Que faut-il faire sur demo0" in chat.last
+
+    async def test_someone_elses_project_sheet_is_refused(self):
+        await admin(2)
+        await service.create_project(2, "autre", "https://github.com/x/y")
+        foreign = (await service.list_projects(2))[0]
+        await admin(1)
+        chat = Chat(await admin_user(1))
+        await chat.press(dev_hub.show_project, f"dv:pr:{foreign.id}")
+        await chat.press(dev_hub.new_task_in_project, f"dv:pn:{foreign.id}")
+        assert chat.alerts.count("Ce projet n'existe plus.") == 2
+
+    async def test_connections_lists_providers_without_any_secret(self):
+        await admin(1)
+        await service.create_integration(1, "fake", "super-secret-key-123", label="agent-perso")
+        chat = Chat(await admin_user(1))
+        await chat.press(dev_hub.show_connections, "dv:conn")
+        assert "agent-perso" in chat.last and "Actif" in chat.last
+        assert "super-secret-key-123" not in all_text(chat)
+        assert "/web" in chat.last  # sans https public, on explique comment ouvrir la page web
+
+    async def test_alerts_can_be_switched_off_and_on(self):
+        user = await admin(1)
+        chat = Chat(user)
+        await chat.press(dev_hub.show_settings, "dv:set")
+        assert "activées" in chat.last and "Désactiver les alertes" in chat.last_buttons()
+        await chat.press(dev_hub.toggle_notifications, "dv:notif")
+        assert "désactivées" in chat.last
+        assert "dev_runs" not in (await User.get(user.id)).enabled_notifications
+        await chat.press(dev_hub.toggle_notifications, "dv:notif")
+        assert "dev_runs" in (await User.get(user.id)).enabled_notifications
+
+    async def test_other_modules_are_reachable_from_settings(self):
+        chat = Chat(await admin(1))
+        await chat.press(dev_hub.show_settings, "dv:set")
+        assert "nav:more" in chat.last_data()
+
+    async def test_quiet_and_empty_homes_have_no_emoji_either(self):
+        chat = Chat(await admin(1))
+        await chat.press(dev_hub.show_home, "dv:home")  # compte vide : « pour commencer »
+        assert "○" in chat.last and not emojis_in(all_text(chat))
+        await setup_workspace(1)
+        await chat.press(dev_hub.show_home, "dv:home")  # prêt, aucune tâche
+        assert "Rien en cours." in chat.last and not emojis_in(all_text(chat))
+        project, integration = (await service.list_projects(1))[0], (await service.list_integrations(1))[0]
+        task = await service.create_task(1, str(project.id), str(integration.id), "faite")
+        ex = await service.create_execution(1, str(task.id))
+        await Execution.get_pymongo_collection().update_one({"_id": ex.id}, {"$set": {"status": "succeeded"}})
+        await chat.press(dev_hub.show_home, "dv:home")  # tâches terminées seulement
+        assert "Rien en cours." in chat.last and "✓" in chat.last and not emojis_in(all_text(chat))

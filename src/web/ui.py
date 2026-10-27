@@ -13,7 +13,14 @@ from fastapi import Request
 from fastapi.templating import Jinja2Templates
 
 from src.models.user import User
-from src.orbi_dev.present import PROVIDER_NAMES, STATUS_INFO, ago, aware, provider_name  # noqa: F401 (réexportés)
+from src.orbi_dev.present import (  # noqa: F401 (réexportés)
+    PROVIDER_NAMES,
+    STATUS_INFO,
+    ago,
+    aware,
+    capabilities,
+    provider_name,
+)
 from src.orbi_dev.state import ExecutionStatus
 from src.web.csrf import csrf_token_for
 
@@ -78,18 +85,6 @@ PROVIDER_HELP = {
     "cursor": "Clé d'API créée dans le tableau de bord Cursor (de préférence un compte de service).",
     "jules": "Clé créée dans les réglages de Jules (jules.google.com), puis application GitHub de Jules installée sur chaque dépôt à confier.",
 }
-CAPABILITY_WORDS = {
-    "launch": "lancer des tâches", "status": "suivre leur avancement", "cancel": "les annuler",
-    "pull_request": "proposer une pull request",
-}
-
-
-def capabilities(values: list[str]) -> str:
-    """['launch', 'status'] -> « lancer des tâches et suivre leur avancement »"""
-    words = [CAPABILITY_WORDS.get(v, v) for v in values]
-    return words[0] if len(words) == 1 else ", ".join(words[:-1]) + " et " + words[-1] if words else ""
-
-
 templates.env.filters.update({
     "ago": ago, "duration": duration, "fmt_dt": fmt_dt, "safe_link": safe_link, "repo": repo_label,
     "provider_name": provider_name, "capabilities": capabilities,

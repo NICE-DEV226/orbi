@@ -24,16 +24,17 @@ STATUS_INFO: dict[ExecutionStatus, tuple[str, str, str, str]] = {
     S.TIMED_OUT: ("Trop long", "Arrêté : durée maximale dépassée", "bad", "done"),
 }
 
-STATUS_EMOJI: dict[ExecutionStatus, str] = {
-    S.QUEUED: "⏳",
-    S.RUNNING: "🔄",
-    S.CANCEL_REQUESTED: "⏹",
-    S.AWAITING_APPROVAL: "✋",
-    S.NEEDS_ATTENTION: "⚠️",
-    S.SUCCEEDED: "✅",
-    S.FAILED: "❌",
-    S.CANCELLED: "🚫",
-    S.TIMED_OUT: "⏱",
+# Symboles de texte (pas d'emoji) : mêmes formes partout, sobres, lisibles sur toutes les plateformes.
+STATUS_ICON: dict[ExecutionStatus, str] = {
+    S.QUEUED: "○",
+    S.RUNNING: "◐",
+    S.CANCEL_REQUESTED: "◐",
+    S.AWAITING_APPROVAL: "▲",
+    S.NEEDS_ATTENTION: "▲",
+    S.SUCCEEDED: "✓",
+    S.FAILED: "✕",
+    S.CANCELLED: "⊘",
+    S.TIMED_OUT: "◷",
 }
 
 PROVIDER_NAMES = {"cursor": "Cursor", "jules": "Jules (Google)", "fake": "Démonstration (factice)"}
@@ -69,3 +70,15 @@ def ago(value: datetime | None, now: datetime | None = None) -> str:
     if days < 14:
         return f"il y a {days} j"
     return value.strftime("%d/%m/%Y")
+
+
+CAPABILITY_WORDS = {
+    "launch": "lancer des tâches", "status": "suivre leur avancement", "cancel": "les annuler",
+    "pull_request": "proposer une pull request",
+}
+
+
+def capabilities(values: list[str]) -> str:
+    """['launch', 'status'] -> « lancer des tâches et suivre leur avancement »"""
+    words = [CAPABILITY_WORDS.get(v, v) for v in values]
+    return words[0] if len(words) == 1 else ", ".join(words[:-1]) + " et " + words[-1] if words else ""
