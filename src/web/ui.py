@@ -30,7 +30,7 @@ STATUS_INFO: dict[ExecutionStatus, tuple[str, str, str, str]] = {
     S.RUNNING: ("En cours", "L'agent travaille", "orbit", "active"),
     S.CANCEL_REQUESTED: ("Annulation", "Annulation demandée", "muted", "active"),
     S.AWAITING_APPROVAL: ("Attend votre accord", "En attente de votre accord", "signal", "attention"),
-    S.NEEDS_ATTENTION: ("À vérifier", "Le suivi est interrompu : vérifiez chez le fournisseur", "signal", "attention"),
+    S.NEEDS_ATTENTION: ("À vérifier", "Une vérification est nécessaire chez le fournisseur", "signal", "attention"),
     S.SUCCEEDED: ("Terminé", "Terminé", "ok", "done"),
     S.FAILED: ("Échec", "L'agent n'a pas abouti", "bad", "done"),
     S.CANCELLED: ("Annulé", "Annulé", "muted", "done"),
@@ -113,7 +113,13 @@ def repo_label(url: str) -> str:
     return url.removeprefix("https://").split("/", 1)[-1] if "/" in url.removeprefix("https://") else url
 
 
-PROVIDER_NAMES = {"cursor": "Cursor", "fake": "Démonstration (factice)"}
+PROVIDER_NAMES = {"cursor": "Cursor", "jules": "Jules (Google)", "fake": "Démonstration (factice)"}
+
+# Où trouver la clé et ce qu'il faut avoir fait avant (affiché sous le formulaire de connexion)
+PROVIDER_HELP = {
+    "cursor": "Clé d'API créée dans le tableau de bord Cursor (de préférence un compte de service).",
+    "jules": "Clé créée dans les réglages de Jules (jules.google.com), puis application GitHub de Jules installée sur chaque dépôt à confier.",
+}
 CAPABILITY_WORDS = {
     "launch": "lancer des tâches", "status": "suivre leur avancement", "cancel": "les annuler",
     "pull_request": "proposer une pull request",
@@ -135,6 +141,7 @@ templates.env.filters.update({
     "provider_name": provider_name, "capabilities": capabilities,
 })
 templates.env.globals["status_info"] = status_info
+templates.env.globals["PROVIDER_HELP"] = PROVIDER_HELP
 templates.env.globals["GROUP_TITLES"] = GROUP_TITLES
 
 # ─────────────────────────────────────

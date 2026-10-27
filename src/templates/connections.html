@@ -55,6 +55,9 @@
     <div class="field">
       <label for="api_key">Clé d'API</label>
       <input id="api_key" name="api_key" type="password" autocomplete="off" autocapitalize="none" required>
+      <ul class="hint" style="padding-left:1.1rem;margin:.25rem 0 .5rem">
+        {% for p in providers if p in PROVIDER_HELP %}<li><strong>{{ p|provider_name }}</strong> : {{ PROVIDER_HELP[p] }}</li>{% endfor %}
+      </ul>
       <p class="hint">Orbi vérifie la clé, puis la chiffre : elle n'est jamais réaffichée. La révoquer ici ne la supprime pas chez le fournisseur, supprimez-la aussi dans son tableau de bord.</p>
     </div>
     <div class="field"><label for="label">Nom (facultatif)</label><input id="label" name="label" maxlength="100" placeholder="Compte personnel"></div>

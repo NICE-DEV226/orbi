@@ -16,7 +16,7 @@
     <div class="row plain">
       <div>
         <div class="row-title">{{ p.name }}</div>
-        <div class="row-meta">{{ p.repo_url|repo }}, branche <code>{{ p.default_branch }}</code></div>
+        <div class="row-meta">{{ p.repo_url|repo }}, {% if p.default_branch %}branche <code>{{ p.default_branch }}</code>{% else %}branche par défaut du dépôt{% endif %}</div>
       </div>
     </div>
   </li>
@@ -40,7 +40,7 @@
       <input id="repo_url" name="repo_url" inputmode="url" autocapitalize="none" required placeholder="https://github.com/organisation/depot">
       <p class="hint">Une adresse https, par exemple celle de la page GitHub du dépôt.</p>
     </div>
-    <div class="field"><label for="default_branch">Branche de départ</label><input id="default_branch" name="default_branch" value="main" maxlength="100"></div>
+    <div class="field"><label for="default_branch">Branche de départ (facultatif)</label><input id="default_branch" name="default_branch" maxlength="100" placeholder="Branche par défaut du dépôt" autocapitalize="none"><p class="hint">Laissez vide pour partir de la branche par défaut du dépôt (main, master…).</p></div>
     <button class="btn btn-primary" type="submit">Ajouter le projet</button>
   </form>
 </details>

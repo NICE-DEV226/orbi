@@ -35,20 +35,26 @@
   {% endif %}
 
   <div class="actions">
+    {% set provider_link = execution.external_url|safe_link %}
     {% if active %}
     <form method="post" action="/dev/executions/{{ execution.id }}/refresh" hx-post="/dev/executions/{{ execution.id }}/refresh" hx-target="#run-panel" hx-swap="outerHTML" hx-boost="false">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <button class="btn btn-quiet" type="submit">{{ icon('refresh') }} Actualiser</button>
     </form>
+    {% if can_cancel %}
     <form method="post" action="/dev/executions/{{ execution.id }}/cancel" hx-post="/dev/executions/{{ execution.id }}/cancel" hx-target="#run-panel" hx-swap="outerHTML" hx-confirm="Demander l'arrêt de cette exécution ?" hx-boost="false">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <button class="btn btn-danger" type="submit">{{ icon('stop') }} Arrêter</button>
     </form>
+    {% endif %}
     {% elif terminal %}
     <form method="post" action="/dev/tasks/{{ task.id }}/retry" hx-disabled-elt="find button">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <button class="btn {% if execution.status.value in ('failed', 'timed_out') %}btn-primary{% else %}btn-quiet{% endif %}" type="submit">{{ icon('retry') }} Nouvelle tentative</button>
     </form>
+    {% endif %}
+    {% if provider_link %}
+    <a class="btn {% if execution.status.value == 'needs_attention' %}btn-primary{% else %}btn-quiet{% endif %}" href="{{ provider_link }}" target="_blank" rel="noopener noreferrer" hx-boost="false">{{ icon('external') }} Ouvrir chez le fournisseur</a>
     {% endif %}
   </div>
 

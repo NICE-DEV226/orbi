@@ -14,7 +14,6 @@ from typing import Any
 import httpx
 
 from src.orbi_dev.connectors.base import (
-    BaseConnector,
     Capability,
     ConnectorError,
     ErrorCategory,
@@ -23,12 +22,12 @@ from src.orbi_dev.connectors.base import (
     RemoteStatus,
     VerifyResult,
 )
+from src.orbi_dev.connectors.http import HttpConnector, parse_retry_after
 from src.orbi_dev.redact import sanitize_text
 
 logger = logging.getLogger("orbi.dev.cursor")
 
 DEFAULT_BASE_URL = "https://api.cursor.com"
-MAX_RETRY_AFTER = 30.0
 
 _RUN_STATUS = {
     "CREATING": RemoteStatus.PENDING,
@@ -73,17 +72,6 @@ _STATUS_CATEGORY = {
     429: ErrorCategory.RATE_LIMITED,
 }
 
-# Erreurs réseau où la requête n'a certainement pas atteint le fournisseur.
-_NOT_SENT = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
-
-
-def _parse_retry_after(value: str | None) -> float | None:
-    try:
-        return min(max(float(value), 0.0), MAX_RETRY_AFTER) if value else None
-    except ValueError:
-        return None
-
-
 def error_from_response(response: httpx.Response) -> ConnectorError:
     """Traduit une réponse d'erreur en ConnectorError, sans jamais reprendre d'en-têtes ni de corps bruts."""
     code: str | None = None
@@ -101,7 +89,7 @@ def error_from_response(response: httpx.Response) -> ConnectorError:
     category = _CODE_CATEGORY.get(code or "") or _STATUS_CATEGORY.get(status)
     if category is None:
         category = ErrorCategory.UNAVAILABLE if status >= 500 else ErrorCategory.UNKNOWN
-    retry_after = _parse_retry_after(response.headers.get("retry-after"))
+    retry_after = parse_retry_after(response.headers.get("retry-after"))
     retryable = category in (ErrorCategory.RATE_LIMITED, ErrorCategory.UNAVAILABLE)
     return ConnectorError(
         category,
@@ -112,8 +100,9 @@ def error_from_response(response: httpx.Response) -> ConnectorError:
     )
 
 
-class CursorCloudAgentsConnector(BaseConnector):
+class CursorCloudAgentsConnector(HttpConnector):
     provider = "cursor"
+    display_name = "Cursor"
     capabilities = frozenset({Capability.LAUNCH, Capability.STATUS, Capability.CANCEL, Capability.PULL_REQUEST})
 
     def __init__(
@@ -126,60 +115,17 @@ class CursorCloudAgentsConnector(BaseConnector):
         max_retries: int = 2,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ):
-        self._client = httpx.AsyncClient(
-            base_url=base_url,
-            headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
-            timeout=timeout,
-            transport=transport,
+        super().__init__(
+            base_url=base_url, headers={"Authorization": f"Bearer {api_key}"}, transport=transport, timeout=timeout,
+            max_retries=max_retries, sleep=sleep,
         )
-        self._max_retries = max_retries
-        self._sleep = sleep
 
-    async def aclose(self) -> None:
-        await self._client.aclose()
+    def _error_from_response(self, response: httpx.Response) -> ConnectorError:
+        return error_from_response(response)
 
     def external_id_for(self, client_ref: str) -> str | None:
         # Format imposé par l'API : bc-<uuid>. `client_ref` est un UUID généré par Orbi.
         return f"bc-{client_ref}"
-
-    # ── transport ──
-
-    async def _request(
-        self, method: str, path: str, *, json: dict[str, Any] | None = None, params: dict[str, Any] | None = None,
-        retry_unknown: bool = False,
-    ) -> dict[str, Any]:
-        """
-        Envoie une requête avec retries bornés.
-
-        On réessaie : les erreurs de limite/indisponibilité, et les erreurs réseau où l'envoi est
-        exclu. Une réponse perdue après envoi n'est réessayée que si `retry_unknown` (opération idempotente).
-        """
-        attempt = 0
-        while True:
-            try:
-                response = await self._client.request(method, path, json=json, params=params)
-            except httpx.TimeoutException as e:
-                error = ConnectorError(
-                    ErrorCategory.TIMEOUT, "Délai dépassé en contactant Cursor",
-                    retryable=isinstance(e, _NOT_SENT), outcome_unknown=not isinstance(e, _NOT_SENT),
-                )
-            except httpx.TransportError as e:
-                error = ConnectorError(
-                    ErrorCategory.UNAVAILABLE, "Cursor injoignable",
-                    retryable=isinstance(e, _NOT_SENT), outcome_unknown=not isinstance(e, _NOT_SENT),
-                )
-            else:
-                if response.is_success:
-                    return response.json() if response.content else {}
-                error = error_from_response(response)
-
-            may_retry = error.retryable or (error.outcome_unknown and retry_unknown)
-            if not may_retry or attempt >= self._max_retries:
-                raise error
-            attempt += 1
-            delay = error.retry_after if error.retry_after is not None else min(0.5 * 2**attempt, 4.0)
-            logger.info("Cursor %s %s : nouvel essai %d/%d (%s)", method, path, attempt, self._max_retries, error.category)
-            await self._sleep(delay)
 
     # ── contrat ──
 
@@ -193,7 +139,7 @@ class CursorCloudAgentsConnector(BaseConnector):
         body = {
             "agentId": agent_id,
             "prompt": {"text": request.prompt},
-            "repos": [{"url": request.repo_url, "startingRef": request.base_branch}],
+            "repos": [{"url": request.repo_url, **({"startingRef": request.base_branch} if request.base_branch else {})}],
             "autoCreatePR": True,
         }
         try:

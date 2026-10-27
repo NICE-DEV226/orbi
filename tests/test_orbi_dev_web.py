@@ -269,3 +269,25 @@ class TestUntrustedContent:
         async with client:
             for path in ("/dev/", "/dev/runs", f"/dev/executions/{execution.id}", f"/dev/executions/{execution.id}/panel"):
                 assert (await client.get(path)).headers["cache-control"] == "no-store", path
+
+
+class TestProjectBranch:
+    async def test_branch_is_optional_when_creating_a_project(self, aclient):
+        from src.models.user import User
+        from src.orbi_dev import service
+        from src.web.auth import COOKIE_NAME, create_web_session
+        from src.web.csrf import csrf_token
+
+        admin = await User(telegram_id=910, first_name="Ada", role="admin").insert()
+        sid = await create_web_session(admin)
+        page = (await aclient.get("/dev/projects", cookies={COOKIE_NAME: sid})).text
+        assert 'name="default_branch"' in page and 'value="main"' not in page
+
+        r = await aclient.post(
+            "/dev/projects", cookies={COOKIE_NAME: sid},
+            data={"name": "xui", "repo_url": "https://github.com/acme/xui.git", "default_branch": "", "csrf_token": csrf_token(sid)},
+        )
+        assert r.status_code in (200, 303)
+        assert [p.default_branch for p in await service.list_projects(910)] == [""]
+        page = (await aclient.get("/dev/projects", cookies={COOKIE_NAME: sid})).text
+        assert "branche par défaut du dépôt" in page

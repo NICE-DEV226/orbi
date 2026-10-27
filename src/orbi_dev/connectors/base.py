@@ -56,6 +56,7 @@ class ConnectorError(Exception):
 class RemoteStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
+    WAITING = "waiting"  # le fournisseur attend une réponse ou une validation de l'utilisateur chez lui
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     CANCELLED = "cancelled"
@@ -95,6 +96,13 @@ class BaseConnector:
 
     def external_id_for(self, client_ref: str) -> str | None:
         """Identifiant fournisseur déterministe si le fournisseur accepte un identifiant choisi par le client."""
+        return None
+
+    async def find_by_client_ref(self, client_ref: str) -> RemoteRun | None:
+        """
+        Retrouve une exécution lancée mais dont la réponse a été perdue, quand le fournisseur n'accepte pas
+        d'identifiant choisi par le client. None = introuvable (ou non supporté) ; ne crée jamais rien.
+        """
         return None
 
     async def verify(self) -> VerifyResult:
