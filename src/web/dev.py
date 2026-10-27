@@ -228,10 +228,10 @@ async def projects(request: Request, admin: User = Depends(require_admin)):
 @router.post("/projects", dependencies=[Depends(csrf_protect)])
 async def add_project(
     request: Request, admin: User = Depends(require_admin),
-    name: str = Form(...), repo_url: str = Form(...), default_branch: str = Form("main"),
+    name: str = Form(...), repo_url: str = Form(...), default_branch: str = Form(""),
 ):
     try:
-        await service.create_project(admin.telegram_id, name.strip(), repo_url.strip(), default_branch.strip() or "main")
+        await service.create_project(admin.telegram_id, name.strip(), repo_url.strip(), default_branch.strip())
     except ValueError:
         return await _projects_page(request, admin, "Donnez un nom (100 caractères au plus) et une adresse de dépôt en https.")
     return RedirectResponse("/dev/projects", status_code=303)

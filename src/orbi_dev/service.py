@@ -68,7 +68,7 @@ async def record_audit(
 # Projets
 # ─────────────────────────────────────
 
-async def create_project(owner_id: int, name: str, repo_url: str, default_branch: str = "main") -> Project:
+async def create_project(owner_id: int, name: str, repo_url: str, default_branch: str = "") -> Project:
     project = Project(owner_id=owner_id, name=name, repo_url=repo_url, default_branch=default_branch)
     await project.insert()
     await record_audit(owner_id, "project.create", "project", str(project.id))

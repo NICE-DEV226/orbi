@@ -61,6 +61,18 @@ def json_response(status, body, headers=None):
     return httpx.Response(status, json=body, headers=headers)
 
 
+class TestStartingRef:
+    async def test_cursor_omits_startingref_when_no_branch_is_chosen(self):
+        rec = Recorder(json_response(201, {"agent": AGENT, "run": run_body("CREATING")}))
+        await connector(rec).launch(LaunchRequest(REF, "p", "https://github.com/acme/demo", ""))
+        assert "startingRef" not in json.loads(rec.requests[0].content)["repos"][0]
+
+    async def test_cursor_sends_the_chosen_branch(self):
+        rec = Recorder(json_response(201, {"agent": AGENT, "run": run_body("CREATING")}))
+        await connector(rec).launch(LaunchRequest(REF, "p", "https://github.com/acme/demo", "develop"))
+        assert json.loads(rec.requests[0].content)["repos"][0]["startingRef"] == "develop"
+
+
 class TestLaunch:
     async def test_request_shape_and_result(self):
         rec = Recorder(json_response(201, {"agent": AGENT, "run": run_body("CREATING")}))

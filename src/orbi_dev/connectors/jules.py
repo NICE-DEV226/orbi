@@ -119,6 +119,21 @@ def error_from_response(response: httpx.Response) -> ConnectorError:
     )
 
 
+_FATAL_LINE = re.compile(r"^\+*\s*(fatal|error):", re.IGNORECASE)
+
+
+def summarize_failure(reason: str) -> str:
+    """
+    Raison d'échec lisible. Jules renvoie parfois un journal de script entier : on garde la phrase d'introduction et
+    la dernière ligne `fatal:` / `error:` (la cause réelle), sans le bruit intermédiaire.
+    """
+    lines = [line.strip() for line in reason.replace("```", "\n").splitlines() if line.strip()]
+    if not lines:
+        return ""
+    fatal = [line for line in lines[1:] if _FATAL_LINE.match(line)]
+    return sanitize_text(f"{lines[0]} {fatal[-1]}" if fatal else lines[0], 500)
+
+
 def _first_line(text: str, limit: int) -> str:
     line = text.strip().splitlines()[0] if text.strip() else ""
     return line if len(line) <= limit else line[: limit - 1] + "…"
@@ -156,11 +171,11 @@ class JulesConnector(HttpConnector):
         return VerifyResult(capabilities=self.capabilities)
 
     async def launch(self, request: LaunchRequest) -> RemoteRun:
-        source = await self._source_for(request.repo_url)
+        source, branch = await self._source_for(request.repo_url, request.base_branch)
         body = {
             "prompt": request.prompt,
             "title": f"{_first_line(request.prompt, 60)} {self._marker(request.client_ref)}".strip(),
-            "sourceContext": {"source": source, "githubRepoContext": {"startingBranch": request.base_branch}},
+            "sourceContext": {"source": source, "githubRepoContext": {"startingBranch": branch}},
             "automationMode": "AUTO_CREATE_PR",
         }
         # Pas d'identifiant choisi par le client : jamais de nouvel essai après un délai dépassé (risque de doublon).
@@ -204,12 +219,18 @@ class JulesConnector(HttpConnector):
             raise ConnectorError(ErrorCategory.INVALID_REQUEST, "Identifiant de session invalide")
         return external_id
 
-    async def _source_for(self, repo_url: str) -> str:
-        """Nom de la source Jules (`sources/...`) du dépôt : il doit être connecté à Jules par l'application GitHub."""
+    async def _source_for(self, repo_url: str, base_branch: str) -> tuple[str, str]:
+        """
+        Nom de la source Jules (`sources/...`) du dépôt, et branche de départ à utiliser.
+
+        Le dépôt doit être connecté à Jules par l'application GitHub. Une branche vide prend la branche par défaut du
+        dépôt ; une branche que Jules ne connaît pas est refusée ici, avant de créer une session vouée à l'échec.
+        """
         match = _REPO_URL.fullmatch(repo_url.strip())
         if not match:
             raise ConnectorError(ErrorCategory.INVALID_REQUEST, "Jules ne prend en charge que les dépôts GitHub")
         owner, repo = (part.lower() for part in match.groups())
+        full_name = f"{match.group(1)}/{match.group(2).removesuffix('.git')}"
         token: str | None = None
         for _ in range(MAX_SOURCE_PAGES):
             params: dict[str, Any] = {"pageSize": SOURCE_PAGE_SIZE}
@@ -221,18 +242,43 @@ class JulesConnector(HttpConnector):
                 if (
                     isinstance(github, dict)
                     and str(github.get("owner", "")).lower() == owner
-                    and str(github.get("repo", "")).lower() == repo
+                    and str(github.get("repo", "")).lower() == repo.removesuffix(".git")
                     and isinstance(source.get("name"), str)
                 ):
-                    return source["name"]
+                    return source["name"], self._choose_branch(github, base_branch.strip(), full_name)
             token = page.get("nextPageToken")
             if not token:
                 break
         raise ConnectorError(
             ErrorCategory.PERMISSION_DENIED,
-            f"Ce dépôt n'est pas connecté à Jules : installez l'application GitHub de Jules sur « {match.group(1)}/{match.group(2)} ».",
+            f"Ce dépôt n'est pas connecté à Jules : installez l'application GitHub de Jules sur « {full_name} ».",
             code="repository_access",
         )
+
+    @staticmethod
+    def _choose_branch(github: dict[str, Any], wanted: str, full_name: str) -> str:
+        def name(branch: Any) -> str:
+            return str(branch.get("displayName", "")) if isinstance(branch, dict) else ""
+
+        default = name(github.get("defaultBranch"))
+        known = [n for n in (name(b) for b in github.get("branches") or []) if n]
+        if not wanted:
+            if default:
+                return default
+            raise ConnectorError(
+                ErrorCategory.INVALID_REQUEST,
+                f"Indiquez la branche de départ du projet : Jules n'a pas fourni la branche par défaut de « {full_name} ».",
+                code="branch_required",
+            )
+        if known and wanted not in known:
+            listed = ", ".join(f"« {n} »" for n in known[:8]) + ("…" if len(known) > 8 else "")
+            raise ConnectorError(
+                ErrorCategory.INVALID_REQUEST,
+                f"La branche « {wanted} » n'existe pas (ou n'est pas active) dans « {full_name} ». "
+                f"Branches connues de Jules : {listed}. Corrigez la branche du projet, ou laissez-la vide.",
+                code="branch_not_found",
+            )
+        return wanted
 
     # ── détails (activités) ──
 
@@ -267,7 +313,7 @@ class JulesConnector(HttpConnector):
             failed = last("sessionFailed")
             reason = ((failed or {}).get("sessionFailed") or {}).get("reason")
             if isinstance(reason, str) and reason.strip():
-                return replace(remote, error_message=sanitize_text(reason, 500))
+                return replace(remote, error_message=summarize_failure(reason))
         elif state == "AWAITING_USER_FEEDBACK":
             message = ((last("agentMessaged") or {}).get("agentMessaged") or {}).get("agentMessage")
             if isinstance(message, str) and message.strip():

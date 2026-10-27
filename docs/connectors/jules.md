@@ -9,7 +9,7 @@ Sources : [API Jules](https://developers.google.com/jules/api) et sa [référenc
 1. Dans Jules (jules.google.com), ouvrir les réglages et créer une **clé d'API** (3 clés au plus par compte).
 2. Installer l'**application GitHub de Jules** sur chaque dépôt à confier (sans elle, le dépôt n'apparaît pas dans les sources de Jules).
 3. Dans Orbi, page **Connexions** : choisir « Jules (Google) », coller la clé. Orbi la vérifie par une lecture seule, puis la chiffre. Elle n'est jamais réaffichée.
-4. Créer un projet avec l'URL `https://github.com/<propriétaire>/<dépôt>` : Jules ne prend en charge que GitHub.
+4. Créer un projet avec l'URL `https://github.com/<propriétaire>/<dépôt>` : Jules ne prend en charge que GitHub. Laissez la **branche vide** pour partir de la branche par défaut du dépôt (`main`, `master`…) ; si vous en indiquez une, elle doit exister.
 
 Chaque personne connecte sa propre clé : elle est rattachée à son compte Orbi et n'est utilisée que pour ses tâches.
 
@@ -29,6 +29,16 @@ Chaque personne connecte sa propre clé : elle est rattachée à son compte Orbi
 - **L'agent peut attendre l'utilisateur** (`AWAITING_USER_FEEDBACK`, `AWAITING_PLAN_APPROVAL`, `PAUSED`). Orbi passe l'exécution en « À vérifier », affiche la dernière question de l'agent, envoie la notification Telegram avec un lien vers la session, et reprend le suivi quand vous avez répondu dans Jules.
 - **Clé invalide en HTTP 400.** Google renvoie `INVALID_ARGUMENT` (raison `API_KEY_INVALID`), pas 401 : les deux sont reconnus comme « clé refusée ».
 - **Quota.** `RESOURCE_EXHAUSTED` est traité comme un quota épuisé (non réessayé), sauf si la réponse indique un délai d'attente (alors limite de débit, réessayée avec ce délai).
+
+## Branche de départ
+
+Constaté lors du premier essai réel : une branche inexistante (`main` sur un dépôt dont la branche par défaut est `master`) fait échouer la session **après** sa création, avec un journal de script de plusieurs dizaines de lignes. Orbi :
+
+- laisse la branche **vide par défaut** (= `githubRepo.defaultBranch` de la source Jules) ;
+- refuse avant de créer la session une branche absente de `githubRepo.branches`, en listant les branches connues (si Jules ne liste pas de branches, la valeur est transmise telle quelle) ;
+- réduit un journal d'échec à sa phrase d'introduction et à sa dernière ligne `fatal:` / `error:`.
+
+Vérifié avec l'API réelle : le texte d'échec arrive bien dans l'activité `sessionFailed.reason`.
 
 ## Mapping des états
 

@@ -24,7 +24,14 @@ class FakeJules:
     """Serveur Jules minimal et à état, branché sur httpx.MockTransport."""
 
     def __init__(self):
-        self.sources = [{"name": "sources/github/acme/demo", "githubRepo": {"owner": "acme", "repo": "demo"}}]
+        self.sources = [{
+            "name": "sources/github/acme/demo",
+            "githubRepo": {
+                "owner": "acme", "repo": "demo", "isPrivate": False,
+                "defaultBranch": {"displayName": "main"},
+                "branches": [{"displayName": "main"}, {"displayName": "develop"}],
+            },
+        }]
         self.sessions: dict[str, dict] = {}
         self.activities: dict[str, list[dict]] = {}
         self.requests: list[httpx.Request] = []
@@ -178,6 +185,39 @@ class TestLaunch:
         assert exc.value.category == ErrorCategory.PERMISSION_DENIED and exc.value.code == "repository_access"
         assert "acme/other" in exc.value.message and not any(r.method == "POST" for r in server.requests)
 
+    async def test_empty_branch_means_the_repositorys_default_branch(self):
+        server = FakeJules()
+        server.sources[0]["githubRepo"]["defaultBranch"] = {"displayName": "master"}
+        server.sources[0]["githubRepo"]["branches"] = [{"displayName": "master"}]
+        await connector(server).launch(LaunchRequest(REF, "p", "https://github.com/acme/demo", ""))
+        body = json.loads([r for r in server.requests if r.method == "POST"][0].content)
+        assert body["sourceContext"]["githubRepoContext"]["startingBranch"] == "master"
+
+    async def test_unknown_branch_is_refused_before_any_session_is_created(self):
+        """Une branche inexistante fait échouer Jules au clonage : on l'évite et on dit quelles branches existent."""
+        server = FakeJules()
+        server.sources[0]["githubRepo"]["defaultBranch"] = {"displayName": "master"}
+        server.sources[0]["githubRepo"]["branches"] = [{"displayName": "master"}, {"displayName": "dev"}]
+        with pytest.raises(ConnectorError) as exc:
+            await connector(server).launch(LaunchRequest(REF, "p", "https://github.com/acme/demo", "main"))
+        assert exc.value.category == ErrorCategory.INVALID_REQUEST and exc.value.code == "branch_not_found"
+        assert "« main »" in exc.value.message and "« master »" in exc.value.message and "« dev »" in exc.value.message
+        assert not any(r.method == "POST" for r in server.requests)
+
+    async def test_branch_is_accepted_when_jules_does_not_list_branches(self):
+        server = FakeJules()
+        server.sources[0]["githubRepo"].pop("branches")
+        await connector(server).launch(LaunchRequest(REF, "p", "https://github.com/acme/demo", "feature/x"))
+        body = json.loads([r for r in server.requests if r.method == "POST"][0].content)
+        assert body["sourceContext"]["githubRepoContext"]["startingBranch"] == "feature/x"
+
+    async def test_empty_branch_without_a_known_default_asks_for_one(self):
+        server = FakeJules()
+        server.sources[0]["githubRepo"].pop("defaultBranch")
+        with pytest.raises(ConnectorError) as exc:
+            await connector(server).launch(LaunchRequest(REF, "p", "https://github.com/acme/demo", ""))
+        assert exc.value.code == "branch_required" and not any(r.method == "POST" for r in server.requests)
+
     @pytest.mark.parametrize("url", ["https://gitlab.com/acme/demo", "https://github.com/acme", "https://github.com/a/b/c", "http://github.com/a/b"])
     async def test_only_github_repositories_are_supported(self, url):
         with pytest.raises(ConnectorError) as exc:
@@ -262,6 +302,21 @@ class TestStateMapping:
         server.fail_activities = True
         remote = await c.get("s1")
         assert remote.status == RemoteStatus.FAILED and remote.error_message == "La session a échoué chez Jules."
+
+    async def test_a_raw_script_log_is_reduced_to_its_cause(self):
+        server = FakeJules()
+        c = connector(server)
+        await c.launch(REQUEST)
+        finish(server, "s1", "FAILED")
+        log = (
+            "Jules encountered an error when cloning the repo.\n```+ sudo rm -rf /app\n+ sudo mkdir /app\n"
+            + "+ git config --global core.hooksPath /dev/null\n" * 40
+            + "+ git clone --depth 1 https://github.com/acme/demo -b main /app\n"
+            + "Cloning into '/app'...\nfatal: Remote branch main not found in upstream origin\n```"
+        )
+        server.activities["s1"] = [{"createTime": "2026-01-01T00:00:00Z", "sessionFailed": {"reason": log}}]
+        message = (await c.get("s1")).error_message
+        assert message == "Jules encountered an error when cloning the repo. fatal: Remote branch main not found in upstream origin"
 
     @pytest.mark.parametrize("bad", ["../sessions", "a/b", "s1?x=1", "", "a b"])
     async def test_session_ids_cannot_change_the_request_path(self, bad):

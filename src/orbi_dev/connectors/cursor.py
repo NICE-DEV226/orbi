@@ -139,7 +139,7 @@ class CursorCloudAgentsConnector(HttpConnector):
         body = {
             "agentId": agent_id,
             "prompt": {"text": request.prompt},
-            "repos": [{"url": request.repo_url, "startingRef": request.base_branch}],
+            "repos": [{"url": request.repo_url, **({"startingRef": request.base_branch} if request.base_branch else {})}],
             "autoCreatePR": True,
         }
         try:

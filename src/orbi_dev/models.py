@@ -25,7 +25,7 @@ class Project(Document):
     owner_id: Indexed(int)  # type: ignore[valid-type]
     name: str = Field(min_length=1, max_length=100)
     repo_url: str
-    default_branch: str = Field(default="main", min_length=1, max_length=100)
+    default_branch: str = Field(default="", max_length=100)  # "" = branche par défaut du dépôt, choisie par le fournisseur
     is_archived: bool = False
     created_at: datetime = Field(default_factory=_now)
 
