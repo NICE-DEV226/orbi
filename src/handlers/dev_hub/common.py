@@ -18,6 +18,7 @@ from src.core.config import get_settings
 from src.core.text import esc
 from src.orbi_dev import service
 from src.orbi_dev.access import can_use_orbi_dev
+from src.orbi_dev.inputs import MAX_PROMPT, MIN_PROMPT  # noqa: F401 (réexportés)
 from src.orbi_dev.look import BACK, btn
 from src.orbi_dev.models import Execution, IntegrationStatus, Task
 from src.orbi_dev.notifier import first_line
@@ -40,6 +41,12 @@ CB_NEW = "dv:new"
 CB_NEW_IN_PROJECT = "dv:pn:"  # + id de projet
 CB_ADD_PROJECT = "dv:addp"
 CB_NEW_REPO = "dv:newrepo"
+CB_REPO_AGAIN = "dv:repoagain"  # corriger l'adresse saisie
+CB_REPO_OK = "dv:repook"  # confirmer l'ajout du dépôt en attente
+CB_RENAME = "dv:prn:"  # + id de projet
+CB_BRANCH = "dv:prb:"
+CB_REMOVE = "dv:prd:"
+CB_REMOVE_OK = "dv:prx:"
 CB_PICK_PROJECT = "dv:p:"
 CB_PICK_PROVIDER = "dv:i:"
 CB_GO = "dv:go"
@@ -48,7 +55,6 @@ CB_CHANGE_PROJECT = "dv:chp"
 CB_CHANGE_PROVIDER = "dv:chi"
 CB_DISCARD = "dv:no"
 
-MAX_PROMPT = 8000
 DRAFT_TTL = 15 * 60
 
 NOT_ALLOWED = "Orbi Dev est réservé aux administrateurs pour l'instant."
@@ -62,9 +68,13 @@ def allowed(context: ContextTypes.DEFAULT_TYPE) -> bool:
     return can_use_orbi_dev((context.user_data or {}).get("db_user"))
 
 
+def is_stale(draft: dict) -> bool:
+    return bool(draft) and time.monotonic() - draft.get("at", 0) > DRAFT_TTL
+
+
 def draft_of(context: ContextTypes.DEFAULT_TYPE) -> dict:
     draft = context.user_data.setdefault("dev", {})
-    if draft and time.monotonic() - draft.get("at", 0) > DRAFT_TTL:
+    if is_stale(draft):
         draft.clear()
     draft["at"] = time.monotonic()
     return draft

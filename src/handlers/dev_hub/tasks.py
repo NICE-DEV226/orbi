@@ -203,7 +203,7 @@ async def new_task_in_project(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
     project_id = update.callback_query.data.removeprefix(CB_NEW_IN_PROJECT)
     try:
-        await service.get_project(owner, project_id)
+        await service.get_active_project(owner, project_id)
     except service.NotFoundError:
         await update.callback_query.answer("Ce projet n'existe plus.", show_alert=True)
         return
@@ -247,7 +247,7 @@ async def pick_project(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
     project_id = update.callback_query.data.removeprefix(CB_PICK_PROJECT)
     try:
-        await service.get_project(owner, project_id)
+        await service.get_active_project(owner, project_id)
     except service.NotFoundError:
         await update.callback_query.answer("Ce projet n'existe plus.", show_alert=True)
         return

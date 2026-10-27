@@ -1,59 +1,82 @@
 """
-Orbi Dev dans Telegram — messages libres : l'adresse d'un dépôt ou la consigne d'une tâche, quand le parcours les attend.
-"""
+Orbi Dev dans Telegram — messages libres : ce que l'utilisateur écrit quand un parcours lui pose une question.
 
-import time
+Un message n'est lu que si un parcours attend une réponse (dépôt, consigne, nouveau nom, branche). Dans ce cas rien ne
+reste sans réponse : saisie trop courte ou trop longue, photo ou vocal à la place du texte, saisie restée plus de
+15 minutes sans suite, tout reçoit une phrase qui dit quoi faire.
+"""
 
 from telegram import InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from src.core.text import esc
-from src.orbi_dev.look import PLUS, PRIMARY
+from src.orbi_dev.inputs import MAX_PROMPT, MIN_PROMPT, clean_text
 
-from .common import CB_NEW, MAX_PROMPT, allowed, back, button, clear_draft, draft_of
-from .projects import add_project, cancel_markup
+from .common import DRAFT_TTL, allowed, back, clear_draft, draft_of, is_stale
+from .projects import cancel_markup, handle_edit_text, handle_repo_text
 from .tasks import advance
+
+STEPS = ("repo", "prompt", "rename", "branch")
+WAITING_FOR = {
+    "repo": "l'adresse du dépôt",
+    "prompt": "la consigne de la tâche",
+    "rename": "le nouveau nom",
+    "branch": "le nom de la branche",
+}
+
+
+def _waiting(context: ContextTypes.DEFAULT_TYPE) -> dict | None:
+    raw = context.user_data.get("dev") if context.user_data else None
+    return raw if raw and raw.get("step") in STEPS else None
 
 
 async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Prend le message uniquement si le parcours attend un dépôt ou une consigne ; sinon ne fait rien."""
-    if not allowed(context) or not context.user_data.get("dev"):
+    if not allowed(context):
         return
+    raw = _waiting(context)
+    if raw is None:
+        return
+    if is_stale(raw):
+        clear_draft(context)
+        await update.message.reply_text(
+            f"<b>Saisie expirée.</b> Plus de {DRAFT_TTL // 60} minutes se sont écoulées sans suite : recommencez.",
+            reply_markup=InlineKeyboardMarkup([[back()]]),
+        )
+        return
+
     draft = draft_of(context)
-    step = draft.get("step")
-    if step not in ("repo", "prompt"):
-        return
+    step = draft["step"]
     owner = update.effective_user.id
-    text = (update.message.text or "").strip()
+    text = clean_text(update.message.text or "")
 
     if step == "repo":
-        project, known = await add_project(owner, text)
-        if project is None:
+        await handle_repo_text(update, context, text)
+    elif step in ("rename", "branch"):
+        await handle_edit_text(update, context, owner, step, text)
+    else:
+        if len(text) < MIN_PROMPT:
             await update.message.reply_text(
-                "<b>Je n'ai pas reconnu ce dépôt.</b>\nCollez l'adresse de sa page GitHub :\n"
-                "<code>https://github.com/vous/projet</code>\nou <code>vous/projet</code>",
+                f"<b>Trop court.</b> Décrivez la tâche en quelques mots au moins ({MIN_PROMPT} caractères).",
                 reply_markup=cancel_markup(),
             )
             return
-        if draft.get("then_task"):
-            draft.pop("step")
-            draft["project_id"] = str(project.id)
-            draft["at"] = time.monotonic()
-            await advance(update, context, owner)
+        if len(text) > MAX_PROMPT:
+            await update.message.reply_text(
+                f"<b>Trop long.</b> {MAX_PROMPT} caractères au plus ({len(text)} reçus). Résumez ou découpez en deux tâches.",
+                reply_markup=cancel_markup(),
+            )
             return
-        clear_draft(context)
-        note = "est déjà dans vos projets" if known else "est ajouté"
-        await update.message.reply_text(
-            f"<b>{esc(project.name)}</b> {note}.",
-            reply_markup=InlineKeyboardMarkup([[button(f"{PLUS} Nouvelle tâche", CB_NEW, PRIMARY)], [back()]]),
-        )
-        return
+        draft["prompt"] = text
+        await advance(update, context, owner)
 
-    if not text or len(text) > MAX_PROMPT:
-        await update.message.reply_text(
-            f"<b>Trop long.</b> Décrivez la tâche en {MAX_PROMPT} caractères au plus ({len(text)} reçus).",
-            reply_markup=cancel_markup(),
-        )
+
+async def on_unsupported(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Photo, vocal, fichier, autocollant… alors qu'un parcours attend du texte : on le dit au lieu de se taire."""
+    if not allowed(context):
         return
-    draft["prompt"] = text
-    await advance(update, context, owner)
+    raw = _waiting(context)
+    if raw is None or is_stale(raw):
+        return
+    await update.message.reply_text(
+        f"<b>J'attends du texte</b> : {WAITING_FOR[raw['step']]}. Les images, vocaux et fichiers ne sont pas lus.",
+        reply_markup=cancel_markup(),
+    )

@@ -9,8 +9,8 @@ from telegram.error import BadRequest, NetworkError
 from src.handlers import dev_hub
 from src.models.user import User
 from src.orbi_dev import cards, service
+from src.orbi_dev.inputs import parse_repo
 from src.orbi_dev.models import Execution, Project, Task
-from src.orbi_dev.repo import parse_repo
 from src.orbi_dev.state import ExecutionStatus
 
 REPO = "https://github.com/acme/demo"
@@ -313,8 +313,41 @@ class TestCreateTask:
         assert any("plus active" in a for a in chat.alerts)
 
 
+class FakeGitHub:
+    """Remplace la vérification GitHub : jamais d'appel réseau dans les tests."""
+
+    def __init__(self, info):
+        self.info = info
+        self.asked: list[str] = []
+
+    async def __call__(self, repo, client=None):
+        self.asked.append(repo.full_name)
+        return self.info
+
+
+@pytest.fixture
+def github(monkeypatch):
+    from src.orbi_dev.github import Lookup, RepoInfo
+
+    fake = FakeGitHub(RepoInfo(Lookup.FOUND, default_branch="master", description="Un dépôt", language="Python"))
+    monkeypatch.setattr("src.handlers.dev_hub.projects.lookup_repo", fake)
+    return fake
+
+
 class TestAddRepo:
-    async def test_pasted_url_creates_the_project_and_continues_the_task(self):
+    async def test_nothing_is_created_until_the_user_confirms(self, github):
+        chat = Chat(await admin(1))
+        await chat.press(dev_hub.ask_repo_from_projects, "dv:addp")
+        await chat.say(dev_hub.on_text, "https://github.com/acme/demo")
+        assert "Ajouter ce dépôt" in chat.last and "acme/demo" in chat.last
+        assert "<b>master</b>" in chat.last and "Python" in chat.last and "Un dépôt" in chat.last
+        assert await Project.find().count() == 0
+        await chat.press(dev_hub.confirm_repo, "dv:repook")
+        project = await Project.find_one()
+        assert project.repo_url == REPO and project.name == "demo" and project.default_branch == ""
+        assert "est ajouté" in chat.last
+
+    async def test_pasted_url_then_continues_the_task(self, github):
         await admin(1)
         await service.create_integration(1, "fake", "k")
         chat = Chat(await admin_user(1))
@@ -323,32 +356,238 @@ class TestAddRepo:
         await chat.press(dev_hub.ask_repo_for_task, "dv:newrepo")
         assert "Quel dépôt" in chat.last
         await chat.say(dev_hub.on_text, "https://github.com/acme/demo")
-        project = await Project.find_one()
-        assert project.repo_url == REPO and project.name == "demo" and project.default_branch == ""
+        await chat.press(dev_hub.confirm_repo, "dv:repook")
         assert "Que faut-il faire sur demo" in chat.last
 
-    async def test_garbage_is_explained_and_asked_again(self):
+    async def test_address_hidden_in_a_sentence_is_found(self, github):
+        chat = Chat(await admin(1))
+        await chat.press(dev_hub.ask_repo_from_projects, "dv:addp")
+        await chat.say(dev_hub.on_text, "Voilà le dépôt : https://github.com/acme/demo, merci !")
+        assert github.asked == ["acme/demo"]
+
+    async def test_garbage_is_explained_and_asked_again(self, github):
         chat = Chat(await admin(1))
         await chat.press(dev_hub.ask_repo_from_projects, "dv:addp")
         await chat.say(dev_hub.on_text, "n'importe quoi")
-        assert "pas reconnu" in chat.last
-        assert await Project.find().count() == 0
+        assert "pas reconnu" in chat.last and github.asked == []
         await chat.say(dev_hub.on_text, "acme/demo")
+        await chat.press(dev_hub.confirm_repo, "dv:repook")
         assert await Project.find().count() == 1
 
-    async def test_same_repo_twice_reuses_the_project(self):
+    async def test_unknown_repo_can_still_be_added_on_purpose(self, github):
+        from src.orbi_dev.github import Lookup, RepoInfo
+
+        github.info = RepoInfo(Lookup.NOT_FOUND)
+        chat = Chat(await admin(1))
+        await chat.press(dev_hub.ask_repo_from_projects, "dv:addp")
+        await chat.say(dev_hub.on_text, "acme/prive")
+        assert "introuvable" in chat.last and "privé" in chat.last
+        assert chat.last_buttons()[:2] == ["Ajouter quand même", "Corriger l'adresse"]
+        assert await Project.find().count() == 0
+        await chat.press(dev_hub.confirm_repo, "dv:repook")
+        assert (await Project.find_one()).repo_url == "https://github.com/acme/prive"
+
+    async def test_github_down_does_not_block(self, github):
+        from src.orbi_dev.github import Lookup, RepoInfo
+
+        github.info = RepoInfo(Lookup.UNKNOWN)
+        chat = Chat(await admin(1))
+        await chat.press(dev_hub.ask_repo_from_projects, "dv:addp")
+        await chat.say(dev_hub.on_text, "acme/demo")
+        assert "non vérifié" in chat.last and "Ajouter quand même" in chat.last_buttons()
+
+    async def test_archived_repo_is_flagged(self, github):
+        from src.orbi_dev.github import Lookup, RepoInfo
+
+        github.info = RepoInfo(Lookup.FOUND, default_branch="main", archived=True)
+        chat = Chat(await admin(1))
+        await chat.press(dev_hub.ask_repo_from_projects, "dv:addp")
+        await chat.say(dev_hub.on_text, "acme/demo")
+        assert "archivé" in chat.last
+
+    async def test_correcting_the_address_keeps_the_goal(self, github):
+        from src.handlers.dev_hub.projects import ask_repo_again
+        from src.orbi_dev.github import Lookup, RepoInfo
+
+        github.info = RepoInfo(Lookup.NOT_FOUND)
+        await admin(1)
+        await service.create_integration(1, "fake", "k")
+        chat = Chat(await admin_user(1))
+        await chat.press(dev_hub.ask_repo_for_task, "dv:newrepo")
+        await chat.say(dev_hub.on_text, "acme/fautif")
+        await chat.press(ask_repo_again, "dv:repoagain")
+        assert "Quel dépôt" in chat.last
+        github.info = RepoInfo(Lookup.FOUND, default_branch="main")
+        await chat.say(dev_hub.on_text, "acme/demo")
+        await chat.press(dev_hub.confirm_repo, "dv:repook")
+        assert "Que faut-il faire" in chat.last  # l'objectif « nouvelle tâche » n'a pas été perdu
+
+    async def test_same_repo_twice_reuses_the_project(self, github):
         chat = Chat(await admin(1))
         for _ in range(2):
             await chat.press(dev_hub.ask_repo_from_projects, "dv:addp")
             await chat.say(dev_hub.on_text, "https://github.com/acme/demo")
+            await chat.press(dev_hub.confirm_repo, "dv:repook")
         assert await Project.find().count() == 1
         assert "déjà dans vos projets" in chat.last
 
-    async def test_branch_in_the_url_becomes_the_project_branch(self):
+    async def test_same_name_for_another_repo_gets_the_owner_prefix(self, github):
+        chat = Chat(await admin(1))
+        for url in ("acme/demo", "other/demo"):
+            await chat.press(dev_hub.ask_repo_from_projects, "dv:addp")
+            await chat.say(dev_hub.on_text, url)
+            await chat.press(dev_hub.confirm_repo, "dv:repook")
+        assert {p.name for p in await Project.find().to_list()} == {"demo", "other/demo"}
+
+    async def test_branch_in_the_url_becomes_the_project_branch(self, github):
         chat = Chat(await admin(1))
         await chat.press(dev_hub.ask_repo_from_projects, "dv:addp")
         await chat.say(dev_hub.on_text, "https://github.com/acme/demo/tree/dev")
+        assert "indiquée dans l'adresse" in chat.last
+        await chat.press(dev_hub.confirm_repo, "dv:repook")
         assert (await Project.find_one()).default_branch == "dev"
+
+    async def test_confirming_twice_creates_one_project(self, github):
+        chat = Chat(await admin(1))
+        await chat.press(dev_hub.ask_repo_from_projects, "dv:addp")
+        await chat.say(dev_hub.on_text, "acme/demo")
+        await chat.press(dev_hub.confirm_repo, "dv:repook")
+        await chat.press(dev_hub.confirm_repo, "dv:repook")
+        assert await Project.find().count() == 1
+        assert any("expiré" in a for a in chat.alerts)
+
+
+class TestEditProject:
+    async def _project(self, name="demo"):
+        await admin(1)
+        return await service.create_project(1, name, REPO)
+
+    async def test_rename(self):
+        project = await self._project()
+        chat = Chat(await admin_user(1))
+        await chat.press(dev_hub.ask_rename, f"dv:prn:{project.id}")
+        assert "Nouveau nom" in chat.last
+        await chat.say(dev_hub.on_text, "  Mon site \n")
+        assert (await Project.get(project.id)).name == "Mon site"
+        assert "Mon site" in chat.last and "Branche" in chat.last  # retour sur la fiche
+
+    @pytest.mark.parametrize("bad", ["", "ligne un\nligne deux", "x" * 61])
+    async def test_bad_names_are_refused_with_a_reason(self, bad):
+        project = await self._project()
+        chat = Chat(await admin_user(1))
+        await chat.press(dev_hub.ask_rename, f"dv:prn:{project.id}")
+        await chat.say(dev_hub.on_text, bad)
+        assert (await Project.get(project.id)).name == "demo"
+        assert "invalide" in chat.last or "au moins" in chat.last or "Trop court" in chat.last
+
+    async def test_taken_name_is_refused(self):
+        project = await self._project()
+        await service.create_project(1, "Autre", "https://github.com/x/y")
+        chat = Chat(await admin_user(1))
+        await chat.press(dev_hub.ask_rename, f"dv:prn:{project.id}")
+        await chat.say(dev_hub.on_text, "autre")
+        assert "déjà pris" in chat.last and (await Project.get(project.id)).name == "demo"
+
+    async def test_branch_can_be_set_and_reset(self):
+        project = await self._project()
+        chat = Chat(await admin_user(1))
+        await chat.press(dev_hub.ask_branch, f"dv:prb:{project.id}")
+        await chat.say(dev_hub.on_text, "feature/login-2")
+        assert (await Project.get(project.id)).default_branch == "feature/login-2"
+        await chat.press(dev_hub.ask_branch, f"dv:prb:{project.id}")
+        await chat.say(dev_hub.on_text, "-")
+        assert (await Project.get(project.id)).default_branch == ""
+        assert "par défaut du dépôt" in chat.last
+
+    @pytest.mark.parametrize("bad", ["avec espace", "a..b", "-x", "x/", "$(rm -rf)", "a;b", "x.lock"])
+    async def test_invalid_branch_names_are_refused(self, bad):
+        project = await self._project()
+        chat = Chat(await admin_user(1))
+        await chat.press(dev_hub.ask_branch, f"dv:prb:{project.id}")
+        await chat.say(dev_hub.on_text, bad)
+        assert (await Project.get(project.id)).default_branch == "" and "invalide" in chat.last
+
+    async def test_remove_needs_confirmation_and_keeps_history(self):
+        from src.handlers.dev_hub.projects import confirm_remove, remove_project
+
+        project = await self._project()
+        await service.create_integration(1, "fake", "k")
+        integration = (await service.list_integrations(1))[0]
+        task = await service.create_task(1, str(project.id), str(integration.id), "ancienne tâche")
+        chat = Chat(await admin_user(1))
+        await chat.press(confirm_remove, f"dv:prd:{project.id}")
+        assert "Retirer ce projet" in chat.last and (await Project.get(project.id)).is_archived is False
+        await chat.press(remove_project, f"dv:prx:{project.id}")
+        assert (await Project.get(project.id)).is_archived is True
+        assert await service.list_projects(1) == []
+        assert (await service.get_task(1, str(task.id))).prompt == "ancienne tâche"  # l'historique reste
+        # un projet retiré ne reçoit plus de travail neuf
+        with pytest.raises(service.NotFoundError):
+            await service.create_task(1, str(project.id), str(integration.id), "nouvelle")
+        await chat.press(dev_hub.show_project, f"dv:pr:{project.id}")
+        assert any("n'existe plus" in a for a in chat.alerts)
+
+    async def test_retry_on_a_removed_project_is_refused(self):
+        project = await self._project()
+        await service.create_integration(1, "fake", "k")
+        integration = (await service.list_integrations(1))[0]
+        task = await service.create_task(1, str(project.id), str(integration.id), "x")
+        ex = await service.create_execution(1, str(task.id))
+        await Execution.get_pymongo_collection().update_one({"_id": ex.id}, {"$set": {"status": "failed"}})
+        await service.archive_project(1, str(project.id))
+        with pytest.raises(service.ConflictError):
+            await service.create_execution(1, str(task.id))
+
+    async def test_someone_elses_project_cannot_be_edited(self):
+        from src.handlers.dev_hub.projects import remove_project
+
+        foreign = await self._project()
+        await admin(2)
+        chat = Chat(await admin_user(2))
+        for handler, data in ((dev_hub.ask_rename, f"dv:prn:{foreign.id}"), (dev_hub.ask_branch, f"dv:prb:{foreign.id}"),
+                              (remove_project, f"dv:prx:{foreign.id}")):
+            await chat.press(handler, data)
+        assert chat.alerts.count("Ce projet n'existe plus.") == 3
+        assert (await Project.get(foreign.id)).is_archived is False
+
+
+class TestInputRobustness:
+    async def test_photo_or_voice_gets_an_answer_not_silence(self):
+        from src.handlers.dev_hub import on_unsupported
+
+        await admin(1)
+        chat = Chat(await admin_user(1))
+        await chat.say(on_unsupported, "")  # hors parcours : on ne dit rien
+        assert chat.shown == []
+        await chat.press(dev_hub.ask_repo_from_projects, "dv:addp")
+        await chat.say(on_unsupported, "")
+        assert "J'attends du texte" in chat.last and "l'adresse du dépôt" in chat.last
+
+    async def test_stale_input_is_explained(self):
+        await setup_workspace(1)
+        chat = Chat(await admin_user(1))
+        await chat.press(dev_hub.start_task, "dv:new")
+        chat.context.user_data["dev"]["at"] -= dev_hub.DRAFT_TTL + 5
+        await chat.say(dev_hub.on_text, "trop tard pour cette consigne")
+        assert "Saisie expirée" in chat.last
+        await chat.say(dev_hub.on_text, "encore un message")  # après l'explication, plus de parcours : silence
+        assert chat.shown.count(chat.last) == 1
+
+    async def test_too_short_prompt_is_refused(self):
+        await setup_workspace(1)
+        chat = Chat(await admin_user(1))
+        await chat.press(dev_hub.start_task, "dv:new")
+        await chat.say(dev_hub.on_text, "ok")
+        assert "Trop court" in chat.last
+        await chat.say(dev_hub.on_text, "Corrige le bug du login")
+        assert "Lancer cette tâche" in chat.last
+
+    async def test_control_characters_are_stripped_from_a_prompt(self):
+        await setup_workspace(1)
+        chat = Chat(await admin_user(1))
+        await chat.press(dev_hub.start_task, "dv:new")
+        await chat.say(dev_hub.on_text, "Corrige\x00 le\u202e bug\n\n\n\n\ndu login")
+        assert chat.context.user_data["dev"]["prompt"] == "Corrige le bug\n\ndu login"
 
 
 class TestListAndCard:

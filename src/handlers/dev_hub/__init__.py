@@ -13,6 +13,7 @@ from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler, f
 
 from .common import (
     CB_ADD_PROJECT,
+    CB_BRANCH,
     CB_CHANGE_PROJECT,
     CB_CHANGE_PROVIDER,
     CB_CONNECTIONS,
@@ -30,14 +31,30 @@ from .common import (
     CB_PICK_PROVIDER,
     CB_PROJECT,
     CB_PROJECTS,
+    CB_REMOVE,
+    CB_REMOVE_OK,
+    CB_RENAME,
+    CB_REPO_AGAIN,
+    CB_REPO_OK,
     CB_SETTINGS,
     DRAFT_TTL,
     MAX_PROMPT,
     logger,
 )
 from .home import ADMIN_COMMANDS, build_home, show_connections, show_home, show_settings, toggle_notifications
-from .messages import on_text
-from .projects import ask_repo_for_task, ask_repo_from_projects, show_project, show_projects
+from .messages import on_text, on_unsupported
+from .projects import (
+    ask_branch,
+    ask_rename,
+    ask_repo_again,
+    ask_repo_for_task,
+    ask_repo_from_projects,
+    confirm_remove,
+    confirm_repo,
+    remove_project,
+    show_project,
+    show_projects,
+)
 from .tasks import (
     change_project,
     change_provider,
@@ -55,7 +72,7 @@ from .tasks import (
 )
 
 __all__ = [
-    "ADMIN_COMMANDS", "DRAFT_TTL", "MAX_PROMPT", "ask_repo_for_task", "ask_repo_from_projects", "build_home",
+    "ADMIN_COMMANDS", "DRAFT_TTL", "MAX_PROMPT", "on_unsupported", "ask_repo_for_task", "ask_repo_from_projects", "build_home",
     "change_project", "change_provider", "discard", "edit_prompt", "launch", "new_task_in_project", "on_text",
     "pick_project", "pick_provider", "register_dev_hub_handlers", "show_connections", "show_execution", "show_home",
     "show_list", "show_project", "show_projects", "show_settings", "start_task", "task_command", "tasks_command",
@@ -73,16 +90,22 @@ def register_dev_hub_handlers(application) -> None:
         (CB_HOME, show_home), (CB_NEW, start_task), (CB_PROJECTS, show_projects),
         (CB_ADD_PROJECT, ask_repo_from_projects), (CB_NEW_REPO, ask_repo_for_task),
         (CB_CONNECTIONS, show_connections), (CB_SETTINGS, show_settings), (CB_NOTIFICATIONS, toggle_notifications),
+        (CB_REPO_AGAIN, ask_repo_again), (CB_REPO_OK, confirm_repo),
         (CB_GO, launch), (CB_EDIT, edit_prompt), (CB_CHANGE_PROJECT, change_project),
         (CB_CHANGE_PROVIDER, change_provider), (CB_DISCARD, discard),
     ):
         on(CallbackQueryHandler(callback, pattern=f"^{pattern}$"))
     on(CallbackQueryHandler(show_list, pattern=f"^{CB_LIST}(:[ad])?$"))
     on(CallbackQueryHandler(show_project, pattern=rf"^{CB_PROJECT}"))
+    on(CallbackQueryHandler(ask_rename, pattern=rf"^{CB_RENAME}"))
+    on(CallbackQueryHandler(ask_branch, pattern=rf"^{CB_BRANCH}"))
+    on(CallbackQueryHandler(confirm_remove, pattern=rf"^{CB_REMOVE}"))
+    on(CallbackQueryHandler(remove_project, pattern=rf"^{CB_REMOVE_OK}"))
     on(CallbackQueryHandler(new_task_in_project, pattern=rf"^{CB_NEW_IN_PROJECT}"))
     on(CallbackQueryHandler(pick_project, pattern=rf"^{CB_PICK_PROJECT}"))
     on(CallbackQueryHandler(pick_provider, pattern=rf"^{CB_PICK_PROVIDER}"))
     on(CallbackQueryHandler(show_execution, pattern=rf"^{CB_OPEN}"))
     # Groupe 1 : ne retire rien aux autres parcours (support, productivité) qui lisent aussi les messages texte
     on(MessageHandler(filters.TEXT & ~filters.COMMAND & private, on_text), group=1)
+    on(MessageHandler(~filters.TEXT & ~filters.COMMAND & ~filters.StatusUpdate.ALL & private, on_unsupported), group=1)
     logger.info("Handlers Orbi Dev (Telegram) enregistrés")

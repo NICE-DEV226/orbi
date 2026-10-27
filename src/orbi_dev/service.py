@@ -19,6 +19,7 @@ from beanie import PydanticObjectId
 from pymongo import ReturnDocument
 
 from src.orbi_dev.crypto import encrypt_secret
+from src.orbi_dev.inputs import parse_name, valid_branch
 from src.orbi_dev.models import (
     AuditRecord,
     EventKind,
@@ -80,9 +81,46 @@ async def list_projects(owner_id: int) -> list[Project]:
 
 
 async def get_project(owner_id: int, project_id: str) -> Project:
+    """Un projet, même retiré : une exécution en cours ou passée doit pouvoir retrouver le sien."""
     project = await Project.find_one(Project.id == _oid(project_id), Project.owner_id == owner_id)
     if project is None:
         raise NotFoundError("Projet introuvable")
+    return project
+
+
+async def get_active_project(owner_id: int, project_id: str) -> Project:
+    """Un projet utilisable pour du nouveau travail : un projet retiré est introuvable."""
+    project = await get_project(owner_id, project_id)
+    if project.is_archived:
+        raise NotFoundError("Projet introuvable")
+    return project
+
+
+async def update_project(
+    owner_id: int, project_id: str, *, name: str | None = None, default_branch: str | None = None
+) -> Project:
+    """Renomme un projet et/ou change sa branche de départ (`""` = branche par défaut du dépôt)."""
+    project = await get_active_project(owner_id, project_id)
+    if name is not None:  # l'affectation ne passe pas par les validateurs du modèle : mêmes règles, appliquées ici
+        cleaned = parse_name(name)
+        if cleaned is None:
+            raise ValueError("nom invalide")
+        project.name = cleaned
+    if default_branch is not None:
+        if default_branch and not valid_branch(default_branch):
+            raise ValueError("nom de branche invalide")
+        project.default_branch = default_branch
+    await project.save()
+    await record_audit(owner_id, "project.update", "project", str(project.id))
+    return project
+
+
+async def archive_project(owner_id: int, project_id: str) -> Project:
+    """Retire un projet de la liste. Ses tâches et exécutions restent consultables ; les exécutions en cours continuent."""
+    project = await get_active_project(owner_id, project_id)
+    project.is_archived = True
+    await project.save()
+    await record_audit(owner_id, "project.archive", "project", str(project.id))
     return project
 
 
@@ -163,7 +201,7 @@ async def revoke_integration(owner_id: int, integration_id: str) -> Integration:
 # ─────────────────────────────────────
 
 async def create_task(owner_id: int, project_id: str, integration_id: str, prompt: str) -> Task:
-    project = await get_project(owner_id, project_id)
+    project = await get_active_project(owner_id, project_id)
     integration = await get_integration(owner_id, integration_id)
     if integration.status != IntegrationStatus.ACTIVE:
         raise ConflictError("Intégration inactive")
@@ -208,6 +246,9 @@ async def create_execution(
     integration = await get_integration(owner_id, task.integration_id)
     if integration.status != IntegrationStatus.ACTIVE:
         raise ConflictError("Intégration inactive")
+
+    if (await get_project(owner_id, task.project_id)).is_archived:
+        raise ConflictError("Ce projet a été retiré")
 
     previous = await Execution.find(Execution.task_id == str(task.id), Execution.owner_id == owner_id).to_list()
     if any(not is_terminal(e.status) for e in previous):
