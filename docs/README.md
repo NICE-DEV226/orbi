@@ -4,6 +4,7 @@ Documentation de cadrage pour la reprise progressive du dépôt. Les documents d
 
 ## Documents
 
+- [Direction produit](PRODUCT_DIRECTION.md) — orientation DevOps-first, périmètre, parcours visé et écart avec les capacités actuelles.
 - [Spécification produit et technique](ORBI_SPECIFICATION.md) — vision, architecture, exigences et critères d'acceptation.
 - [Audit initial du dépôt](AUDIT_INITIAL.md) — constats statiques, risques et limites de l'audit.
 - [Feuille de route d'ingénierie](ROADMAP.md) — priorités, phases, lots de travail et critères de sortie.
@@ -24,8 +25,9 @@ Les décisions d'architecture sont des propositions tant que leur statut ne pré
 
 ## Ordre de lecture
 
-1. Spécification.
-2. Audit initial.
-3. Feuille de route.
-4. Inventaire historique.
-5. ADR selon le sujet.
+1. Direction produit.
+2. Spécification.
+3. Audit initial.
+4. Feuille de route.
+5. Inventaire historique.
+6. ADR selon le sujet.

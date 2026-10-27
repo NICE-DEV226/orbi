@@ -1,9 +1,9 @@
 <div align="center">
   <img src="logo.png" alt="Orbi Logo" width="400"/>
 
-  # Orbi — piloter ses agents de code depuis Telegram et le web
+  # Orbi — copilote DevOps, avec le code au service de l'exploitation
 
-  **Bot Telegram × Dashboard d'administration × Orbi Dev (agents de code distants)**
+  **Superviser les livraisons et les problèmes de service depuis le web et Telegram**
 
   [![Python](https://img.shields.io/badge/Python-3.12%20→%203.14-blue?logo=python&logoColor=white)](https://python.org)
   [![FastAPI](https://img.shields.io/badge/FastAPI-0.1xx-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
@@ -17,9 +17,9 @@
 
 ## Présentation
 
-Orbi est un projet open source qui permet de **lancer et suivre des tâches de développement confiées à un agent de code distant** (fournisseurs : [Cursor Cloud Agents](docs/connectors/cursor.md) et [Jules](docs/connectors/jules.md)) depuis un navigateur mobile, avec un bot Telegram pour le support et les outils du quotidien.
+Orbi vise à aider les développeurs et les petites équipes à **comprendre et traiter les problèmes de livraison et d'exploitation** depuis une interface web mobile et Telegram. Les agents de code — notamment [Jules](docs/connectors/jules.md) et [Cursor Cloud Agents](docs/connectors/cursor.md) — sont des outils possibles pour préparer un correctif, pas le produit à eux seuls.
 
-> **État du projet.** Le parcours Orbi Dev est implémenté et testé de bout en bout avec un fournisseur *factice*. Il n'a **pas encore été essayé avec un compte fournisseur réel** et l'interface n'a pas été vérifiée visuellement sur un téléphone. Voir [la feuille de route](docs/ROADMAP.md).
+> **État actuel et direction.** Le dépôt implémente la gestion de projets, les tâches, les exécutions d'agents, leur suivi et des notifications. Le propriétaire indique avoir testé le parcours avec un compte Jules réel et l'avoir trouvé presque fonctionnel ; ce test réel n'a pas été reproduit indépendamment ici. Le parcours DevOps visé (signal d'échec CI/service → diagnostic → correction proposée → vérification) n'est pas encore implémenté de bout en bout. Voir [la direction produit](docs/PRODUCT_DIRECTION.md) et [la feuille de route](docs/ROADMAP.md).
 
 | Module | Contenu | Où |
 |---|---|---|
@@ -38,15 +38,19 @@ Il est **désactivé par défaut** (`ENABLE_COMMUNITY=false`) : sa modération l
 
 ---
 
-## Orbi Dev en bref
+## Orbi Dev aujourd'hui
 
 1. Un administrateur ouvre l'interface **depuis Telegram** (bouton « Orbi Dev », Mini App, connexion automatique) ou depuis un navigateur avec le lien magique de `/web`. Les Mini Apps exigent une URL https publique ([ADR-0007](docs/adr/0007-telegram-mini-app.md)).
 2. Il enregistre un **projet** (URL https du dépôt) et connecte une **clé fournisseur** : elle est vérifiée, puis chiffrée (Fernet) dans une collection séparée, jamais réaffichée.
-3. Il crée une **tâche** : l'agent travaille sur une branche et propose une **pull request**. Rien n'est fusionné ni déployé automatiquement.
+3. Il crée une **tâche** : l'agent travaille sur une branche et peut proposer une **pull request**. Rien n'est fusionné ni déployé automatiquement.
 4. L'exécution est suivie en arrière-plan ; l'état vit en base, donc recharger la page ou perdre la connexion ne perd rien et ne relance rien.
 5. Quand une exécution se termine, échoue, dépasse sa durée ou demande une vérification, le bot envoie **un message à son propriétaire seul** (une fois par état), avec les boutons Ouvrir, Voir la PR, Réessayer ou Vérifier. Réglage : Profil → Notifications.
 
 Garanties de conception ([ADR-0003](docs/adr/0003-durable-execution-model.md)) : identifiants durables créés avant tout appel réseau, lancement idempotent, résultat incertain réconcilié par lecture (jamais relancé à l'aveugle), retries bornés, transitions d'état validées et atomiques.
+
+### Direction visée
+
+Le contrôle mobile des agents existe déjà chez les fournisseurs. Orbi vise plutôt à relier **un signal d'exploitation à une résolution vérifiable** : par exemple, un échec CI → contexte et diagnostic → correctif proposé par un agent → validation humaine → vérification du résultat. Cette orchestration DevOps est une direction produit, pas encore une fonctionnalité livrée de bout en bout. Les risques, le périmètre de départ et les écarts avec le produit actuel sont décrits dans [docs/PRODUCT_DIRECTION.md](docs/PRODUCT_DIRECTION.md).
 
 ---
 
@@ -161,7 +165,7 @@ Chaque message du bot traverse 4 middlewares (`group=-10`) : journalisation, aut
 
 ## Documentation
 
-- [Spécification](docs/ORBI_SPECIFICATION.md) · [Feuille de route](docs/ROADMAP.md) · [Audit initial](docs/AUDIT_INITIAL.md) · [Inventaire des modules](docs/LEGACY_MODULES.md)
+- [Direction produit](docs/PRODUCT_DIRECTION.md) · [Spécification](docs/ORBI_SPECIFICATION.md) · [Feuille de route](docs/ROADMAP.md) · [Audit initial](docs/AUDIT_INITIAL.md) · [Inventaire des modules](docs/LEGACY_MODULES.md)
 - Décisions d'architecture : [ADR-0001 à 0006](docs/README.md)
 - [Connecteur Cursor](docs/connectors/cursor.md) — configuration, mapping, hypothèses et limites
 - [`cdc.md`](cdc.md) — cahier des charges historique (v4.0), en partie obsolète
