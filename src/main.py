@@ -36,6 +36,10 @@ async def lifespan(app: FastAPI):
 
     # Connexion MongoDB
     await init_db()
+
+    from src.orbi_dev.migrations import run_migrations
+
+    await run_migrations()
     logger.info("🍃 MongoDB connecté")
 
     # Connexion Redis
@@ -48,10 +52,11 @@ async def lifespan(app: FastAPI):
 
     from src.orbi_dev.worker import start_worker, stop_worker
 
-    dev_worker = start_worker()
     bot_app = None
     bot_started = False
     scheduler_started = False
+    # Le bot démarre après le worker : il est lu à chaque passage (None tant qu'il n'est pas prêt, ou s'il a échoué).
+    dev_worker = start_worker(lambda: bot_app.bot if bot_app is not None and bot_started else None)
     try:
         # Démarrage du bot Telegram
         from src.bot.app import create_bot_application, start_bot, stop_bot

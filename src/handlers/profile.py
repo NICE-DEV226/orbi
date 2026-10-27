@@ -25,6 +25,7 @@ from src.core.i18n import t
 from src.core.i18n import t as translate_func
 from src.core.text import esc
 from src.models.user import NotificationPreferences, User
+from src.orbi_dev.access import can_use_orbi_dev
 
 logger = logging.getLogger("orbi.handlers.profile")
 
@@ -171,24 +172,29 @@ async def show_notifications(update: Update, context: ContextTypes.DEFAULT_TYPE)
             NotificationPreferences.COMMUNITY_ANNOUNCEMENTS: "📢 Annonces communauté",
             NotificationPreferences.MORNING_BRIEF: "🌅 Morning Brief",
             NotificationPreferences.TASK_REMINDERS: "⏰ Rappels tâches",
+            NotificationPreferences.DEV_RUNS: "🤖 Fin des tâches Orbi Dev",
         },
         "en": {
             NotificationPreferences.TICKET_REPLIES: "🎧 Ticket replies",
             NotificationPreferences.COMMUNITY_ANNOUNCEMENTS: "📢 Community announcements",
             NotificationPreferences.MORNING_BRIEF: "🌅 Morning Brief",
             NotificationPreferences.TASK_REMINDERS: "⏰ Task reminders",
+            NotificationPreferences.DEV_RUNS: "🤖 Orbi Dev run results",
         },
         "ar": {
             NotificationPreferences.TICKET_REPLIES: "🎧 ردود التذاكر",
             NotificationPreferences.COMMUNITY_ANNOUNCEMENTS: "📢 إعلانات المجتمع",
             NotificationPreferences.MORNING_BRIEF: "🌅 ملخص الصباح",
             NotificationPreferences.TASK_REMINDERS: "⏰ تذكيرات المهام",
+            NotificationPreferences.DEV_RUNS: "🤖 نتائج مهام Orbi Dev",
         },
     }
 
     labels = dict(notif_labels.get(lang, notif_labels["fr"]))
     if not get_settings().ENABLE_COMMUNITY:
         labels.pop(NotificationPreferences.COMMUNITY_ANNOUNCEMENTS, None)
+    if not can_use_orbi_dev(db_user):
+        labels.pop(NotificationPreferences.DEV_RUNS, None)
     buttons = []
     for notif_type, label in labels.items():
         is_on = notif_type in enabled

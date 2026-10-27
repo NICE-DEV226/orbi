@@ -112,6 +112,10 @@ async def create_bot_application() -> Application:
     from src.handlers.admin_auth import register_admin_handlers
     register_admin_handlers(application)
 
+    # ── Orbi Dev : boutons des notifications ──
+    from src.handlers.orbi_dev import register_orbi_dev_handlers
+    register_orbi_dev_handlers(application)
+
     # Module optionnel : communauté (sondages, karma) et gestion/modération de groupes
     if settings.ENABLE_COMMUNITY:
         from src.handlers.community import register_community_handlers

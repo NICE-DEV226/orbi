@@ -7,6 +7,7 @@ valeurs puis supprime le champ, afin qu'aucun secret ne reste dans un document e
 """
 
 import logging
+from datetime import UTC, datetime
 
 from src.orbi_dev.models import Integration, IntegrationSecret
 
@@ -33,3 +34,34 @@ async def migrate_legacy_secrets() -> int:
     if migrated:
         logger.info("Secrets d'intégration migrés vers leur collection dédiée : %d", migrated)
     return migrated
+
+
+DEV_NOTIFICATIONS_MARKER = "enable_dev_run_notifications_v1"
+
+
+async def enable_dev_run_notifications_once() -> int:
+    """
+    Active « fin d'exécution Orbi Dev » chez les utilisateurs déjà inscrits, une seule fois.
+
+    Le marqueur est posé de façon atomique : un utilisateur qui désactive ensuite la notification ne la retrouve pas
+    au démarrage suivant. Retourne le nombre d'utilisateurs modifiés (0 si la migration a déjà eu lieu).
+    """
+    from src.core.database import get_database
+    from src.models.user import NotificationPreferences, User
+
+    marker = await get_database()["orbi_dev_migrations"].update_one(
+        {"_id": DEV_NOTIFICATIONS_MARKER}, {"$setOnInsert": {"applied_at": datetime.now(UTC)}}, upsert=True
+    )
+    if marker.upserted_id is None:
+        return 0
+    result = await User.get_pymongo_collection().update_many(
+        {}, {"$addToSet": {"enabled_notifications": NotificationPreferences.DEV_RUNS.value}}
+    )
+    logger.info("Notifications Orbi Dev activées pour %d utilisateur(s)", result.modified_count)
+    return result.modified_count
+
+
+async def run_migrations() -> None:
+    """Toutes les migrations Orbi Dev, idempotentes ; appelées au démarrage de l'application et par scripts/init_db.py."""
+    await migrate_legacy_secrets()
+    await enable_dev_run_notifications_once()
