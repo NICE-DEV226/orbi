@@ -40,6 +40,7 @@ Sleep = Callable[[float], Awaitable[None]]
 _REMOTE_TO_STATUS = {
     RemoteStatus.PENDING: ExecutionStatus.RUNNING,
     RemoteStatus.RUNNING: ExecutionStatus.RUNNING,
+    RemoteStatus.WAITING: ExecutionStatus.NEEDS_ATTENTION,
     RemoteStatus.SUCCEEDED: ExecutionStatus.SUCCEEDED,
     RemoteStatus.FAILED: ExecutionStatus.FAILED,
     RemoteStatus.CANCELLED: ExecutionStatus.CANCELLED,
@@ -144,6 +145,7 @@ def _remote_fields(remote: RemoteRun) -> dict:
 # Phrase d'historique selon l'état atteint, quand l'appelant n'en fournit pas.
 _TARGET_MESSAGE = {
     ExecutionStatus.RUNNING: "L'agent travaille",
+    ExecutionStatus.NEEDS_ATTENTION: "L'agent attend une réponse ou une validation",
     ExecutionStatus.SUCCEEDED: "L'agent a terminé",
     ExecutionStatus.FAILED: "L'agent n'a pas abouti",
     ExecutionStatus.CANCELLED: "Exécution annulée",
@@ -159,6 +161,8 @@ async def _converge(execution: Execution, remote: RemoteRun, *, message: str | N
     if target in (ExecutionStatus.FAILED, ExecutionStatus.TIMED_OUT):
         fields["error_message"] = remote.error_message or "Échec signalé par le fournisseur"
         fields["error_category"] = ErrorCategory.UNKNOWN.value
+    elif target == ExecutionStatus.NEEDS_ATTENTION:
+        fields["error_message"] = remote.error_message or "Le fournisseur attend une réponse ou une validation"
 
     if execution.status == target:
         if fields:
@@ -222,11 +226,13 @@ async def _reconcile_unknown_launch(execution: Execution, connector: AgentConnec
     """Réponse perdue : on lit l'état distant. Introuvable ou illisible => `needs_attention`, pas de relance."""
     remote: RemoteRun | None = None
     external_id = execution.external_id
-    if external_id:
-        try:
+    try:
+        if external_id:
             remote = await connector.get(external_id)
-        except ConnectorError as e:
-            logger.info("Réconciliation du lancement impossible (%s)", e.category)
+        else:
+            remote = await connector.find_by_client_ref(execution.client_ref)
+    except ConnectorError as e:
+        logger.info("Réconciliation du lancement impossible (%s)", e.category)
     if remote is not None:
         await service.add_event(
             execution.owner_id, str(execution.id), EventKind.RECONCILIATION,
@@ -270,12 +276,16 @@ async def refresh_execution(owner_id: int, execution_id: str) -> Execution:
         return await _time_out(execution)
 
     integration = await service.get_integration(owner_id, execution.integration_id)
-    if not execution.external_id:
-        return await _handle_missing_remote(execution)
 
     try:
         async with _Session(integration) as connector:
-            remote = await connector.get(execution.external_id)
+            if execution.external_id:
+                remote = await connector.get(execution.external_id)
+            else:
+                # Lancement dont la réponse a été perdue chez un fournisseur sans identifiant choisi par Orbi.
+                remote = await connector.find_by_client_ref(execution.client_ref)
+                if remote is None:
+                    return await _handle_missing_remote(execution)
     except ConnectorError as e:
         return await _handle_poll_error(execution, e, integration)
 

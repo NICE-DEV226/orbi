@@ -41,7 +41,7 @@
 {%- elif ex.status.value == 'failed' -%}a échoué {{ ex.finished_at|ago }}
 {%- elif ex.status.value == 'cancelled' -%}annulé {{ ex.finished_at|ago }}
 {%- elif ex.status.value == 'timed_out' -%}arrêté, trop long
-{%- elif ex.status.value == 'needs_attention' -%}suivi interrompu, à vérifier
+{%- elif ex.status.value == 'needs_attention' -%}à vérifier chez le fournisseur
 {%- elif ex.status.value == 'awaiting_approval' -%}attend votre accord
 {%- elif ex.status.value == 'cancel_requested' -%}annulation en cours
 {%- else -%}en attente de démarrage{%- endif -%}

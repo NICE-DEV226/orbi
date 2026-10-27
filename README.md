@@ -17,7 +17,7 @@
 
 ## Présentation
 
-Orbi est un projet open source qui permet de **lancer et suivre des tâches de développement confiées à un agent de code distant** (premier fournisseur : [Cursor Cloud Agents](docs/connectors/cursor.md)) depuis un navigateur mobile, avec un bot Telegram pour le support et les outils du quotidien.
+Orbi est un projet open source qui permet de **lancer et suivre des tâches de développement confiées à un agent de code distant** (fournisseurs : [Cursor Cloud Agents](docs/connectors/cursor.md) et [Jules](docs/connectors/jules.md)) depuis un navigateur mobile, avec un bot Telegram pour le support et les outils du quotidien.
 
 > **État du projet.** Le parcours Orbi Dev est implémenté et testé de bout en bout avec un fournisseur *factice*. Il n'a **pas encore été essayé avec un compte fournisseur réel** et l'interface n'a pas été vérifiée visuellement sur un téléphone. Voir [la feuille de route](docs/ROADMAP.md).
 

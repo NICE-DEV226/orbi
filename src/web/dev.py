@@ -152,10 +152,16 @@ async def _panel_context(admin: User, execution_id: str) -> dict[str, Any]:
         project = (await service.get_project(admin.telegram_id, task.project_id)).name
     except service.NotFoundError:
         project = "projet supprimé"
+    try:
+        integration = await service.get_integration(admin.telegram_id, execution.integration_id)
+        can_cancel = "cancel" in integration.capabilities
+    except service.NotFoundError:
+        can_cancel = False
     return {
         "execution": execution, "task": task, "project": project, "events": list(reversed(events)),
         "active": execution.status in ACTIVE_STATUSES or execution.status == ExecutionStatus.AWAITING_APPROVAL,
         "terminal": is_terminal(execution.status), "node_var": status_info(execution.status)["var"],
+        "can_cancel": can_cancel,
     }
 
 

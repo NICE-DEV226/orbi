@@ -49,7 +49,7 @@ _HEADLINES: dict[ExecutionStatus, str] = {
 _FALLBACK_DETAIL: dict[ExecutionStatus, str] = {
     S.FAILED: "L'agent n'a pas abouti.",
     S.TIMED_OUT: "Arrêté : durée maximale dépassée.",
-    S.NEEDS_ATTENTION: "Le suivi est interrompu : vérifiez chez le fournisseur.",
+    S.NEEDS_ATTENTION: "Une vérification est nécessaire chez le fournisseur.",
 }
 
 
@@ -84,6 +84,9 @@ def build_keyboard(execution: Execution, *, with_action: bool = True) -> InlineK
     pr = _safe_https(execution.pr_url)
     if pr:
         top.append(InlineKeyboardButton("🔀 Voir la PR", url=pr))
+    provider = _safe_https(execution.external_url)
+    if provider and status == S.NEEDS_ATTENTION:
+        top.append(InlineKeyboardButton("↗ Ouvrir chez le fournisseur", url=provider))
     rows = [top] if top else []
     if not with_action:
         pass

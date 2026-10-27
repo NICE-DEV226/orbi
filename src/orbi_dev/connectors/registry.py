@@ -4,9 +4,11 @@ from src.core.config import get_settings
 from src.orbi_dev.connectors.base import AgentConnectorType, ConnectorError, ErrorCategory
 from src.orbi_dev.connectors.cursor import CursorCloudAgentsConnector
 from src.orbi_dev.connectors.fake import FakeConnector
+from src.orbi_dev.connectors.jules import JulesConnector
 
 _PROVIDERS: dict[str, type[AgentConnectorType]] = {
     CursorCloudAgentsConnector.provider: CursorCloudAgentsConnector,
+    JulesConnector.provider: JulesConnector,
     FakeConnector.provider: FakeConnector,
 }
 
