@@ -83,8 +83,8 @@ class Settings(BaseSettings):
 
     @property
     def cookie_secure(self) -> bool:
-        """Cookies `Secure` partout sauf en développement local (HTTP)."""
-        return not self.is_development
+        """Cookies `Secure` partout sauf en développement local en HTTP (une URL publique https les rend `Secure` aussi en développement)."""
+        return not self.is_development or self.public_https
 
     @property
     def is_production(self) -> bool:
