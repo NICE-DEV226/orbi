@@ -132,8 +132,13 @@ class TestProductionConfig:
         assert s.cookie_secure is True
 
     def test_development_cookie_not_secure(self, monkeypatch):
-        s = self._settings(monkeypatch, ENVIRONMENT="development")
+        s = self._settings(monkeypatch, ENVIRONMENT="development", BASE_URL="http://localhost:8000")
         assert s.cookie_secure is False
+
+    def test_development_behind_a_public_https_url_gets_secure_cookies(self, monkeypatch):
+        """Un tunnel https en développement ne doit pas servir un cookie de session lisible en clair."""
+        s = self._settings(monkeypatch, ENVIRONMENT="development", BASE_URL="https://abc.trycloudflare.com")
+        assert s.cookie_secure is True
 
 
 class TestWebHardening:
