@@ -12,7 +12,7 @@ from telegram.error import BadRequest
 from telegram.ext import CallbackQueryHandler, ContextTypes
 
 from src.models.user import User
-from src.orbi_dev import runner, service
+from src.orbi_dev import cards, runner, service
 from src.orbi_dev.access import can_use_orbi_dev
 from src.orbi_dev.notifier import CB_CHECK, CB_RETRY, build_keyboard
 
@@ -53,6 +53,7 @@ async def retry_execution(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     context.application.create_task(_launch_safely(owner_id, str(execution.id)))
     await query.answer("Nouvelle tentative lancée.")
     await _drop_action(query, previous)
+    await cards.post_card(query.get_bot(), execution)  # la nouvelle tentative se suit sur sa propre carte
 
 
 async def check_execution(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -67,7 +68,10 @@ async def check_execution(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await query.answer("Exécution introuvable.", show_alert=True)
         return
     await query.answer("Vérification faite. Vous serez prévenu si l'état change.")
-    await _drop_action(query, execution)
+    if query.message.message_id == execution.card_message_id:
+        await cards.update_cards(query.get_bot())  # la carte garde ses boutons et reflète l'état d'après
+    else:
+        await _drop_action(query, execution)
 
 
 async def _drop_action(query, execution) -> None:

@@ -18,11 +18,13 @@ from src.bot.keyboards import (
     CB_MODULE_DEVELOPERS,
     CB_MODULE_PRODUCTIVITY,
     CB_MODULE_SUPPORT,
+    CB_MORE,
     main_menu_keyboard,
     orbi_dev_button,
 )
 from src.core.config import get_settings
 from src.core.i18n import t
+from src.orbi_dev.access import can_use_orbi_dev
 
 logger = logging.getLogger("orbi.handlers.menu")
 
@@ -71,7 +73,19 @@ async def send_or_edit_menu(update: Update, context: ContextTypes.DEFAULT_TYPE, 
 
 
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Affiche le menu principal avec le logo."""
+    """
+    « Accueil ». Pour un administrateur, c'est Orbi Dev (état des tâches, nouvelle tâche) ; les autres modules sont
+    derrière « Plus ». Les autres utilisateurs gardent le menu des modules.
+    """
+    if can_use_orbi_dev((context.user_data or {}).get("db_user")):
+        from src.handlers.dev_hub import show_home
+        await show_home(update, context)
+        return
+    await show_modules_menu(update, context)
+
+
+async def show_modules_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Menu des modules (Support, Productivité, Développeurs, Profil…) avec le logo."""
     if update.callback_query:
         await update.callback_query.answer()
 
@@ -183,6 +197,7 @@ async def show_developers_menu(update: Update, context: ContextTypes.DEFAULT_TYP
 def register_menu_handlers(application) -> None:
     """Enregistre les handlers de navigation du menu principal."""
     application.add_handler(CallbackQueryHandler(show_main_menu, pattern=f"^{CB_HOME}$"))
+    application.add_handler(CallbackQueryHandler(show_modules_menu, pattern=f"^{CB_MORE}$"))
     application.add_handler(CallbackQueryHandler(show_support_menu, pattern=f"^{CB_MODULE_SUPPORT}$"))
     application.add_handler(CallbackQueryHandler(show_productivity_menu, pattern=f"^{CB_MODULE_PRODUCTIVITY}$"))
     application.add_handler(CallbackQueryHandler(show_developers_menu, pattern=f"^{CB_MODULE_DEVELOPERS}$"))

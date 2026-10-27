@@ -14,6 +14,7 @@ from beanie import Document, Indexed
 from pydantic import BaseModel, Field, field_validator
 from pymongo import ASCENDING, IndexModel
 
+from src.orbi_dev.inputs import MAX_NAME, parse_name, valid_branch
 from src.orbi_dev.state import ExecutionStatus
 
 
@@ -28,6 +29,21 @@ class Project(Document):
     default_branch: str = Field(default="", max_length=100)  # "" = branche par défaut du dépôt, choisie par le fournisseur
     is_archived: bool = False
     created_at: datetime = Field(default_factory=_now)
+
+    @field_validator("name")
+    @classmethod
+    def _readable_name(cls, v: str) -> str:
+        cleaned = parse_name(v)
+        if cleaned is None:
+            raise ValueError(f"le nom tient sur une ligne de {MAX_NAME} caractères au plus")
+        return cleaned
+
+    @field_validator("default_branch")
+    @classmethod
+    def _branch_name(cls, v: str) -> str:
+        if v and not valid_branch(v):
+            raise ValueError("nom de branche invalide")
+        return v
 
     @field_validator("repo_url")
     @classmethod
@@ -121,6 +137,11 @@ class Execution(Document):
     version: int = 0  # incrémenté à chaque transition (contrôle de concurrence)
     notified_status: str | None = None  # dernier état signalé au propriétaire sur Telegram (voir notifier.py)
     notify_attempts: int = 0
+    # Carte de suivi dans Telegram : un message unique, édité à chaque changement d'état (voir cards.py)
+    card_chat_id: int | None = None
+    card_message_id: int | None = None
+    card_status: str | None = None
+    card_attempts: int = 0
     event_seq: int = 0
     poll_count: int = 0
     last_polled_at: datetime | None = None

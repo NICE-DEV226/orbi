@@ -16,7 +16,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 
 from pymongo import ReturnDocument
-from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, ReplyParameters, WebAppInfo
 from telegram.error import Forbidden, TelegramError
 
 from src.core.config import get_settings
@@ -24,7 +24,9 @@ from src.core.text import esc
 from src.models.user import NotificationPreferences, User
 from src.orbi_dev import service
 from src.orbi_dev.access import can_use_orbi_dev
+from src.orbi_dev.look import EXTERNAL, PRIMARY, REFRESH, quote
 from src.orbi_dev.models import Execution
+from src.orbi_dev.present import STATUS_ICON, STATUS_INFO
 from src.orbi_dev.state import ExecutionStatus
 
 logger = logging.getLogger("orbi.dev.notifier")
@@ -41,10 +43,7 @@ CB_RETRY = "devx:retry:"
 CB_CHECK = "devx:check:"
 
 _HEADLINES: dict[ExecutionStatus, str] = {
-    S.SUCCEEDED: "✅ <b>Terminé</b>",
-    S.FAILED: "❌ <b>Échec</b>",
-    S.TIMED_OUT: "⏱ <b>Trop long</b>",
-    S.NEEDS_ATTENTION: "⚠️ <b>À vérifier</b>",
+    status: f"{STATUS_ICON[status]} <b>{STATUS_INFO[status][0]}</b>" for status in NOTIFY_STATUSES
 }
 _FALLBACK_DETAIL: dict[ExecutionStatus, str] = {
     S.FAILED: "L'agent n'a pas abouti.",
@@ -53,7 +52,7 @@ _FALLBACK_DETAIL: dict[ExecutionStatus, str] = {
 }
 
 
-def _first_line(text: str, limit: int) -> str:
+def first_line(text: str, limit: int) -> str:
     line = text.strip().splitlines()[0] if text.strip() else ""
     return line if len(line) <= limit else line[: limit - 1] + "…"
 
@@ -62,10 +61,12 @@ def build_text(execution: Execution, prompt: str, project: str) -> str:
     """Message d'annonce (HTML Telegram : tout texte venant de l'extérieur est échappé)."""
     status = ExecutionStatus(execution.status)
     detail = execution.result_summary if status == S.SUCCEEDED else execution.error_message
-    detail = _first_line(detail or "", 300) or _FALLBACK_DETAIL.get(status, "")
-    lines = [f"{_HEADLINES[status]} · {esc(project)}", esc(_first_line(prompt, 120))]
+    detail = first_line(detail or "", 300) or _FALLBACK_DETAIL.get(status, "")
+    lines = [f"{_HEADLINES[status]}  ·  <b>{esc(project)}</b>"]
+    if prompt:
+        lines += ["", quote(esc(first_line(prompt, 120)), expandable=False)]
     if detail:
-        lines += ["", esc(detail)]
+        lines.append(esc(detail))
     return "\n".join(lines)
 
 
@@ -80,20 +81,22 @@ def build_keyboard(execution: Execution, *, with_action: bool = True) -> InlineK
     top: list[InlineKeyboardButton] = []
     if settings.public_https:
         url = f"{settings.BASE_URL.rstrip('/')}/dev/executions/{execution.id}"
-        top.append(InlineKeyboardButton("📱 Ouvrir", web_app=WebAppInfo(url=url)))
+        top.append(InlineKeyboardButton("Ouvrir", web_app=WebAppInfo(url=url)))
     pr = _safe_https(execution.pr_url)
     if pr:
-        top.append(InlineKeyboardButton("🔀 Voir la PR", url=pr))
+        top.append(InlineKeyboardButton(f"Voir la PR {EXTERNAL}", url=pr))
     provider = _safe_https(execution.external_url)
     if provider and status == S.NEEDS_ATTENTION:
-        top.append(InlineKeyboardButton("↗ Ouvrir chez le fournisseur", url=provider))
+        top.append(InlineKeyboardButton(f"Ouvrir chez le fournisseur {EXTERNAL}", url=provider))
     rows = [top] if top else []
     if not with_action:
         pass
     elif status in (S.FAILED, S.TIMED_OUT):
-        rows.append([InlineKeyboardButton("🔁 Réessayer", callback_data=f"{CB_RETRY}{execution.id}")])
+        rows.append([InlineKeyboardButton(f"{REFRESH} Réessayer", callback_data=f"{CB_RETRY}{execution.id}", style=PRIMARY)])
     elif status == S.NEEDS_ATTENTION:
-        rows.append([InlineKeyboardButton("🔄 Vérifier maintenant", callback_data=f"{CB_CHECK}{execution.id}")])
+        rows.append([InlineKeyboardButton(f"{REFRESH} Vérifier maintenant", callback_data=f"{CB_CHECK}{execution.id}")])
+    elif status in (S.QUEUED, S.RUNNING, S.CANCEL_REQUESTED):
+        rows.append([InlineKeyboardButton(f"{REFRESH} Actualiser", callback_data=f"{CB_CHECK}{execution.id}")])
     return InlineKeyboardMarkup(rows) if rows else None
 
 
@@ -126,10 +129,14 @@ async def _announce(bot: Bot, execution: Execution) -> str:
         prompt = task.prompt
     except service.NotFoundError:
         project, prompt = "projet supprimé", ""
+    # En réponse à la carte de suivi quand il y en a une : l'alerte reste liée à sa tâche
+    reply = {}
+    if execution.card_message_id:
+        reply["reply_parameters"] = ReplyParameters(message_id=execution.card_message_id, allow_sending_without_reply=True)
     try:
         await bot.send_message(
             chat_id=execution.owner_id, text=build_text(execution, prompt, project),
-            reply_markup=build_keyboard(execution),
+            reply_markup=build_keyboard(execution), **reply,
         )
     except Forbidden:
         logger.info("Notification Orbi Dev non remise : l'utilisateur %s a bloqué le bot", execution.owner_id)

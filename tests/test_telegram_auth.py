@@ -317,17 +317,16 @@ class TestBotEntryPoints:
         await web_command(update, _context(User(telegram_id=2, first_name="U")))
         assert "réservé" in update.effective_message.reply_text.call_args.args[0]
 
-    async def test_mini_app_button_only_for_admins_and_only_on_https(self, monkeypatch):
-        from src.bot.keyboards import main_menu_keyboard
+    async def test_mini_app_buttons_of_orbi_dev_only_on_https(self, monkeypatch):
+        from src.handlers.dev_hub.common import web_button
+        from src.handlers.dev_hub.home import connections_button
 
-        def web_apps(admin):
-            return [b.web_app.url for row in main_menu_keyboard("fr", is_admin=admin).inline_keyboard for b in row if b.web_app]
-
-        assert web_apps(True) == []  # BASE_URL http://localhost : Telegram refuserait
+        assert web_button("Application", "/dev/") is None  # BASE_URL http://localhost : Telegram refuserait
+        assert connections_button().callback_data == "dv:conn"  # repli : l'écran qui explique /web
         monkeypatch.setenv("BASE_URL", "https://orbi.example.org")
         get_settings.cache_clear()
-        assert web_apps(True) == ["https://orbi.example.org/dev/"]
-        assert web_apps(False) == []
+        assert web_button("Application", "/dev/").web_app.url == "https://orbi.example.org/dev/"
+        assert connections_button().web_app.url == "https://orbi.example.org/dev/integrations"
 
     async def test_admin_menu_has_an_administration_entry_non_admin_does_not(self):
         from src.bot.keyboards import main_menu_keyboard
