@@ -39,6 +39,7 @@ class Chat:
         self.context = MagicMock()
         self.context.user_data = {"db_user": user}
         self.context.args = []
+        self.context.bot.set_my_commands = AsyncMock()
         self.context.application.create_task = self._launch
         self.shown: list[str] = []
         self.markups: list = []
@@ -142,7 +143,7 @@ class TestHome:
     async def test_empty_account_gets_a_checklist(self):
         chat = Chat(await admin(1))
         await chat.press(dev_hub.show_home, "dv:home")
-        assert "Pour commencer" in chat.last
+        assert "Connecter un fournisseur" in chat.last
         assert chat.last.count("⬜") == 3
         assert "dv:newrepo" in chat.last_data()
 
@@ -150,7 +151,7 @@ class TestHome:
         await service.create_integration(1, "fake", "k")
         chat = Chat(await admin(1))
         await chat.press(dev_hub.show_home, "dv:home")
-        assert "✅ Connecter un fournisseur" in chat.last and "⬜ Ajouter un dépôt" in chat.last
+        assert "✅ Connecter un fournisseur" in chat.last and "⬜ <b>Ajouter un dépôt</b>" in chat.last  # l'étape suivante ressort
 
     async def test_board_counts_active_and_attention_runs(self):
         await setup_workspace(1)
@@ -162,7 +163,7 @@ class TestHome:
             await Execution.get_pymongo_collection().update_one({"_id": ex.id}, {"$set": {"status": status.value}})
         chat = Chat(await admin_user(1))
         await chat.press(dev_hub.show_home, "dv:home")
-        assert "1 en cours" in chat.last and "1 à vérifier" in chat.last
+        assert "<b>1</b> en cours" in chat.last and "<b>1</b> à vérifier" in chat.last
         assert "tâche succeeded" in chat.last
         assert {"dv:new", "dv:list", "dv:projects", "nav:more"} <= set(chat.last_data())
 
@@ -318,7 +319,7 @@ class TestAddRepo:
         await service.create_integration(1, "fake", "k")
         chat = Chat(await admin_user(1))
         await chat.press(dev_hub.start_task, "dv:new")
-        assert "Pour commencer" in chat.last
+        assert "Ajouter un dépôt" in chat.last  # pas de dépôt : retour à la liste « pour commencer »
         await chat.press(dev_hub.ask_repo_for_task, "dv:newrepo")
         assert "Quel dépôt" in chat.last
         await chat.say(dev_hub.on_text, "https://github.com/acme/demo")
@@ -490,3 +491,66 @@ class TestMenus:
         chat = Chat(await admin(1))
         await chat.press(menu.show_main_menu, "nav:home")
         assert "Orbi Dev" in chat.last
+
+
+def styles(chat: Chat) -> dict[str, str | None]:
+    return {b.text: b.api_kwargs.get("style") or getattr(b, "style", None)
+            for row in chat.markups[-1].inline_keyboard for b in row}
+
+
+class TestLook:
+    """Un seul bouton coloré par écran : celui qu'on attend de l'utilisateur."""
+
+    async def test_home_has_one_primary_button(self):
+        await setup_workspace(1)
+        chat = Chat(await admin_user(1))
+        await chat.press(dev_hub.show_home, "dv:home")
+        colored = {t: s for t, s in styles(chat).items() if s}
+        assert colored == {"✏️ Nouvelle tâche": "primary"}
+
+    async def test_launch_is_green_and_cancel_is_neutral(self):
+        await setup_workspace(1)
+        chat = Chat(await admin_user(1))
+        await chat.press(dev_hub.start_task, "dv:new")
+        await chat.say(dev_hub.on_text, "Fais ceci")
+        colored = {t: s for t, s in styles(chat).items() if s}
+        assert colored == {"▶️ Lancer": "success"}
+
+    async def test_instruction_is_quoted_and_long_ones_fold(self):
+        await setup_workspace(1)
+        chat = Chat(await admin_user(1))
+        await chat.press(dev_hub.start_task, "dv:new")
+        await chat.say(dev_hub.on_text, "court")
+        assert "<blockquote>court</blockquote>" in chat.last
+        await chat.press(dev_hub.edit_prompt, "dv:edit")
+        await chat.say(dev_hub.on_text, "long " * 80)
+        assert "<blockquote expandable>" in chat.last
+
+    async def test_card_shows_progress_and_quotes_the_instruction(self):
+        await admin(1)
+        ex = await run_with_card(ExecutionStatus.QUEUED)
+        for status, bar in ((ExecutionStatus.QUEUED, "▰▱▱"), (ExecutionStatus.RUNNING, "▰▰▱"),
+                            (ExecutionStatus.SUCCEEDED, "▰▰▰"), (ExecutionStatus.FAILED, "▰▰✕")):
+            ex = await run_with_card_status(ex, status)
+            text, _ = await cards.render(ex)
+            assert bar in text and "<blockquote>Ajoute un test</blockquote>" in text
+
+    async def test_retry_is_the_only_colored_button_of_an_alert(self):
+        from src.orbi_dev import notifier
+
+        await admin(1)
+        ex = await run_with_card(ExecutionStatus.FAILED)
+        keyboard = notifier.build_keyboard(ex)
+        colored = {b.text: getattr(b, "style", None) for row in keyboard.inline_keyboard for b in row if getattr(b, "style", None)}
+        assert colored == {"🔁 Réessayer": "primary"}
+
+    async def test_admin_gets_a_command_menu_on_start(self):
+        await setup_workspace(1)
+        chat = Chat(await admin_user(1))
+        await chat.say(dev_hub.show_home, "/start")
+        sent = chat.context.bot.set_my_commands.await_args
+        assert [c.command for c in sent.args[0]] == ["start", "task", "tasks", "web"]
+        assert sent.kwargs["scope"].chat_id == 1
+        chat.context.bot.set_my_commands.reset_mock()
+        await chat.press(dev_hub.show_home, "dv:home")  # un simple bouton ne rappelle pas Telegram
+        chat.context.bot.set_my_commands.assert_not_awaited()

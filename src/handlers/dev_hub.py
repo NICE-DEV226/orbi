@@ -13,7 +13,8 @@ données de celui qui appuie : le service filtre toujours par propriétaire.
 import logging
 import time
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppInfo
+from telegram import BotCommand, BotCommandScopeChat, InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppInfo
+from telegram.error import TelegramError
 from telegram.ext import CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
 
 from src.bot.keyboards import CB_DEV_HOME, CB_MORE
@@ -22,6 +23,7 @@ from src.core.config import get_settings
 from src.core.text import esc
 from src.orbi_dev import cards, runner, service
 from src.orbi_dev.access import can_use_orbi_dev
+from src.orbi_dev.look import PRIMARY, SUCCESS, btn, quote
 from src.orbi_dev.models import Execution, IntegrationStatus, Project, Task
 from src.orbi_dev.notifier import build_keyboard, first_line
 from src.orbi_dev.present import STATUS_EMOJI, STATUS_INFO, ago, provider_name
@@ -49,6 +51,14 @@ MAX_PROMPT = 8000
 DRAFT_TTL = 15 * 60
 RECENT = 4
 LIST_SIZE = 8
+
+# Menu « / » du champ de saisie, réservé aux administrateurs (les autres ne voient pas des commandes inutilisables)
+ADMIN_COMMANDS = [
+    BotCommand("start", "Accueil Orbi Dev"),
+    BotCommand("task", "Lancer une tâche : /task votre consigne"),
+    BotCommand("tasks", "Voir vos tâches"),
+    BotCommand("web", "Lien vers l'application web"),
+]
 
 NOT_ALLOWED = "🔒 Orbi Dev est réservé aux administrateurs pour l'instant."
 
@@ -95,20 +105,20 @@ async def _show(update: Update, text: str, markup: InlineKeyboardMarkup | None =
         await update.effective_message.reply_text(text, reply_markup=markup)
 
 
-def _button(label: str, data: str) -> InlineKeyboardButton:
-    return InlineKeyboardButton(label, callback_data=data)
+def _button(label: str, data: str, style: str | None = None) -> InlineKeyboardButton:
+    return btn(label, data, style=style)
 
 
-def _web_button(label: str, path: str) -> InlineKeyboardButton | None:
+def _web_button(label: str, path: str, style: str | None = None) -> InlineKeyboardButton | None:
     """Ouvre une page de l'application web comme Mini App (Telegram exige une URL https publique)."""
     settings = get_settings()
     if not settings.public_https:
         return None
-    return InlineKeyboardButton(label, web_app=WebAppInfo(url=f"{settings.BASE_URL.rstrip('/')}{path}"))
+    return InlineKeyboardButton(label, web_app=WebAppInfo(url=f"{settings.BASE_URL.rstrip('/')}{path}"), style=style)
 
 
-def _connections_button() -> InlineKeyboardButton:
-    return _web_button("🔑 Connexions", "/dev/integrations") or _button("🔑 Connexions", CB_CONNECTIONS)
+def _connections_button(style: str | None = None) -> InlineKeyboardButton:
+    return _web_button("🔑 Connexions", "/dev/integrations", style) or _button("🔑 Connexions", CB_CONNECTIONS, style)
 
 
 def _home_button() -> InlineKeyboardButton:
@@ -138,7 +148,10 @@ async def _recent_runs(owner: int, limit: int) -> list[tuple[Task, Execution, st
 
 def _run_line(task: Task, execution: Execution, project: str) -> str:
     emoji = STATUS_EMOJI[execution.status]
-    return f"{emoji} <b>{esc(project)}</b> · {esc(first_line(task.prompt, 40))} · {ago(execution.updated_at)}"
+    return (
+        f"{emoji} <b>{esc(project)}</b>  {esc(first_line(task.prompt, 36))}\n"
+        f"      <i>{STATUS_INFO[execution.status][0]} · {ago(execution.updated_at)}</i>"
+    )
 
 
 async def build_home(owner: int) -> tuple[str, InlineKeyboardMarkup]:
@@ -146,22 +159,23 @@ async def build_home(owner: int) -> tuple[str, InlineKeyboardMarkup]:
     providers = await _active_providers(owner)
 
     if not providers or not projects:
-        text = "\n".join([
-            "🤖 <b>Orbi Dev</b>",
-            "Confiez des tâches de code à un agent depuis Telegram.",
-            "",
-            "<b>Pour commencer</b>",
-            f"{'✅' if providers else '⬜'} Connecter un fournisseur (Jules ou Cursor)",
-            f"{'✅' if projects else '⬜'} Ajouter un dépôt",
-            "⬜ Lancer une première tâche",
-        ])
+        steps = [
+            (bool(providers), "Connecter un fournisseur", "Jules ou Cursor"),
+            (bool(projects), "Ajouter un dépôt", "l'adresse GitHub suffit"),
+        ]
+        lines = ["🤖 <b>Orbi Dev</b>", "<i>Confiez des tâches de code à un agent, depuis Telegram.</i>", ""]
+        next_step = next((i for i, (done, _, _) in enumerate(steps) if not done), len(steps))
+        for i, (done, title, hint) in enumerate(steps + [(False, "Lancer une première tâche", "en une phrase")]):
+            mark = "✅" if done else "⬜"
+            lines.append(f"{mark} <b>{title}</b>  <i>{hint}</i>" if i == next_step else f"{mark} {title}")
+        text = "\n".join(lines)
         rows = []
         if not providers:
-            rows.append([_connections_button()])
+            rows.append([_connections_button(PRIMARY)])
         if not projects:
-            rows.append([_button("📁 Ajouter un dépôt", CB_NEW_REPO)])
+            rows.append([_button("📁 Ajouter un dépôt", CB_NEW_REPO, PRIMARY if providers else None)])
         elif providers:
-            rows.append([_button("✏️ Nouvelle tâche", CB_NEW)])
+            rows.append([_button("✏️ Nouvelle tâche", CB_NEW, PRIMARY)])
         rows.append([_button("⋯ Plus", CB_MORE)])
         return text, InlineKeyboardMarkup(rows)
 
@@ -169,21 +183,24 @@ async def build_home(owner: int) -> tuple[str, InlineKeyboardMarkup]:
     groups = [STATUS_INFO[e.status][3] for _, e, _ in runs]
     active, attention = groups.count("active"), groups.count("attention")
     if active or attention:
-        parts = ([f"🔄 {active} en cours"] if active else []) + ([f"⚠️ {attention} à vérifier"] if attention else [])
-        headline = " · ".join(parts)
+        parts = ([f"🔄 <b>{active}</b> en cours"] if active else []) + (
+            [f"⚠️ <b>{attention}</b> à vérifier"] if attention else []
+        )
+        headline = "    ".join(parts)
     else:
-        headline = "Rien en cours."
-    lines = ["🤖 <b>Orbi Dev</b>", headline]
+        headline = "😌 Rien en cours."
+    lines = ["🤖 <b>Orbi Dev</b>", "", headline]
     if runs:
         lines += ["", "<b>Récentes</b>"] + [_run_line(*run) for run in runs]
     else:
-        lines += ["", "Aucune tâche pour l'instant : écrivez <code>/task</code> suivi de votre consigne."]
+        lines += ["", "<i>Aucune tâche pour l'instant. Écrivez </i><code>/task</code><i> suivi de votre consigne.</i>"]
 
     app = _web_button("📱 Application", "/dev/")
     rows = [
-        [_button("✏️ Nouvelle tâche", CB_NEW), _button("📋 Mes tâches", CB_LIST)],
-        [_button("📁 Projets", CB_PROJECTS), _connections_button()],
-        ([app] if app else []) + [_button("⋯ Plus", CB_MORE)],
+        [_button("✏️ Nouvelle tâche", CB_NEW, PRIMARY)],
+        [_button("📋 Tâches", CB_LIST), _button("📁 Projets", CB_PROJECTS)],
+        [_connections_button()] + ([app] if app else []),
+        [_button("⋯ Plus", CB_MORE)],
     ]
     return "\n".join(lines), InlineKeyboardMarkup(rows)
 
@@ -192,11 +209,20 @@ async def build_home(owner: int) -> tuple[str, InlineKeyboardMarkup]:
 # Écrans de consultation
 # ─────────────────────────────────────
 
+async def _sync_commands(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -> None:
+    try:
+        await context.bot.set_my_commands(ADMIN_COMMANDS, scope=BotCommandScopeChat(chat_id))
+    except TelegramError as error:  # un confort : ne jamais empêcher l'accueil de s'afficher
+        logger.warning("Menu des commandes non mis à jour : %s", error)
+
+
 async def show_home(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     owner = await _authorize(update, context)
     if owner is None:
         return
     _clear(context)
+    if update.callback_query is None:  # une commande tapée : bon moment pour afficher le menu des commandes
+        await _sync_commands(context, update.effective_chat.id if update.effective_chat else owner)
     await _show(update, *await build_home(owner))
 
 
@@ -205,8 +231,8 @@ async def show_connections(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if await _authorize(update, context) is None:
         return
     text = (
-        "🔑 <b>Connexions</b>\n"
-        "Les clés d'API se saisissent dans l'application web, jamais dans ce chat.\n\n"
+        "🔑 <b>Connexions</b>\n\n"
+        "Les clés d'API se saisissent dans l'application web, <b>jamais dans ce chat</b>.\n\n"
         "Envoyez /web pour recevoir votre lien de connexion, puis ouvrez <b>Connexions</b>."
     )
     await _show(update, text, InlineKeyboardMarkup([[_home_button()]]))
@@ -218,10 +244,10 @@ async def show_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     runs = await _recent_runs(owner, LIST_SIZE)
     if not runs:
-        text = "📋 <b>Mes tâches</b>\nAucune tâche pour l'instant."
-        rows = [[_button("✏️ Nouvelle tâche", CB_NEW)], [_home_button()]]
+        text = "📋 <b>Tâches</b>\n\n<i>Aucune tâche pour l'instant.</i>"
+        rows = [[_button("✏️ Nouvelle tâche", CB_NEW, PRIMARY)], [_home_button()]]
     else:
-        text = "📋 <b>Mes tâches</b>\nAppuyez sur une tâche pour la suivre."
+        text = "📋 <b>Tâches</b>\n\n<i>Appuyez sur une tâche pour la suivre.</i>"
         rows = [
             [_button(f"{STATUS_EMOJI[e.status]} {project} · {first_line(t.prompt, 28)}", f"{CB_OPEN}{e.id}")]
             for t, e, project in runs
@@ -242,7 +268,7 @@ async def show_execution(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     text, _ = await cards.render(execution)
     keyboard = build_keyboard(execution)
     rows = [list(row) for row in keyboard.inline_keyboard] if keyboard else []
-    rows.append([_button("← Mes tâches", CB_LIST)])
+    rows.append([_button("← Tâches", CB_LIST)])
     await _show(update, text, InlineKeyboardMarkup(rows))
 
 
@@ -251,11 +277,11 @@ async def show_projects(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if owner is None:
         return
     projects = await service.list_projects(owner)
-    lines = ["📁 <b>Projets</b>"]
-    lines += [f"• <b>{esc(p.name)}</b> · {esc(p.repo_url.removeprefix('https://'))}" for p in projects] or [
-        "Aucun dépôt pour l'instant."
+    lines = ["📁 <b>Projets</b>", ""]
+    lines += [f"<b>{esc(p.name)}</b>\n<code>{esc(p.repo_url.removeprefix('https://'))}</code>" for p in projects] or [
+        "<i>Aucun dépôt pour l'instant.</i>"
     ]
-    rows = [[_button("➕ Ajouter un dépôt", CB_ADD_PROJECT)], [_home_button()]]
+    rows = [[_button("➕ Ajouter un dépôt", CB_ADD_PROJECT, PRIMARY)], [_home_button()]]
     await _show(update, "\n".join(lines), InlineKeyboardMarkup(rows))
 
 
@@ -272,8 +298,9 @@ async def _ask_repo(update: Update, context: ContextTypes.DEFAULT_TYPE, *, then_
     draft.clear()
     draft.update(step="repo", then_task=then_task, at=time.monotonic())
     text = (
-        "📁 <b>Quel dépôt ?</b>\n"
-        "Collez son adresse GitHub, par exemple <code>https://github.com/vous/projet</code> "
+        "📁 <b>Quel dépôt ?</b>\n\n"
+        "Collez son adresse GitHub :\n"
+        "<code>https://github.com/vous/projet</code>\n"
         "ou simplement <code>vous/projet</code>."
     )
     await _show(update, text, _cancel_markup())
@@ -333,8 +360,12 @@ async def _advance(update: Update, context: ContextTypes.DEFAULT_TYPE, owner: in
         else:
             last_project, _ = await _last_used(owner)
             ordered = sorted(projects, key=lambda p: str(p.id) != last_project)
-            rows = [[_button(f"📁 {p.name}", f"{CB_PICK_PROJECT}{p.id}")] for p in ordered]
-            await _show(update, "📁 <b>Quel projet ?</b>", _choice_markup(rows, [_button("➕ Autre dépôt", CB_NEW_REPO)]))
+            rows = [
+                [_button(f"📁 {p.name}", f"{CB_PICK_PROJECT}{p.id}", PRIMARY if n == 0 else None)]
+                for n, p in enumerate(ordered)
+            ]
+            text = "📁 <b>Quel projet ?</b>\n\n<i>Le dernier utilisé est en premier.</i>"
+            await _show(update, text, _choice_markup(rows, [_button("➕ Autre dépôt", CB_NEW_REPO)]))
             return
 
     if "integration_id" not in draft:
@@ -344,7 +375,9 @@ async def _advance(update: Update, context: ContextTypes.DEFAULT_TYPE, owner: in
             _, last_integration = await _last_used(owner)
             ordered = sorted(providers, key=lambda i: str(i.id) != last_integration)
             rows = [
-                [_button(f"🤖 {i.label or provider_name(i.provider)}", f"{CB_PICK_PROVIDER}{i.id}")] for i in ordered
+                [_button(f"🤖 {i.label or provider_name(i.provider)}", f"{CB_PICK_PROVIDER}{i.id}",
+                         PRIMARY if n == 0 else None)]
+                for n, i in enumerate(ordered)
             ]
             await _show(update, "🤖 <b>Quel fournisseur ?</b>", _choice_markup(rows))
             return
@@ -353,7 +386,10 @@ async def _advance(update: Update, context: ContextTypes.DEFAULT_TYPE, owner: in
         draft["step"] = "prompt"
         project = next((p for p in projects if str(p.id) == draft["project_id"]), None)
         name = esc(project.name) if project else "ce projet"
-        text = f"✏️ <b>Que faut-il faire sur {name} ?</b>\nDécrivez la tâche en un message."
+        text = (
+            f"✏️ <b>Que faut-il faire sur {name} ?</b>\n\n"
+            "Décrivez la tâche en un message.\n<i>Plus c'est précis (fichier, comportement attendu), meilleur est le résultat.</i>"
+        )
         await _show(update, text, _cancel_markup())
         return
 
@@ -368,13 +404,17 @@ async def _advance(update: Update, context: ContextTypes.DEFAULT_TYPE, owner: in
     shown = prompt if len(prompt) <= 1500 else prompt[:1499] + "…"
     text = (
         "▶️ <b>Lancer cette tâche ?</b>\n\n"
-        f"📁 {esc(project.name)} · 🤖 {esc(provider.label or provider_name(provider.provider))}\n\n"
-        f"{esc(shown)}"
+        f"📁 <b>{esc(project.name)}</b>    🤖 {esc(provider.label or provider_name(provider.provider))}\n\n"
+        f"{quote(esc(shown))}"
     )
     change = [_button("📁 Projet", CB_CHANGE_PROJECT)]
     if len(providers) > 1:
         change.append(_button("🤖 Fournisseur", CB_CHANGE_PROVIDER))
-    rows = [[_button("▶️ Lancer", CB_GO)], [_button("✏️ Modifier", CB_EDIT)] + change, [_button("Annuler", CB_DISCARD)]]
+    rows = [
+        [_button("▶️ Lancer", CB_GO, SUCCESS)],
+        [_button("✏️ Modifier", CB_EDIT)] + change,
+        [_button("Annuler", CB_DISCARD)],
+    ]
     await _show(update, text, InlineKeyboardMarkup(rows))
 
 
@@ -522,8 +562,8 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         project, known = await _add_project(owner, text)
         if project is None:
             await update.message.reply_text(
-                "Je n'ai pas reconnu ce dépôt. Collez l'adresse de sa page GitHub "
-                "(<code>https://github.com/vous/projet</code>) ou <code>vous/projet</code>.",
+                "🤔 <b>Je n'ai pas reconnu ce dépôt.</b>\n\nCollez l'adresse de sa page GitHub :\n"
+                "<code>https://github.com/vous/projet</code>\nou <code>vous/projet</code>.",
                 reply_markup=_cancel_markup(),
             )
             return
@@ -536,13 +576,14 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         note = "déjà dans vos projets" if known else "ajouté"
         await update.message.reply_text(
             f"✅ <b>{esc(project.name)}</b> {note}.",
-            reply_markup=InlineKeyboardMarkup([[_button("✏️ Nouvelle tâche", CB_NEW)], [_home_button()]]),
+            reply_markup=InlineKeyboardMarkup([[_button("✏️ Nouvelle tâche", CB_NEW, PRIMARY)], [_home_button()]]),
         )
         return
 
     if not text or len(text) > MAX_PROMPT:
         await update.message.reply_text(
-            f"Décrivez la tâche en {MAX_PROMPT} caractères au plus ({len(text)} reçus).", reply_markup=_cancel_markup()
+            f"✂️ <b>Trop long.</b> Décrivez la tâche en {MAX_PROMPT} caractères au plus ({len(text)} reçus).",
+            reply_markup=_cancel_markup(),
         )
         return
     draft["prompt"] = text

@@ -19,6 +19,7 @@ from telegram.error import BadRequest, Forbidden, TelegramError
 
 from src.core.text import esc
 from src.orbi_dev import service
+from src.orbi_dev.look import progress, quote
 from src.orbi_dev.models import Execution
 from src.orbi_dev.notifier import build_keyboard, first_line
 from src.orbi_dev.present import STATUS_EMOJI, STATUS_INFO, ago, provider_name
@@ -35,17 +36,21 @@ def render_text(execution: Execution, prompt: str, project: str) -> str:
     """Texte de la carte (HTML Telegram : tout ce qui vient de l'extérieur est échappé)."""
     status = ExecutionStatus(execution.status)
     label, sentence, _tone, _group = STATUS_INFO[status]
-    lines = [f"{STATUS_EMOJI[status]} <b>{label}</b> · {esc(project)}", esc(first_line(prompt, 120))]
     if status == ExecutionStatus.SUCCEEDED:
         detail = first_line(execution.result_summary or "", 300)
     elif is_terminal(status) or status == ExecutionStatus.NEEDS_ATTENTION:
         detail = first_line(execution.error_message or "", 300) or sentence
     else:
         detail = sentence
+    lines = [
+        f"{STATUS_EMOJI[status]} <b>{label}</b>  {progress(status)}",
+        f"<b>{esc(project)}</b> · {esc(provider_name(execution.provider))}",
+        "",
+        quote(esc(first_line(prompt, 160)), expandable=False),
+    ]
     if detail:
-        lines += ["", esc(detail)]
-    since = ago(execution.created_at)
-    lines += ["", f"<i>{esc(provider_name(execution.provider))} · tentative {execution.attempt} · lancée {since}</i>"]
+        lines.append(esc(detail))
+    lines += ["", f"<i>Lancée {ago(execution.created_at)} · tentative {execution.attempt}</i>"]
     return "\n".join(lines)
 
 

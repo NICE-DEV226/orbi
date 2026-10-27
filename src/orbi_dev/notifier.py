@@ -24,6 +24,7 @@ from src.core.text import esc
 from src.models.user import NotificationPreferences, User
 from src.orbi_dev import service
 from src.orbi_dev.access import can_use_orbi_dev
+from src.orbi_dev.look import PRIMARY, quote
 from src.orbi_dev.models import Execution
 from src.orbi_dev.state import ExecutionStatus
 
@@ -63,9 +64,11 @@ def build_text(execution: Execution, prompt: str, project: str) -> str:
     status = ExecutionStatus(execution.status)
     detail = execution.result_summary if status == S.SUCCEEDED else execution.error_message
     detail = first_line(detail or "", 300) or _FALLBACK_DETAIL.get(status, "")
-    lines = [f"{_HEADLINES[status]} · {esc(project)}", esc(first_line(prompt, 120))]
+    lines = [f"{_HEADLINES[status]}  ·  <b>{esc(project)}</b>"]
+    if prompt:
+        lines += ["", quote(esc(first_line(prompt, 120)), expandable=False)]
     if detail:
-        lines += ["", esc(detail)]
+        lines.append(esc(detail))
     return "\n".join(lines)
 
 
@@ -91,7 +94,7 @@ def build_keyboard(execution: Execution, *, with_action: bool = True) -> InlineK
     if not with_action:
         pass
     elif status in (S.FAILED, S.TIMED_OUT):
-        rows.append([InlineKeyboardButton("🔁 Réessayer", callback_data=f"{CB_RETRY}{execution.id}")])
+        rows.append([InlineKeyboardButton("🔁 Réessayer", callback_data=f"{CB_RETRY}{execution.id}", style=PRIMARY)])
     elif status == S.NEEDS_ATTENTION:
         rows.append([InlineKeyboardButton("🔄 Vérifier maintenant", callback_data=f"{CB_CHECK}{execution.id}")])
     elif status in (S.QUEUED, S.RUNNING, S.CANCEL_REQUESTED):
