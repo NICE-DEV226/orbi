@@ -24,6 +24,7 @@ class NotificationPreferences(StrEnum):
     COMMUNITY_ANNOUNCEMENTS = "community_announcements"
     MORNING_BRIEF = "morning_brief"
     TASK_REMINDERS = "task_reminders"
+    DEV_RUNS = "dev_runs"  # fin d'une exécution Orbi Dev
 
 
 class User(Document):
@@ -53,6 +54,7 @@ class User(Document):
             NotificationPreferences.COMMUNITY_ANNOUNCEMENTS,
             NotificationPreferences.MORNING_BRIEF,
             NotificationPreferences.TASK_REMINDERS,
+            NotificationPreferences.DEV_RUNS,
         ]
     )
     morning_brief_hour: int = Field(default=9, ge=0, le=23)

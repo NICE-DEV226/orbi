@@ -44,6 +44,7 @@ Il est **désactivé par défaut** (`ENABLE_COMMUNITY=false`) : sa modération l
 2. Il enregistre un **projet** (URL https du dépôt) et connecte une **clé fournisseur** : elle est vérifiée, puis chiffrée (Fernet) dans une collection séparée, jamais réaffichée.
 3. Il crée une **tâche** : l'agent travaille sur une branche et propose une **pull request**. Rien n'est fusionné ni déployé automatiquement.
 4. L'exécution est suivie en arrière-plan ; l'état vit en base, donc recharger la page ou perdre la connexion ne perd rien et ne relance rien.
+5. Quand une exécution se termine, échoue, dépasse sa durée ou demande une vérification, le bot envoie **un message à son propriétaire seul** (une fois par état), avec les boutons Ouvrir, Voir la PR, Réessayer ou Vérifier. Réglage : Profil → Notifications.
 
 Garanties de conception ([ADR-0003](docs/adr/0003-durable-execution-model.md)) : identifiants durables créés avant tout appel réseau, lancement idempotent, résultat incertain réconcilié par lecture (jamais relancé à l'aveugle), retries bornés, transitions d'état validées et atomiques.
 

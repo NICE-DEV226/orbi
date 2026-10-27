@@ -58,9 +58,9 @@ async def init() -> None:
     logging.basicConfig(level=logging.INFO)
     await _connect_with_retry()
 
-    from src.orbi_dev.migrations import migrate_legacy_secrets
+    from src.orbi_dev.migrations import run_migrations
 
-    await migrate_legacy_secrets()
+    await run_migrations()
 
     admin_id = get_settings().ADMIN_CHAT_ID
     if not admin_id:
