@@ -6,6 +6,8 @@ Logique métier : création, mise à jour, SLA, compteur, CSAT.
 import logging
 from datetime import UTC, datetime, timedelta
 
+from beanie.operators import In
+
 from src.models.ticket import (
     SLA_SECONDS,
     Ticket,
@@ -38,7 +40,7 @@ async def count_open_tickets(telegram_id: int) -> int:
     """Compte les tickets ouverts d'un utilisateur."""
     return await Ticket.find(
         Ticket.user_telegram_id == telegram_id,
-        Ticket.status.is_in([TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.WAITING_USER]),  # type: ignore
+        In(Ticket.status, [TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.WAITING_USER]),
     ).count()
 
 
@@ -107,7 +109,7 @@ async def get_user_tickets(
     if status_filter:
         query = Ticket.find(
             Ticket.user_telegram_id == telegram_id,
-            Ticket.status.is_in(status_filter),  # type: ignore
+            In(Ticket.status, status_filter),
         )
 
     return await query.sort(-Ticket.created_at).limit(limit).to_list()
@@ -178,7 +180,7 @@ async def check_sla_breaches() -> list[Ticket]:
     """Vérifie les tickets dont le SLA est dépassé (pour APScheduler)."""
     now = datetime.now(UTC)
     breached = await Ticket.find(
-        Ticket.status.is_in([TicketStatus.OPEN, TicketStatus.IN_PROGRESS]),  # type: ignore
+        In(Ticket.status, [TicketStatus.OPEN, TicketStatus.IN_PROGRESS]),
         Ticket.sla_breached == False,  # noqa: E712
         Ticket.sla_deadline <= now,
     ).to_list()

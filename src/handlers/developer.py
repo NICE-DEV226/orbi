@@ -10,6 +10,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackQueryHandler, ContextTypes
 
 from src.bot.keyboards import CB_MODULE_DEVELOPERS
+from src.bot.screen import edit_screen
 from src.core.i18n import t
 from src.core.text import esc
 from src.models.user import User
@@ -67,7 +68,7 @@ async def show_github_events(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     text += f"   📌 <i>{esc(ev.payload_details['title'])} ({esc(ev.payload_details.get('state', ''))})</i>\n"
 
     buttons = [[InlineKeyboardButton(t("common.back", context.user_data.get("lang", "fr")), callback_data=CB_MODULE_DEVELOPERS)]]
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+    await edit_screen(query, text, reply_markup=InlineKeyboardMarkup(buttons))
 
 
 # ─────────────────────────────────────
@@ -111,7 +112,7 @@ async def show_infra_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         text += f"└ Mémoire utilisée : {redis_stats.get('used_memory_human')}\n"
 
     buttons = [[InlineKeyboardButton(t("common.back", context.user_data.get("lang", "fr")), callback_data=CB_MODULE_DEVELOPERS)]]
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+    await edit_screen(query, text, reply_markup=InlineKeyboardMarkup(buttons))
 
 
 # ─────────────────────────────────────
@@ -147,7 +148,7 @@ async def show_error_logs(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             buttons.append([InlineKeyboardButton(f"✅ Marquer résolu ({err.service})", callback_data=f"dev_err_resolve:{err.id}")])
 
     buttons.append([InlineKeyboardButton(t("common.back", context.user_data.get("lang", "fr")), callback_data=CB_MODULE_DEVELOPERS)])
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+    await edit_screen(query, text, reply_markup=InlineKeyboardMarkup(buttons))
 
 
 async def handle_error_resolve(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

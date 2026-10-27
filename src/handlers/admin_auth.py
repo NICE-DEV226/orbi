@@ -11,6 +11,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackQueryHandler, CommandHandler, ContextTypes, filters
 
 from src.bot.keyboards import orbi_dev_button
+from src.bot.screen import edit_screen
 from src.core.config import get_settings
 from src.core.i18n import t
 from src.core.redis import get_redis
@@ -44,7 +45,7 @@ async def request_magic_link(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not db_user or db_user.role not in ["admin", "superadmin"]:
         lang = context.user_data.get("lang", "fr")
         if update.callback_query:
-            await update.callback_query.edit_message_text("🚫 Accès réservé aux administrateurs")
+            await edit_screen(update.callback_query, "🚫 Accès réservé aux administrateurs")
         elif update.effective_message:
             await update.effective_message.reply_text("🚫 Accès réservé aux administrateurs")
         return
@@ -86,7 +87,7 @@ async def request_magic_link(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
 
     if update.callback_query:
-        await update.callback_query.edit_message_text(text, reply_markup=keyboard)
+        await edit_screen(update.callback_query, text, reply_markup=keyboard)
     else:
         await update.effective_message.reply_text(text, reply_markup=keyboard)
 
@@ -113,7 +114,7 @@ async def show_admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if not db_user or db_user.role not in ["admin", "superadmin"]:
         lang = context.user_data.get("lang", "fr")
         if update.callback_query:
-            await update.callback_query.edit_message_text("🚫 Accès réservé aux administrateurs")
+            await edit_screen(update.callback_query, "🚫 Accès réservé aux administrateurs")
         elif update.effective_message:
             await update.effective_message.reply_text("🚫 Accès réservé aux administrateurs")
         return
@@ -141,7 +142,7 @@ Que souhaitez-vous faire ?
     """
 
     if update.callback_query:
-        await update.callback_query.edit_message_text(text, reply_markup=keyboard)
+        await edit_screen(update.callback_query, text, reply_markup=keyboard)
     else:
         await update.effective_message.reply_text(text, reply_markup=keyboard)
 
@@ -200,7 +201,7 @@ async def show_admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     """
 
     if update.callback_query:
-        await update.callback_query.edit_message_text(text, reply_markup=keyboard)
+        await edit_screen(update.callback_query, text, reply_markup=keyboard)
     else:
         await update.effective_message.reply_text(text, reply_markup=keyboard)
 

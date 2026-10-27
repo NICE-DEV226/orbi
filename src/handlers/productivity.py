@@ -17,6 +17,7 @@ from telegram.ext import (
 )
 
 from src.bot.keyboards import CB_HOME, CB_MODULE_PRODUCTIVITY
+from src.bot.screen import edit_screen
 from src.core.i18n import t
 from src.core.text import esc
 from src.models.productivity import TaskPriority
@@ -88,7 +89,7 @@ async def show_focus(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             [InlineKeyboardButton(t("common.back", lang), callback_data=CB_MODULE_PRODUCTIVITY)],
         ]
 
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+    await edit_screen(query, text, reply_markup=InlineKeyboardMarkup(buttons))
 
 
 async def start_focus(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -145,7 +146,7 @@ async def show_tasks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     buttons.append([InlineKeyboardButton(t("productivity.add_task", lang), callback_data="prod:task_new")])
     buttons.append([InlineKeyboardButton(t("common.back", lang), callback_data=CB_MODULE_PRODUCTIVITY)])
 
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+    await edit_screen(query, text, reply_markup=InlineKeyboardMarkup(buttons))
 
 
 async def handle_task_toggle(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -184,7 +185,8 @@ async def start_task_creation(update: Update, context: ContextTypes.DEFAULT_TYPE
     lang = context.user_data.get("lang", "fr")
     msg = {"fr": "✏️ Entrez la description de la tâche :", "en": "✏️ Enter task description:", "ar": "✏️ أدخل وصف المهمة:"}
 
-    await query.edit_message_text(
+    await edit_screen(
+        query,
         msg.get(lang, msg["fr"]),
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton(t("common.cancel", lang), callback_data="prod_cancel")]
@@ -243,7 +245,7 @@ async def show_notes(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     buttons.append([InlineKeyboardButton(t("productivity.add_note", lang), callback_data="prod:note_new")])
     buttons.append([InlineKeyboardButton(t("common.back", lang), callback_data=CB_MODULE_PRODUCTIVITY)])
 
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+    await edit_screen(query, text, reply_markup=InlineKeyboardMarkup(buttons))
 
 
 async def start_note_creation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -256,7 +258,8 @@ async def start_note_creation(update: Update, context: ContextTypes.DEFAULT_TYPE
            "en": "✏️ Write your note (add #hashtags to categorize):",
            "ar": "✏️ اكتب ملاحظتك (أضف # للوسوم):"}
 
-    await query.edit_message_text(
+    await edit_screen(
+        query,
         msg.get(lang, msg["fr"]),
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton(t("common.cancel", lang), callback_data="prod_cancel")]
@@ -301,7 +304,7 @@ async def cancel_productivity(update: Update, context: ContextTypes.DEFAULT_TYPE
         [InlineKeyboardButton(t("common.home", lang), callback_data=CB_HOME)],
     ])
 
-    await query.edit_message_text(t("productivity.menu_title", lang), reply_markup=keyboard)
+    await edit_screen(query, t("productivity.menu_title", lang), reply_markup=keyboard)
     return ConversationHandler.END
 
 

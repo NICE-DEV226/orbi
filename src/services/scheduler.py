@@ -88,7 +88,7 @@ async def _task_reminders_job() -> None:
             from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
             # On marque le rappel comme envoyé pour ne pas spammer
-            task.has_reminder = False
+            task.reminder_day_sent = True
             await task.save()
 
             keyboard = InlineKeyboardMarkup([

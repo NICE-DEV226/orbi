@@ -77,6 +77,10 @@ async def create_bot_application() -> Application:
 
     application = builder.build()
 
+    from src.bot.errors import register_error_handler
+
+    register_error_handler(application)
+
     # ── Enregistrement du middleware handler (group=-10 = exécuté en premier) ──
     application.add_handler(
         TypeHandler(Update, _middleware_handler),

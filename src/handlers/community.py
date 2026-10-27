@@ -17,6 +17,7 @@ from telegram.ext import (
 )
 
 from src.bot.keyboards import CB_HOME, CB_MODULE_COMMUNITY
+from src.bot.screen import edit_screen
 from src.core.i18n import t
 from src.core.text import esc
 from src.models.user import User
@@ -53,7 +54,8 @@ async def show_polls(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
     if not polls:
         text = {"fr": "📊 Aucun sondage en cours.", "en": "📊 No active polls.", "ar": "📊 لا توجد استطلاعات نشطة."}
-        await query.edit_message_text(
+        await edit_screen(
+            query,
             text.get(lang, text["fr"]),
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton(t("community.create_poll", lang), callback_data="community:poll_new")],
@@ -72,7 +74,7 @@ async def show_polls(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     buttons.append([InlineKeyboardButton(t("community.create_poll", lang), callback_data="community:poll_new")])
     buttons.append([InlineKeyboardButton(t("common.back", lang), callback_data=CB_MODULE_COMMUNITY)])
 
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+    await edit_screen(query, text, reply_markup=InlineKeyboardMarkup(buttons))
 
 
 async def view_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -88,7 +90,7 @@ async def view_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     poll = await get_poll(poll_id)
 
     if not poll:
-        await query.edit_message_text(t("errors.not_found", lang))
+        await edit_screen(query, t("errors.not_found", lang))
         return
 
     db_user: User = context.user_data.get("db_user")
@@ -116,7 +118,7 @@ async def view_poll(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     buttons.append([InlineKeyboardButton(t("common.back", lang), callback_data="community:polls")])
 
-    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+    await edit_screen(query, text, reply_markup=InlineKeyboardMarkup(buttons))
 
 
 async def handle_vote(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -179,7 +181,8 @@ async def start_poll_creation(update: Update, context: ContextTypes.DEFAULT_TYPE
         "ar": "📝 <b>استطلاع جديد</b>\n\nما هو سؤالك؟",
     }
 
-    await query.edit_message_text(
+    await edit_screen(
+        query,
         msg.get(lang, msg["fr"]),
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton(t("common.cancel", lang), callback_data="poll_create_cancel")]
@@ -284,7 +287,8 @@ async def show_leaderboard(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         medal = "🥇" if i == 0 else "🥈" if i == 1 else "🥉" if i == 2 else f"{i+1}."
         text += f"{medal} <b>{esc(u.display_name)}</b> — {u.karma_points} pts\n"
 
-    await query.edit_message_text(
+    await edit_screen(
+        query,
         text,
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton(t("common.back", lang), callback_data=CB_MODULE_COMMUNITY)],
