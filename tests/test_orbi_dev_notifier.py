@@ -207,6 +207,7 @@ def _query(user_id: int, data: str) -> tuple[MagicMock, MagicMock]:
     query.from_user.id = user_id
     query.answer = AsyncMock()
     query.edit_message_reply_markup = AsyncMock()
+    query.get_bot.return_value.send_message = AsyncMock(return_value=MagicMock(chat_id=user_id, message_id=900))
     update = MagicMock()
     update.callback_query = query
     return update, query

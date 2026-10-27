@@ -19,6 +19,7 @@ from src.bot.keyboards import (
 from src.core.i18n import t
 from src.core.text import esc
 from src.models.user import User
+from src.orbi_dev.access import can_use_orbi_dev
 
 logger = logging.getLogger("orbi.handlers.onboarding")
 
@@ -47,6 +48,11 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     lang = db_user.language
     context.user_data["lang"] = lang
     context.user_data["_onboarded"] = True
+
+    if can_use_orbi_dev(db_user):  # un administrateur arrive sur Orbi Dev, pas sur la liste des modules
+        from src.handlers.dev_hub import show_home
+        await show_home(update, context)
+        return
     name = esc(db_user.display_name)
 
     # Vérifier si c'est la première fois qu'il utilise /start
@@ -88,6 +94,11 @@ async def language_selected(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     context.user_data["lang"] = lang
     context.user_data["t"] = lambda key, **kwargs: t(key, lang, **kwargs)
     context.user_data["_onboarded"] = True
+
+    if can_use_orbi_dev(db_user):
+        from src.handlers.dev_hub import show_home
+        await show_home(update, context)
+        return
 
     name = esc(db_user.display_name if db_user else update.effective_user.first_name)
 

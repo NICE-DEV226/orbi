@@ -16,7 +16,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 
 from pymongo import ReturnDocument
-from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, ReplyParameters, WebAppInfo
 from telegram.error import Forbidden, TelegramError
 
 from src.core.config import get_settings
@@ -53,7 +53,7 @@ _FALLBACK_DETAIL: dict[ExecutionStatus, str] = {
 }
 
 
-def _first_line(text: str, limit: int) -> str:
+def first_line(text: str, limit: int) -> str:
     line = text.strip().splitlines()[0] if text.strip() else ""
     return line if len(line) <= limit else line[: limit - 1] + "…"
 
@@ -62,8 +62,8 @@ def build_text(execution: Execution, prompt: str, project: str) -> str:
     """Message d'annonce (HTML Telegram : tout texte venant de l'extérieur est échappé)."""
     status = ExecutionStatus(execution.status)
     detail = execution.result_summary if status == S.SUCCEEDED else execution.error_message
-    detail = _first_line(detail or "", 300) or _FALLBACK_DETAIL.get(status, "")
-    lines = [f"{_HEADLINES[status]} · {esc(project)}", esc(_first_line(prompt, 120))]
+    detail = first_line(detail or "", 300) or _FALLBACK_DETAIL.get(status, "")
+    lines = [f"{_HEADLINES[status]} · {esc(project)}", esc(first_line(prompt, 120))]
     if detail:
         lines += ["", esc(detail)]
     return "\n".join(lines)
@@ -94,6 +94,8 @@ def build_keyboard(execution: Execution, *, with_action: bool = True) -> InlineK
         rows.append([InlineKeyboardButton("🔁 Réessayer", callback_data=f"{CB_RETRY}{execution.id}")])
     elif status == S.NEEDS_ATTENTION:
         rows.append([InlineKeyboardButton("🔄 Vérifier maintenant", callback_data=f"{CB_CHECK}{execution.id}")])
+    elif status in (S.QUEUED, S.RUNNING, S.CANCEL_REQUESTED):
+        rows.append([InlineKeyboardButton("🔄 Actualiser", callback_data=f"{CB_CHECK}{execution.id}")])
     return InlineKeyboardMarkup(rows) if rows else None
 
 
@@ -126,10 +128,14 @@ async def _announce(bot: Bot, execution: Execution) -> str:
         prompt = task.prompt
     except service.NotFoundError:
         project, prompt = "projet supprimé", ""
+    # En réponse à la carte de suivi quand il y en a une : l'alerte reste liée à sa tâche
+    reply = {}
+    if execution.card_message_id:
+        reply["reply_parameters"] = ReplyParameters(message_id=execution.card_message_id, allow_sending_without_reply=True)
     try:
         await bot.send_message(
             chat_id=execution.owner_id, text=build_text(execution, prompt, project),
-            reply_markup=build_keyboard(execution),
+            reply_markup=build_keyboard(execution), **reply,
         )
     except Forbidden:
         logger.info("Notification Orbi Dev non remise : l'utilisateur %s a bloqué le bot", execution.owner_id)

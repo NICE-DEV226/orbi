@@ -116,6 +116,10 @@ async def create_bot_application() -> Application:
     from src.handlers.orbi_dev import register_orbi_dev_handlers
     register_orbi_dev_handlers(application)
 
+    # ── Orbi Dev dans Telegram : accueil, nouvelle tâche, suivi (/dev, /task, /tasks) ──
+    from src.handlers.dev_hub import register_dev_hub_handlers
+    register_dev_hub_handlers(application)
+
     # Module optionnel : communauté (sondages, karma) et gestion/modération de groupes
     if settings.ENABLE_COMMUNITY:
         from src.handlers.community import register_community_handlers

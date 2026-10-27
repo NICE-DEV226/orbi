@@ -15,6 +15,8 @@ from src.core.i18n import t
 # Navigation
 CB_HOME = "nav:home"
 CB_BACK = "nav:back"
+CB_MORE = "nav:more"  # administrateurs : les autres modules, derrière l'accueil Orbi Dev
+CB_DEV_HOME = "dv:home"
 
 # Sélection de langue
 CB_LANG_FR = "lang:fr"
@@ -88,9 +90,10 @@ def main_menu_keyboard(lang: str, is_admin: bool = False) -> InlineKeyboardMarku
         rows = [[support, productivity], [developers], [profile]]
 
     if is_admin:
-        admin_row = [InlineKeyboardButton("🔐 Administration", callback_data="admin:panel")]
-        mini_app = orbi_dev_button()
-        rows.insert(0, [mini_app] + admin_row if mini_app else admin_row)
+        rows.insert(0, [
+            InlineKeyboardButton("🤖 Orbi Dev", callback_data=CB_DEV_HOME),
+            InlineKeyboardButton("🔐 Administration", callback_data="admin:panel"),
+        ])
     return InlineKeyboardMarkup(rows)
 
 
