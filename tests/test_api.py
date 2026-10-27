@@ -166,3 +166,30 @@ class TestBotToDashboardLogin:
 
         assert response.status_code == 303
         assert "admsession=" in response.headers["set-cookie"]
+
+
+class TestMagicLinkMessage:
+    URL = "https://orbi.example.org/admin/auth/0b0b0b0b-0000-0000-0000-000000000000"
+
+    def test_link_is_always_in_a_copyable_block(self):
+        from src.handlers.admin_auth import magic_link_text
+
+        for clickable in (False, True):
+            assert f"<code>{self.URL}</code>" in magic_link_text(self.URL, clickable=clickable)
+
+    def test_localhost_link_is_not_offered_as_a_link_telegram_would_refuse(self):
+        from src.handlers.admin_auth import magic_link_text
+
+        text = magic_link_text("http://localhost:8000/admin/auth/abc", clickable=False)
+        assert "<a " not in text and "<code>http://localhost:8000/admin/auth/abc</code>" in text
+
+    def test_public_https_link_is_also_clickable(self):
+        from src.handlers.admin_auth import magic_link_text
+
+        assert f'<a href="{self.URL}">' in magic_link_text(self.URL, clickable=True)
+
+    def test_base_url_cannot_inject_markup(self):
+        from src.handlers.admin_auth import magic_link_text
+
+        text = magic_link_text('https://x"><b>y</b>&z', clickable=True)
+        assert "<b>y</b>" not in text and "&lt;b&gt;" in text

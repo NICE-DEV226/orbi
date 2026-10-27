@@ -3,6 +3,7 @@ Orbi — Handler Authentification Web Admin.
 Génère les Magic Links pour la connexion au dashboard web.
 """
 
+import html
 import logging
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -21,6 +22,25 @@ logger = logging.getLogger("orbi.handlers.admin_auth")
 
 MAGIC_LINK_PREFIX = "magic_link:"
 WEB_SESSION_PREFIX = "websession:"
+
+
+def magic_link_text(login_url: str, *, clickable: bool) -> str:
+    """
+    Message du lien de connexion. Le lien est toujours dans un bloc que l'on copie d'un toucher : Telegram ne rend pas
+    cliquable une adresse http://localhost. En https public, il est aussi cliquable.
+    """
+    copy = f"<code>{esc(login_url)}</code>"
+    if clickable:
+        link = f'<a href="{html.escape(login_url, quote=True)}">Ouvrir le dashboard</a>'
+        body = f"{link}\n\nOu copiez le lien d'un toucher :\n{copy}"
+    else:
+        body = f"Touchez le lien pour le copier, puis collez-le dans le navigateur de cet ordinateur :\n\n{copy}"
+    return (
+        "🔐 <b>Connexion au dashboard</b>\n\n"
+        f"{body}\n\n"
+        "Lien à usage unique, valable 10 minutes. "
+        "Depuis Telegram, le bouton « Orbi Dev » s'ouvre directement, sans lien."
+    )
 
 
 async def request_magic_link(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -80,11 +100,7 @@ async def request_magic_link(update: Update, context: ContextTypes.DEFAULT_TYPE)
     rows.append([InlineKeyboardButton(t("common.back", lang), callback_data="nav:home")])
     keyboard = InlineKeyboardMarkup(rows)
 
-    text = (
-        "🔐 <b>Connexion au dashboard</b>\n\n"
-        f"Lien à usage unique, valable 10 minutes :\n{login_url}\n\n"
-        "Depuis Telegram, le bouton « Orbi Dev » s'ouvre directement, sans lien."
-    )
+    text = magic_link_text(login_url, clickable=settings.public_https)
 
     if update.callback_query:
         await edit_screen(update.callback_query, text, reply_markup=keyboard)
