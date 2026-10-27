@@ -75,8 +75,6 @@ async def create_bot_application() -> Application:
         .pool_timeout(10.0)
     )
 
-
-
     application = builder.build()
 
     from src.bot.errors import register_error_handler
