@@ -1,13 +1,22 @@
 # Orbi — Direction produit : copilote DevOps, avec le code au service de l’exploitation
 
-> **Statut :** orientation proposée, à valider par l’usage
-> **Mise à jour :** 27 octobre 2026
+> **Statut :** orientation retenue par le propriétaire le 29 octobre 2026 (ordre de réalisation ci-dessous) ; sa valeur reste à valider par l’usage
+> **Mise à jour :** 29 octobre 2026
 
 ## En une phrase
 
 **Orbi aide les développeurs et petites équipes à comprendre et traiter les problèmes de livraison et d’exploitation depuis une interface mobile, en reliant le dépôt, les signaux opérationnels et les agents de code, avec une validation humaine avant les actions sensibles.**
 
 Orbi ne cherche pas à devenir un nouvel agent de code, un IDE mobile, un hébergeur cloud ni une plateforme DevOps universelle. Le code est un moyen de résoudre les problèmes d’exploitation : l’agent peut aider à diagnostiquer et proposer un correctif, mais le résultat utile est un service rétabli ou une livraison débloquée, vérifiés par des signaux observables.
+
+## Ordre de réalisation
+
+Décision du propriétaire (29 octobre 2026) : les deux formulations de la direction sont deux étapes d’un même produit, dans cet ordre.
+
+1. **Contrôle mobile d’agents de code (existe).** Lancer une tâche, la suivre et recevoir le résultat ou la pull request depuis Telegram (accueil, `/task`, carte de suivi, alertes), avec le web en appoint pour ce qui ne doit pas passer par un chat (clés d’API). Cette étape est la condition de la suivante : sans elle, pas d’agent à qui confier un correctif. Elle n’est pas encore validée par un parcours réel complet (voir « État de validation du connecteur Jules »).
+2. **Un seul signal d’exploitation : l’échec d’une exécution GitHub Actions.** Il déclenche une proposition de correctif confiée à l’agent, après validation humaine, puis la vérification du résultat par la CI elle-même. Conception : [ADR-0009](adr/0009-first-operational-signal-ci-failure.md). Rien n’est construit tant que l’étape 1 n’a pas fait ses preuves avec un compte fournisseur réel.
+
+Un seul signal à la fois : aucun autre outil d’exploitation n’est ajouté avant que celui-ci ait montré une valeur répétée.
 
 ## Problème visé
 
@@ -103,7 +112,7 @@ Ne pas déclarer la proposition validée sur la seule base de tests logiciels, d
 | Domaine | État observable dans le dépôt | Direction visée |
 |---|---|---|
 | Agents | Connecteurs Jules, Cursor et factice ; lancement et suivi d’exécutions | Utiliser l’agent comme étape d’un parcours de résolution |
-| Interface | Web mobile rendu côté serveur et entrées Telegram ; Orbi Dev est réservé aux administrateurs | Interface de supervision concise pour l’opérateur responsable |
+| Interface | Bot Telegram comme interface principale (accueil, nouvelle tâche, carte de suivi, alertes) et web mobile pour les clés ; Orbi Dev est réservé aux administrateurs | Interface de supervision concise pour l’opérateur responsable |
 | État et historique | Tâches, exécutions, événements, notifications et références de PR | Historique d’incidents reliant signal, décision, changement et vérification |
 | Intégration CI / exploitation | Webhook GitHub historique pour certains événements ; pas de parcours CI/incidents établi par le code inspecté | Détection et contextualisation d’un scénario d’échec limité |
 | Vérification | Suivi de l’état du fournisseur et lien éventuel vers une PR | Résultat de CI ou état de service observé après le correctif |
@@ -112,4 +121,4 @@ Ne pas déclarer la proposition validée sur la seule base de tests logiciels, d
 
 ## Prochaine décision produit
 
-Choisir et tester **un** signal d’entrée pour le premier parcours — par exemple un échec GitHub Actions — et définir précisément les données accessibles, la méthode de diagnostic, les actions permises et la preuve de réussite. Ne pas ajouter plusieurs intégrations opérationnelles tant que ce parcours n’a pas démontré une valeur répétée.
+Le signal d’entrée est choisi : un échec **GitHub Actions** ([ADR-0009](adr/0009-first-operational-signal-ci-failure.md), proposition à valider). Restent à trancher dans cet ADR les données réellement accessibles sans jeton GitHub, la méthode de diagnostic, les actions permises et la preuve de réussite. Ne pas ajouter d’autres intégrations opérationnelles tant que ce parcours n’a pas démontré une valeur répétée.

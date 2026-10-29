@@ -23,7 +23,7 @@ Orbi vise à aider les développeurs et les petites équipes à **comprendre et 
 
 | Module | Contenu | Où |
 |---|---|---|
-| **Orbi Dev** | Projets, clés fournisseur chiffrées, tâches, exécutions suivies (état, historique, pull request, annulation, nouvelle tentative) | Web : `/dev/` |
+| **Orbi Dev** | Projets, clés fournisseur chiffrées, tâches, exécutions suivies (état, historique, pull request, annulation, nouvelle tentative) | Bot Telegram (`/start`, `/task`, `/tasks`) et web : `/dev/` |
 | **Support** | Tickets guidés par conversation, SLA, satisfaction (CSAT), alertes aux admins | Bot Telegram |
 | **Productivité** | Tâches, notes, minuteur de concentration | Bot Telegram |
 | **Outils développeur** | Événements GitHub reçus, journal d'erreurs, statistiques d'infrastructure | Bot Telegram (admins) |
@@ -40,9 +40,9 @@ Il est **désactivé par défaut** (`ENABLE_COMMUNITY=false`) : sa modération l
 
 ## Orbi Dev aujourd'hui
 
-1. Un administrateur ouvre l'interface **depuis Telegram** (bouton « Orbi Dev », Mini App, connexion automatique) ou depuis un navigateur avec le lien magique de `/web`. Les Mini Apps exigent une URL https publique ([ADR-0007](docs/adr/0007-telegram-mini-app.md)).
-2. Il enregistre un **projet** (URL https du dépôt) et connecte une **clé fournisseur** : elle est vérifiée, puis chiffrée (Fernet) dans une collection séparée, jamais réaffichée.
-3. Il crée une **tâche** : l'agent travaille sur une branche et peut proposer une **pull request**. Rien n'est fusionné ni déployé automatiquement.
+1. Un administrateur arrive sur l'**accueil Orbi Dev dans le bot** (`/start` ou `/dev`) : état des tâches, nouvelle tâche, projets, connexions, réglages. Le web (`/dev/`) reste disponible, en Mini App depuis Telegram (URL https publique requise, [ADR-0007](docs/adr/0007-telegram-mini-app.md)) ou avec le lien magique de `/web`.
+2. Il ajoute un **projet** en collant l'adresse GitHub du dépôt (vérifiée sur GitHub, confirmée avant création) et connecte une **clé fournisseur** sur la page web : elle est vérifiée, puis chiffrée (Fernet) dans une collection séparée, jamais réaffichée et jamais saisie dans le chat.
+3. Il crée une **tâche** (`/task` ou le parcours par boutons) : l'agent travaille sur une branche et peut proposer une **pull request**. Rien n'est fusionné ni déployé automatiquement. Le message de confirmation devient une **carte de suivi** mise à jour à chaque changement d'état.
 4. L'exécution est suivie en arrière-plan ; l'état vit en base, donc recharger la page ou perdre la connexion ne perd rien et ne relance rien.
 5. Quand une exécution se termine, échoue, dépasse sa durée ou demande une vérification, le bot envoie **un message à son propriétaire seul** (une fois par état), avec les boutons Ouvrir, Voir la PR, Réessayer ou Vérifier. Réglage : Profil → Notifications.
 
@@ -50,7 +50,7 @@ Garanties de conception ([ADR-0003](docs/adr/0003-durable-execution-model.md)) :
 
 ### Direction visée
 
-Le contrôle mobile des agents existe déjà chez les fournisseurs. Orbi vise plutôt à relier **un signal d'exploitation à une résolution vérifiable** : par exemple, un échec CI → contexte et diagnostic → correctif proposé par un agent → validation humaine → vérification du résultat. Cette orchestration DevOps est une direction produit, pas encore une fonctionnalité livrée de bout en bout. Les risques, le périmètre de départ et les écarts avec le produit actuel sont décrits dans [docs/PRODUCT_DIRECTION.md](docs/PRODUCT_DIRECTION.md).
+Ordre retenu : d'abord le contrôle mobile d'agents (ce que fait le dépôt aujourd'hui), puis un premier signal d'exploitation, l'échec d'une exécution GitHub Actions. Le contrôle mobile des agents existe déjà chez les fournisseurs : Orbi vise à relier **un signal d'exploitation à une résolution vérifiable** : par exemple, un échec CI → contexte et diagnostic → correctif proposé par un agent → validation humaine → vérification du résultat. Cette orchestration DevOps est une direction produit, pas encore une fonctionnalité livrée de bout en bout. Les risques, le périmètre de départ et les écarts avec le produit actuel sont décrits dans [docs/PRODUCT_DIRECTION.md](docs/PRODUCT_DIRECTION.md).
 
 ---
 
@@ -142,10 +142,11 @@ src/
 ├── core/                # Config, MongoDB (Beanie/PyMongo async), Redis, i18n, logs, sécurité, métriques
 ├── bot/                 # Application Telegram, claviers, middlewares (logs → auth → i18n → rate limit)
 ├── handlers/            # Support, productivité, profil, menus, admin, outils développeur, communauté (optionnel)
+│   └── dev_hub/         # Orbi Dev dans Telegram : accueil, tâches, projets, saisies (common/home/tasks/projects/messages)
 ├── services/            # Tickets, productivité, notifications, planification, développeur, communauté
 ├── models/              # Documents Beanie (utilisateurs, tickets, productivité, logs, communauté)
-├── orbi_dev/            # Orbi Dev : modèles, machine à états, chiffrement, orchestration, connecteurs, worker
-│   └── connectors/      # Contrat de connecteur, Cursor Cloud Agents, fournisseur factice (hors production)
+├── orbi_dev/            # Orbi Dev : modèles, machine à états, chiffrement, orchestration, worker, notifications, cartes, saisies
+│   └── connectors/      # Contrat de connecteur, Cursor Cloud Agents, Jules, fournisseur factice (hors production)
 ├── web/                 # Authentification (lien magique, Mini App), pages Orbi Dev et administration, CSRF
 ├── api/                 # API Bearer admin et développeur
 ├── templates/           # Gabarits Jinja2 (un seul shell) et fragments htmx
@@ -166,8 +167,8 @@ Chaque message du bot traverse 4 middlewares (`group=-10`) : journalisation, aut
 ## Documentation
 
 - [Direction produit](docs/PRODUCT_DIRECTION.md) · [Spécification](docs/ORBI_SPECIFICATION.md) · [Feuille de route](docs/ROADMAP.md) · [Audit initial](docs/AUDIT_INITIAL.md) · [Inventaire des modules](docs/LEGACY_MODULES.md)
-- Décisions d'architecture : [ADR-0001 à 0006](docs/README.md)
-- [Connecteur Cursor](docs/connectors/cursor.md) — configuration, mapping, hypothèses et limites
+- Décisions d'architecture : [ADR-0001 à 0009](docs/README.md)
+- [Connecteur Cursor](docs/connectors/cursor.md) · [Connecteur Jules](docs/connectors/jules.md) — configuration, mapping, hypothèses et limites
 - [`cdc.md`](cdc.md) — cahier des charges historique (v4.0), en partie obsolète
 
 ---
