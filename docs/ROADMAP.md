@@ -1,8 +1,19 @@
 # Orbi — Feuille de route d'ingénierie
 
-> **Statut :** proposition de plan, à ajuster après exécution des tests  
-> **Date :** 23 octobre 2026  
-> **Branche :** `docs/orbi-platform-spec`
+> **Statut :** plan d'origine du 23 octobre 2026, mis à jour le 29 octobre (voir « État d'avancement »)
+
+## État d'avancement (29 octobre 2026)
+
+| Phase | État | Preuve |
+|---|---|---|
+| 0 — Sécuriser la base | Fait. Les points P0 du plan d'origine sont corrigés : plus de route de démonstration privilégiée, API Bearer fail-closed (`src/core/security.py`), `JWT_SECRET` obligatoire en production, cookie `Secure`, CSRF, `/health` sans détail interne | `docs/AUDIT_INITIAL.md` (constats historiques), tests de sécurité |
+| 1 — Tests reproductibles | Fait : CI (lint, suite sur 3.12 à 3.14 avec une vraie MongoDB, audit des dépendances, image Docker) ; 729 tests, couverture 72 % le 29 octobre | `.github/workflows/ci.yml` |
+| 2 — Modules historiques | Décisions du 26 octobre : commerce retiré, communauté en option, code mort retiré | `docs/LEGACY_MODULES.md` |
+| 3 — Premier vertical Orbi Dev | Implémenté avec les connecteurs Cursor et Jules et le bot Telegram comme interface principale. **Gate non atteint** : le parcours jusqu'à la pull request n'est pas confirmé de façon indépendante avec un compte réel | `docs/PRODUCT_DIRECTION.md` |
+| 4 — Revue sécurisée | À faire | — |
+| 5 — Premier signal d'exploitation | Conçu (ADR-0009, à valider), non construit | `docs/adr/0009-first-operational-signal-ci-failure.md` |
+
+Ordre retenu le 29 octobre : contrôle mobile d'agents d'abord, puis un seul signal d'exploitation (échec GitHub Actions). Les sections ci-dessous gardent le plan d'origine ; les tickets de la phase 0 sont conservés comme historique.
 
 Cette feuille de route ordonne les travaux pour réduire les risques avant d'ajouter de nouvelles capacités. Les estimations de durée ne sont pas indiquées : elles seraient spéculatives sans connaître le temps disponible, la taille de l'équipe et les résultats des tests.
 
@@ -30,6 +41,8 @@ Cette feuille de route ordonne les travaux pour réduire les risques avant d'ajo
 
 ### ORBI-SEC-02 — Corriger les dépendances d'authentification de l'API admin/dev
 **Priorité : P0 — Bloquante**
+
+> **Mise à jour (29 octobre) :** corrigé. `check_bearer` (`src/core/security.py`) refuse par défaut (503 sans jeton configuré, 401 sinon). Le texte ci-dessous décrit l'état d'origine.
 
 Le code inspecté dans `src/api/admin.py` contient une dépendance `verify_admin_token` qui laisse passer les requêtes même quand le token ne correspond pas à la valeur attendue. `src/api/dev.py` retourne un rôle developer sans authentification effective. Ces fonctions sont des squelettes non sûrs si elles sont exposées.
 
@@ -163,13 +176,16 @@ Ne créer que les modèles et services nécessaires au premier parcours.
 
 - Afficher diff et tests.
 - Créer une pull request si supporté.
+- Suivre l'état de la pull request d'une exécution (le webhook GitHub existe déjà ; voir ADR-0009).
 - Ajouter approbations avant les actions sensibles.
 - Auditer chaque lancement et décision.
 - Tester les changements de périmètre après approbation.
 
-## Phase 5 — CI/CD, opérations et équipes
+**Gate d'entrée :** le parcours de la phase 3 est confirmé avec un compte fournisseur réel, jusqu'à la pull request.
 
-Uniquement après validation du parcours initial :
+## Phase 5 — Premier signal d'exploitation, puis le reste
+
+Uniquement après validation du parcours initial. **Premier lot : l'échec d'une exécution GitHub Actions** (signal reçu, tâche d'agent proposée après validation humaine, résultat vérifié par la CI) — conception dans [ADR-0009](adr/0009-first-operational-signal-ci-failure.md). Rien d'autre de cette liste n'est entrepris avant que ce lot ait montré une valeur répétée :
 - intégration CI ;
 - suivi de déploiement ;
 - observabilité de services ;

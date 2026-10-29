@@ -4,7 +4,7 @@ Documentation de cadrage pour la reprise progressive du dépôt. Les documents d
 
 ## Documents
 
-- [Direction produit](PRODUCT_DIRECTION.md) — orientation DevOps-first, périmètre, parcours visé et écart avec les capacités actuelles.
+- [Direction produit](PRODUCT_DIRECTION.md) — contrôle mobile d'agents d'abord, puis un premier signal d'échec de CI ; périmètre, parcours visé et écart avec les capacités actuelles.
 - [Spécification produit et technique](ORBI_SPECIFICATION.md) — vision, architecture, exigences et critères d'acceptation.
 - [Audit initial du dépôt](AUDIT_INITIAL.md) — constats statiques, risques et limites de l'audit.
 - [Feuille de route d'ingénierie](ROADMAP.md) — priorités, phases, lots de travail et critères de sortie.
@@ -17,6 +17,7 @@ Documentation de cadrage pour la reprise progressive du dépôt. Les documents d
 - [ADR-0006 : Python 3.14](adr/0006-python-3.14.md) — correction de la métadonnée de Beanie.
 - [ADR-0007 : Mini App Telegram](adr/0007-telegram-mini-app.md) — accès web depuis Telegram, cookies, limites.
 - [ADR-0008 : interface Jinja + htmx](adr/0008-web-ui-jinja-htmx.md) — un seul shell, sans framework CSS ni CDN.
+- [ADR-0009 : premier signal d'exploitation, l'échec de CI](adr/0009-first-operational-signal-ci-failure.md) — conception proposée, questions ouvertes.
 - [Design de l'interface](DESIGN.md) — anneau d'orbite, jetons, typographie, règles d'écriture.
 
 ## Statut
