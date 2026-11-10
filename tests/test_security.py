@@ -9,7 +9,8 @@ from fastapi import HTTPException
 
 from src.core.config import get_settings
 from src.core.security import check_bearer
-from src.services.developer_service import verify_github_signature
+from src.models.developer import GithubWebhookLog
+from src.services.developer_service import process_github_webhook, verify_github_signature
 
 
 class TestCheckBearer:
@@ -89,6 +90,91 @@ class TestGithubWebhookRoute:
             )
         assert r.status_code == 200
         proc.assert_called_once()
+
+
+class TestGithubWebhookProcessing:
+    """Idempotence du journal et extraction des événements CI (ADR-0009)."""
+
+    PAYLOAD = {
+        "action": "completed",
+        "repository": {"full_name": "acme/demo"},
+        "sender": {"login": "octocat"},
+        "check_run": {
+            "name": "tests",
+            "head_sha": "abc123",
+            "conclusion": "failure",
+            "html_url": "https://github.com/acme/demo/runs/1",
+        },
+    }
+
+    async def test_same_delivery_is_processed_once(self):
+        first = await process_github_webhook("check_run", self.PAYLOAD, "d-1")
+        second = await process_github_webhook("check_run", self.PAYLOAD, "d-1")
+
+        assert second.id == first.id
+        assert await GithubWebhookLog.find().count() == 1
+
+    async def test_empty_delivery_id_is_not_deduplicated(self):
+        await process_github_webhook("push", {"repository": {"full_name": "a/b"}}, "")
+        await process_github_webhook("push", {"repository": {"full_name": "a/b"}}, "")
+        assert await GithubWebhookLog.find().count() == 2
+
+    async def test_ci_failure_details_are_extracted(self):
+        log = await process_github_webhook("check_run", self.PAYLOAD, "d-2")
+
+        assert log.payload_details["conclusion"] == "failure"
+        assert log.payload_details["check_name"] == "tests"
+        assert log.payload_details["sha"] == "abc123"
+        assert log.payload_details["url"] == "https://github.com/acme/demo/runs/1"
+
+    async def test_ci_success_is_recorded_without_failure_details(self):
+        payload = {**self.PAYLOAD, "check_run": {**self.PAYLOAD["check_run"], "conclusion": "success"}}
+        log = await process_github_webhook("check_run", payload, "d-3")
+
+        assert log.payload_details["conclusion"] == "success"
+        assert log.payload_details["check_name"] == "tests"
+
+
+class TestGithubDeliveryDedupeMigration:
+    async def test_duplicates_are_removed_and_unique_index_created(self):
+        from pymongo.errors import DuplicateKeyError
+
+        from src.orbi_dev.migrations import dedupe_github_webhook_logs
+
+        # L'index a pu être posé par un test précédent (lifespan réel) : on revient à l'état legacy.
+        collection = GithubWebhookLog.get_pymongo_collection()
+        if "delivery_id_1" in await collection.index_information():
+            await collection.drop_index("delivery_id_1")
+
+        for _ in range(2):  # simule une redélivrance avant l'index unique
+            await GithubWebhookLog(
+                event_type="push", action="", repository="a/b", sender="s",
+                payload_details={}, delivery_id="dup-1",
+            ).insert()
+        await GithubWebhookLog(
+            event_type="push", action="", repository="a/b", sender="s",
+            payload_details={}, delivery_id="",
+        ).insert()
+
+        assert await dedupe_github_webhook_logs() == 1
+        assert await GithubWebhookLog.find(GithubWebhookLog.delivery_id == "dup-1").count() == 1
+
+        with pytest.raises(DuplicateKeyError):
+            await GithubWebhookLog(
+                event_type="push", action="", repository="a/b", sender="s",
+                payload_details={}, delivery_id="dup-1",
+            ).insert()
+        # delivery_id vide : hors index partiel, toujours accepté
+        await GithubWebhookLog(
+            event_type="push", action="", repository="a/b", sender="s",
+            payload_details={}, delivery_id="",
+        ).insert()
+
+    async def test_migration_is_idempotent(self):
+        from src.orbi_dev.migrations import dedupe_github_webhook_logs
+
+        await dedupe_github_webhook_logs()
+        assert await dedupe_github_webhook_logs() == 0
 
 
 class TestTelegramWebhook:

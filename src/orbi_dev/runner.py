@@ -370,6 +370,42 @@ async def refresh_active_executions() -> int:
 
 
 # ─────────────────────────────────────
+# Approbation humaine
+# ─────────────────────────────────────
+
+async def approve_execution(owner_id: int, execution_id: str) -> Execution:
+    """
+    Validation humaine d'une exécution `awaiting_approval` : passage en `queued`.
+    Le lancement effectif reste à la charge de l'appelant (`launch_execution`, idempotent) ;
+    à défaut, le worker la récupère via `list_stuck_queued`.
+    """
+    execution = await service.get_execution(owner_id, execution_id)
+    if execution.status != ExecutionStatus.AWAITING_APPROVAL:
+        raise service.ConflictError(f"Approbation impossible depuis l'état {execution.status.value}")
+    try:
+        return await service.transition_execution(
+            owner_id, execution_id, ExecutionStatus.AWAITING_APPROVAL, ExecutionStatus.QUEUED,
+            message="Approuvée par le propriétaire",
+        )
+    except InvalidTransitionError as e:
+        raise service.ConflictError("L'exécution a déjà été traitée") from e
+
+
+async def dismiss_execution(owner_id: int, execution_id: str) -> Execution:
+    """Refus humain d'une exécution `awaiting_approval` : annulation locale, rien n'a été lancé."""
+    execution = await service.get_execution(owner_id, execution_id)
+    if execution.status != ExecutionStatus.AWAITING_APPROVAL:
+        raise service.ConflictError(f"Refus impossible depuis l'état {execution.status.value}")
+    try:
+        return await service.transition_execution(
+            owner_id, execution_id, ExecutionStatus.AWAITING_APPROVAL, ExecutionStatus.CANCELLED,
+            message="Ignorée par le propriétaire",
+        )
+    except InvalidTransitionError as e:
+        raise service.ConflictError("L'exécution a déjà été traitée") from e
+
+
+# ─────────────────────────────────────
 # Annulation
 # ─────────────────────────────────────
 

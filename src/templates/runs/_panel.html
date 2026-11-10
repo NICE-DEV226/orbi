@@ -41,10 +41,16 @@
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <button class="btn btn-quiet" type="submit">{{ icon('refresh') }} Actualiser</button>
     </form>
-    {% if can_cancel %}
-    <form method="post" action="/dev/executions/{{ execution.id }}/cancel" hx-post="/dev/executions/{{ execution.id }}/cancel" hx-target="#run-panel" hx-swap="outerHTML" hx-confirm="Demander l'arrêt de cette exécution ?" hx-boost="false">
+    {% if can_approve %}
+    <form method="post" action="/dev/executions/{{ execution.id }}/approve" hx-post="/dev/executions/{{ execution.id }}/approve" hx-target="#run-panel" hx-swap="outerHTML" hx-boost="false">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <button class="btn btn-danger" type="submit">{{ icon('stop') }} Arrêter</button>
+      <button class="btn btn-primary" type="submit">{{ icon('check') }} Lancer</button>
+    </form>
+    {% endif %}
+    {% if can_cancel %}
+    <form method="post" action="/dev/executions/{{ execution.id }}/cancel" hx-post="/dev/executions/{{ execution.id }}/cancel" hx-target="#run-panel" hx-swap="outerHTML" hx-confirm="{% if can_approve %}Ignorer cette exécution ?{% else %}Demander l'arrêt de cette exécution ?{% endif %}" hx-boost="false">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="btn btn-danger" type="submit">{{ icon('stop') }} {% if can_approve %}Ignorer{% else %}Arrêter{% endif %}</button>
     </form>
     {% endif %}
     {% elif terminal %}
