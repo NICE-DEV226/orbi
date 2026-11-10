@@ -7,9 +7,13 @@ valeurs puis supprime le champ, afin qu'aucun secret ne reste dans un document e
 """
 
 import logging
+import re
 from datetime import UTC, datetime
 
-from src.orbi_dev.models import Integration, IntegrationSecret
+from pymongo import ASCENDING
+
+from src.orbi_dev.models import Integration, IntegrationSecret, Project
+from src.orbi_dev.service import _github_repo
 
 logger = logging.getLogger("orbi.dev.migrations")
 
@@ -61,7 +65,70 @@ async def enable_dev_run_notifications_once() -> int:
     return result.modified_count
 
 
+_GITHUB_URL = re.compile(r"^https://github\.com/")
+
+
+async def backfill_github_repo() -> int:
+    """
+    Remplit `Project.github_repo` (« owner/repo ») pour les projets GitHub créés avant le champ (ADR-0009).
+    Idempotent : seuls les documents sans valeur sont visités, et un dépôt non GitHub garde None.
+    """
+    updated = 0
+    collection = Project.get_pymongo_collection()
+    async for doc in collection.find(
+        {"repo_url": {"$regex": _GITHUB_URL.pattern}, "github_repo": None}
+    ):
+        github_repo = _github_repo(doc["repo_url"])
+        if github_repo is None:
+            continue
+        await collection.update_one({"_id": doc["_id"]}, {"$set": {"github_repo": github_repo}})
+        updated += 1
+    if updated:
+        logger.info("Projets rattachés à leur dépôt GitHub : %d", updated)
+    return updated
+
+
+async def dedupe_github_webhook_logs() -> int:
+    """
+    Garde la plus ancienne occurrence de chaque `delivery_id` du journal GitHub (les suivantes sont des
+    redéliveries ou des doublons sans information nouvelle), puis pose l'index unique qui rend le webhook
+    idempotent (ADR-0009).
+
+    L'index n'est pas déclaré dans `GithubWebhookLog.Settings` : `init_beanie` le créerait avant cette
+    migration et un historique contenant des doublons empêcherait le démarrage. Index partiel : les
+    `delivery_id` vides (absents du en-tête) ne sont pas dédupliqués.
+    """
+    from src.models.developer import GithubWebhookLog
+
+    collection = GithubWebhookLog.get_pymongo_collection()
+    duplicates = await collection.aggregate(
+        [
+            {"$match": {"delivery_id": {"$gt": ""}}},
+            {"$sort": {"received_at": 1}},
+            {"$group": {"_id": "$delivery_id", "ids": {"$push": "$_id"}, "count": {"$sum": 1}}},
+            {"$match": {"count": {"$gt": 1}}},
+        ]
+    )
+    stale_ids: list = []
+    async for dup in duplicates:
+        stale_ids.extend(dup["ids"][1:])
+    removed = 0
+    if stale_ids:
+        result = await collection.delete_many({"_id": {"$in": stale_ids}})
+        removed = result.deleted_count
+    if removed:
+        logger.info("Journal webhooks GitHub : %d doublon(s) de livraison supprimé(s)", removed)
+    await collection.create_index(
+        [("delivery_id", ASCENDING)],
+        unique=True,
+        partialFilterExpression={"delivery_id": {"$gt": ""}},
+    )
+    return removed
+
+
 async def run_migrations() -> None:
     """Toutes les migrations Orbi Dev, idempotentes ; appelées au démarrage de l'application et par scripts/init_db.py."""
     await migrate_legacy_secrets()
     await enable_dev_run_notifications_once()
+    await backfill_github_repo()
+    await dedupe_github_webhook_logs()

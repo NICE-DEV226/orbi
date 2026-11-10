@@ -26,6 +26,7 @@ class Project(Document):
     owner_id: Indexed(int)  # type: ignore[valid-type]
     name: str = Field(min_length=1, max_length=100)
     repo_url: str
+    github_repo: str | None = None  # « owner/repo » si le dépôt est sur github.com, sinon None (ADR-0009)
     default_branch: str = Field(default="", max_length=100)  # "" = branche par défaut du dépôt, choisie par le fournisseur
     is_archived: bool = False
     created_at: datetime = Field(default_factory=_now)
@@ -105,6 +106,7 @@ class Task(Document):
     project_id: str
     integration_id: str
     prompt: str = Field(min_length=1, max_length=8000)
+    source_ref: str | None = Field(default=None, max_length=500)  # origine métier (ex. ci:owner/repo@sha:check) : dédup des tâches automatiques (ADR-0009)
     status: TaskStatus = TaskStatus.OPEN
     created_at: datetime = Field(default_factory=_now)
 

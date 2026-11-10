@@ -9,11 +9,47 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
+from pymongo.errors import DuplicateKeyError
+
 from src.core.config import get_settings
 from src.core.redis import get_redis
 from src.models.developer import ApiLog, ErrorLog, GithubWebhookLog
 
 logger = logging.getLogger("orbi.services.developer")
+
+# Échecs CI routés vers Orbi Dev (ADR-0009) : conclusion d'échec sur un check ou un workflow.
+_CI_FAILURE_EVENTS = ("check_run", "check_suite", "workflow_run")
+
+
+def _ci_failure_details(event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Extrait ce qu'il faut pour une tâche de correction : quoi, quel commit, où voir le détail."""
+    if event_type == "check_run":
+        run = payload.get("check_run") or {}
+        return {
+            "check_name": run.get("name", ""),
+            "sha": run.get("head_sha", ""),
+            "url": run.get("html_url") or run.get("details_url") or "",
+        }
+    if event_type == "check_suite":
+        suite = payload.get("check_suite") or {}
+        return {
+            "check_name": suite.get("app", {}).get("slug", "") if isinstance(suite.get("app"), dict) else "",
+            "sha": suite.get("head_sha", ""),
+            "url": suite.get("url", ""),
+        }
+    run = payload.get("workflow_run") or {}
+    return {
+        "check_name": run.get("name", ""),
+        "sha": run.get("head_sha", ""),
+        "url": run.get("html_url", ""),
+    }
+
+
+def _ci_conclusion(event_type: str, payload: dict[str, Any]) -> str:
+    """Conclusion de l'événement CI (« failure », « success »…), vide si l'événement n'en porte pas."""
+    node = payload.get(event_type) or {}
+    conclusion = node.get("conclusion")
+    return conclusion if isinstance(conclusion, str) else ""
 
 # ─────────────────────────────────────
 # Webhooks GitHub
@@ -43,7 +79,16 @@ async def process_github_webhook(
     payload: dict[str, Any],
     delivery_id: str,
 ) -> GithubWebhookLog:
-    """Traite et enregistre un webhook GitHub."""
+    """
+    Traite et enregistre un webhook GitHub, de façon idempotente : un `delivery_id` déjà vu
+    renvoie le journal existant sans rien retraiter (GitHub rejoue les événements non acquittés).
+    """
+    if delivery_id:
+        existing = await GithubWebhookLog.find_one(GithubWebhookLog.delivery_id == delivery_id)
+        if existing is not None:
+            logger.info("Webhook GitHub %s déjà traité (delivery %s)", event_type, delivery_id)
+            return existing
+
     action = payload.get("action", "")
     repository = payload.get("repository", {}).get("full_name", "unknown")
     sender = payload.get("sender", {}).get("login", "unknown")
@@ -61,6 +106,9 @@ async def process_github_webhook(
         details["title"] = item.get("title", "")
         details["url"] = item.get("html_url", "")
         details["state"] = item.get("state", "")
+    elif event_type in _CI_FAILURE_EVENTS:
+        details["conclusion"] = _ci_conclusion(event_type, payload)
+        details.update(_ci_failure_details(event_type, payload))
 
     log = GithubWebhookLog(
         event_type=event_type,
@@ -70,7 +118,14 @@ async def process_github_webhook(
         payload_details=details,
         delivery_id=delivery_id,
     )
-    await log.insert()
+    try:
+        await log.insert()
+    except DuplicateKeyError:
+        # Livraison concurrente du même delivery_id : l'index unique a tranché, on relit.
+        replayed = await GithubWebhookLog.find_one(GithubWebhookLog.delivery_id == delivery_id)
+        if replayed is not None:
+            return replayed
+        raise
     logger.info("GitHub Webhook enregistré: %s/%s par %s", event_type, action, sender)
     return log
 

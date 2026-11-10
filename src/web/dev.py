@@ -157,11 +157,13 @@ async def _panel_context(admin: User, execution_id: str) -> dict[str, Any]:
         can_cancel = "cancel" in integration.capabilities
     except service.NotFoundError:
         can_cancel = False
+    awaiting = execution.status == ExecutionStatus.AWAITING_APPROVAL
     return {
         "execution": execution, "task": task, "project": project, "events": list(reversed(events)),
-        "active": execution.status in ACTIVE_STATUSES or execution.status == ExecutionStatus.AWAITING_APPROVAL,
+        "active": execution.status in ACTIVE_STATUSES or awaiting,
         "terminal": is_terminal(execution.status), "node_var": status_info(execution.status)["var"],
-        "can_cancel": can_cancel,
+        "can_cancel": can_cancel or awaiting,  # en attente : rien n'est lancé, l'« annulation » est locale
+        "can_approve": awaiting,
     }
 
 
@@ -198,6 +200,21 @@ async def refresh(execution_id: str, request: Request, admin: User = Depends(req
         return await _after_action(request, admin, execution_id)
     except service.NotFoundError:
         return not_found(request, admin)
+
+
+@router.post("/executions/{execution_id}/approve", dependencies=[Depends(csrf_protect)])
+async def approve(
+    execution_id: str, request: Request, background: BackgroundTasks, admin: User = Depends(require_admin)
+):
+    """Validation humaine : l'exécution en attente passe en file puis est lancée."""
+    try:
+        await runner.approve_execution(admin.telegram_id, execution_id)
+    except service.NotFoundError:
+        return not_found(request, admin)
+    except service.ConflictError:
+        return RedirectResponse("/dev/", status_code=303)
+    background.add_task(_launch_safely, admin.telegram_id, execution_id)
+    return await _after_action(request, admin, execution_id)
 
 
 @router.post("/executions/{execution_id}/cancel", dependencies=[Depends(csrf_protect)])

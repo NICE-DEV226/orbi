@@ -183,6 +183,22 @@ class TestProjectValidation:
             await service.create_project(ALICE, "p", url)
 
 
+class TestGithubRepo:
+    """`github_repo` (« owner/repo ») sert à relier les webhooks CI aux projets (ADR-0009)."""
+
+    async def test_github_url_sets_github_repo(self):
+        project = await service.create_project(ALICE, "demo", "https://github.com/acme/demo")
+        assert project.github_repo == "acme/demo"
+
+    async def test_github_url_with_tree_path_still_maps(self):
+        project = await service.create_project(ALICE, "demo", "https://github.com/acme/demo/tree/main")
+        assert project.github_repo == "acme/demo"
+
+    async def test_non_github_url_has_no_github_repo(self):
+        project = await service.create_project(ALICE, "gitlab", "https://gitlab.com/acme/demo")
+        assert project.github_repo is None
+
+
 class TestExecutions:
     async def test_creation_assigns_durable_identifiers_before_any_call(self):
         _, _, task = await _setup()
@@ -392,3 +408,43 @@ class TestLegacySecretMigration:
 
         raw = await Integration.get_pymongo_collection().find_one({"_id": integration.id})
         assert "secret_ciphertext" not in raw
+
+
+class TestGithubRepoBackfill:
+    """Projets créés avant l'ajout de `github_repo` : la migration le déduit de `repo_url`."""
+
+    async def _legacy_project(self, repo_url: str):
+        from src.orbi_dev.models import Project
+
+        project = Project(owner_id=ALICE, name="legacy", repo_url=repo_url)
+        await project.insert()
+        await Project.get_pymongo_collection().update_one(
+            {"_id": project.id}, {"$unset": {"github_repo": ""}}
+        )
+        return project
+
+    async def test_github_project_gets_its_repo(self):
+        from src.orbi_dev.migrations import backfill_github_repo
+        from src.orbi_dev.models import Project
+
+        project = await self._legacy_project("https://github.com/acme/demo")
+
+        assert await backfill_github_repo() == 1
+        assert (await Project.get(project.id)).github_repo == "acme/demo"
+
+    async def test_non_github_project_stays_empty(self):
+        from src.orbi_dev.migrations import backfill_github_repo
+        from src.orbi_dev.models import Project
+
+        project = await self._legacy_project("https://gitlab.com/acme/demo")
+
+        assert await backfill_github_repo() == 0
+        assert (await Project.get(project.id)).github_repo is None
+
+    async def test_backfill_is_idempotent(self):
+        from src.orbi_dev.migrations import backfill_github_repo
+
+        await self._legacy_project("https://github.com/acme/demo")
+        await backfill_github_repo()
+
+        assert await backfill_github_repo() == 0

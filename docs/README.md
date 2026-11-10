@@ -17,6 +17,7 @@ Documentation de cadrage pour la reprise progressive du dépôt. Les documents d
 - [ADR-0006 : Python 3.14](adr/0006-python-3.14.md) — correction de la métadonnée de Beanie.
 - [ADR-0007 : Mini App Telegram](adr/0007-telegram-mini-app.md) — accès web depuis Telegram, cookies, limites.
 - [ADR-0008 : interface Jinja + htmx](adr/0008-web-ui-jinja-htmx.md) — un seul shell, sans framework CSS ni CDN.
+- [ADR-0009 : signal CI → tâche Orbi Dev](adr/0009-ci-failure-to-dev-task.md) — corrélation dépôt, approbation humaine, anti-rejeu (proposé).
 - [Design de l'interface](DESIGN.md) — anneau d'orbite, jetons, typographie, règles d'écriture.
 
 ## Statut
