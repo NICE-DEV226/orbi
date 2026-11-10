@@ -217,6 +217,57 @@ class TestCancel:
         assert len(rec.requests) == 2
 
 
+class TestSendInput:
+    """POST /v1/agents/{id}/runs avec delivery=steer : le remote control de Cursor (ADR-0010)."""
+
+    async def test_steer_posts_prompt_and_delivery(self):
+        rec = Recorder(json_response(202, {"delivery": "steered", "runId": "run-9"}))
+
+        await connector(rec).send_input(AGENT_ID, "Aussi couvre le cas d'erreur")
+
+        req = rec.requests[0]
+        assert (req.method, req.url.path) == ("POST", f"/v1/agents/{AGENT_ID}/runs")
+        assert json.loads(req.content) == {
+            "prompt": {"text": "Aussi couvre le cas d'erreur"}, "delivery": "steer"
+        }
+
+    async def test_queued_delivery_is_also_a_success(self):
+        rec = Recorder(json_response(202, {"delivery": "queued"}))
+        await connector(rec).send_input(AGENT_ID, "suite")
+
+    async def test_invalid_agent_id_cannot_change_the_request_path(self):
+        rec = Recorder()
+        for bad in ("../agents", "a/b", "bc-", "x" * 200, ""):
+            with pytest.raises(ConnectorError) as exc:
+                await connector(rec).send_input(bad, "salut")
+            assert exc.value.category == ErrorCategory.INVALID_REQUEST
+        assert not rec.requests
+
+    async def test_agent_busy_and_steer_refusals_surface_as_errors(self):
+        rec = Recorder(json_response(409, {"error": {"code": "agent_busy", "message": "busy"}}))
+        with pytest.raises(ConnectorError) as exc:
+            await connector(rec).send_input(AGENT_ID, "salut")
+        assert exc.value.category == ErrorCategory.CONFLICT
+
+        rec = Recorder(json_response(400, {"error": {"code": "validation_error", "message": "steer unavailable"}}))
+        with pytest.raises(ConnectorError) as exc:
+            await connector(rec).send_input(AGENT_ID, "salut")
+        assert exc.value.category == ErrorCategory.INVALID_REQUEST
+
+    async def test_lost_response_is_not_retried_blindly(self):
+        """Cursor peut avoir reçu le steer : un retry le compterait comme un nouveau prompt."""
+        rec = Recorder(*[httpx.ReadTimeout("slow")] * 3)
+        with pytest.raises(ConnectorError) as exc:
+            await connector(rec).send_input(AGENT_ID, "salut")
+        assert exc.value.outcome_unknown is True
+        assert len(rec.requests) == 1  # pas de second POST : pas de doublon
+
+    async def test_interact_is_declared_as_a_capability(self):
+        rec = Recorder(json_response(200, {"items": []}))
+        result = await connector(rec).verify()
+        assert Capability.INTERACT in result.capabilities
+
+
 class TestVerify:
     async def test_read_only_probe(self):
         rec = Recorder(json_response(200, {"items": []}))

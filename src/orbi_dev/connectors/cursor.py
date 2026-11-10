@@ -8,6 +8,7 @@ pour les hypothèses et ce qui n'a pas été vérifié contre un compte réel.
 
 import asyncio
 import logging
+import re
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -28,6 +29,8 @@ from src.orbi_dev.redact import sanitize_text
 logger = logging.getLogger("orbi.dev.cursor")
 
 DEFAULT_BASE_URL = "https://api.cursor.com"
+
+_AGENT_ID = re.compile(r"^bc-[A-Za-z0-9-]{1,120}$")
 
 _RUN_STATUS = {
     "CREATING": RemoteStatus.PENDING,
@@ -103,7 +106,10 @@ def error_from_response(response: httpx.Response) -> ConnectorError:
 class CursorCloudAgentsConnector(HttpConnector):
     provider = "cursor"
     display_name = "Cursor"
-    capabilities = frozenset({Capability.LAUNCH, Capability.STATUS, Capability.CANCEL, Capability.PULL_REQUEST})
+    # INTERACT : POST /v1/agents/{id}/runs avec delivery=steer (docs API, ADR-0010).
+    capabilities = frozenset(
+        {Capability.LAUNCH, Capability.STATUS, Capability.CANCEL, Capability.PULL_REQUEST, Capability.INTERACT}
+    )
 
     def __init__(
         self,
@@ -167,6 +173,21 @@ class CursorCloudAgentsConnector(HttpConnector):
         # Pas de retry sur résultat inconnu : l'appelant relit l'état via get().
         await self._request("POST", f"/v1/agents/{external_id}/runs/{run_id}/cancel")
         return await self.get(external_id)
+
+    async def send_input(self, external_id: str, message: str) -> None:
+        """
+        POST /v1/agents/{id}/runs avec `delivery: "steer"` : le message rejoint le tour en cours
+        de l'agent (remote control, ADR-0010). `steered` = injecté, `queued` = prochaine exécution —
+        les deux sont des succès. Un steer peut être retenté comme un nouveau prompt par Cursor :
+        on ne réessaie jamais après un résultat incertain (`retry_unknown=False` par défaut).
+        """
+        if not _AGENT_ID.fullmatch(external_id):
+            raise ConnectorError(ErrorCategory.INVALID_REQUEST, "Identifiant d'agent invalide")
+        await self._request(
+            "POST",
+            f"/v1/agents/{external_id}/runs",
+            json={"prompt": {"text": message}, "delivery": "steer"},
+        )
 
     # ── mapping ──
 

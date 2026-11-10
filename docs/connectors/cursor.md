@@ -22,11 +22,12 @@ La révocation dans Orbi **efface le secret local** et place les exécutions act
 | Lancer | `POST /v1/agents` avec `agentId` choisi par Orbi (`bc-<uuid>`), `prompt.text`, `repos[]`, `autoCreatePR: true` |
 | Suivre | `GET /v1/agents/{id}` puis `GET /v1/agents/{id}/runs/{latestRunId}` |
 | Annuler | `POST /v1/agents/{id}/runs/{runId}/cancel` |
+| Répondre (remote control, ADR-0010) | `POST /v1/agents/{id}/runs` avec `delivery: "steer"` — `steered` injecte le message dans le tour en cours, `queued` le met en file ; les deux sont des succès |
 | Pull request | `git.branches[].prUrl` du run |
 
 La vérification ne prouve que la validité de la clé : le **lancement et l'annulation ne sont vérifiables qu'en les exécutant** (plan, quota, accès au dépôt). Un échec se présente alors comme une erreur normalisée (`plan_or_quota`, `permission_denied`…).
 
-Non utilisés : flux SSE (le polling suffit, ADR-0003), archivage/suppression, follow-up, serveurs MCP, secrets d'environnement.
+Non utilisés : flux SSE (le polling suffit, ADR-0003), archivage/suppression, follow-up sans `delivery`, serveurs MCP, secrets d'environnement.
 
 ## Mapping des statuts
 
