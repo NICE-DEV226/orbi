@@ -14,6 +14,7 @@ class Capability(StrEnum):
     STATUS = "status"
     CANCEL = "cancel"
     PULL_REQUEST = "pull_request"
+    INTERACT = "interact"  # remote control : envoyer un message à une exécution en cours (ADR-0010)
 
 
 class ErrorCategory(StrEnum):
@@ -116,6 +117,10 @@ class BaseConnector:
 
     async def cancel(self, external_id: str) -> RemoteRun:
         raise self._unsupported(Capability.CANCEL)
+
+    async def send_input(self, external_id: str, message: str) -> None:
+        """Envoie un message utilisateur à une exécution existante (remote control, ADR-0010)."""
+        raise self._unsupported(Capability.INTERACT)
 
     async def aclose(self) -> None:
         return None

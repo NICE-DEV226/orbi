@@ -9,6 +9,7 @@ Le comportement se pilote avec des marqueurs dans le prompt :
   [auth]     le lancement est refusé (clé invalide)
   [lost]     le lancement réussit côté fournisseur mais la réponse est perdue (timeout)
   [slow]     l'exécution ne se termine jamais
+  [ask]      l'agent pose une question et attend une réponse (remote control) jusqu'à send_input
 """
 
 from src.orbi_dev.connectors.base import (
@@ -25,7 +26,9 @@ from src.orbi_dev.connectors.base import (
 
 class FakeConnector(BaseConnector):
     provider = "fake"
-    capabilities = frozenset({Capability.LAUNCH, Capability.STATUS, Capability.CANCEL, Capability.PULL_REQUEST})
+    capabilities = frozenset(
+        {Capability.LAUNCH, Capability.STATUS, Capability.CANCEL, Capability.PULL_REQUEST, Capability.INTERACT}
+    )
 
     # État « côté fournisseur », partagé dans le process.
     _runs: dict[str, dict] = {}
@@ -65,6 +68,13 @@ class FakeConnector(BaseConnector):
         run["polls"] += 1
         return self._snapshot(external_id)
 
+    async def send_input(self, external_id: str, message: str) -> None:
+        run = self._runs.get(external_id)
+        if run is None:
+            raise ConnectorError(ErrorCategory.NOT_FOUND, "Agent introuvable")
+        run.setdefault("messages", []).append(message)
+        run["answered"] = True
+
     async def cancel(self, external_id: str) -> RemoteRun:
         run = self._runs.get(external_id)
         if run is None:
@@ -82,6 +92,10 @@ class FakeConnector(BaseConnector):
         polls, prompt = run["polls"], run["prompt"]
         if "[slow]" in prompt or polls < 2:
             return RemoteRun(RemoteStatus.PENDING if polls == 0 else RemoteStatus.RUNNING, external_id, url)
+        if "[ask]" in prompt and not run.get("answered"):
+            return RemoteRun(
+                RemoteStatus.WAITING, external_id, url, error_message="L'agent attend une réponse."
+            )
         if "[fail]" in prompt:
             return RemoteRun(RemoteStatus.FAILED, external_id, url, error_message="Échec simulé de l'agent")
         repo = run["repo"].removeprefix("https://github.com/")

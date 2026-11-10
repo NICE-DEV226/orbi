@@ -11,10 +11,12 @@ from telegram.ext import ContextTypes
 from src.bot.screen import edit_screen
 from src.core.text import esc
 from src.orbi_dev import cards, runner, service
+from src.orbi_dev.connectors.base import ConnectorError
 from src.orbi_dev.look import PLUS, PRIMARY, SUCCESS, quote
 from src.orbi_dev.models import IntegrationStatus
 from src.orbi_dev.notifier import build_keyboard, first_line
 from src.orbi_dev.present import STATUS_ICON, provider_name
+from src.orbi_dev.state import ExecutionStatus
 
 from .common import (
     CB_CHANGE_PROJECT,
@@ -99,7 +101,10 @@ async def show_execution(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.callback_query.answer("Tâche introuvable.", show_alert=True)
         return
     text, _ = await cards.render(execution)
-    keyboard = build_keyboard(execution)
+    can_interact = execution.status in (ExecutionStatus.RUNNING, ExecutionStatus.NEEDS_ATTENTION) and (
+        await service.execution_interact_capable(owner, execution)
+    )
+    keyboard = build_keyboard(execution, can_interact=can_interact)
     rows = [list(row) for row in keyboard.inline_keyboard] if keyboard else []
     rows.append([back("Tâches", CB_LIST)])
     await show(update, text, InlineKeyboardMarkup(rows))
@@ -305,6 +310,34 @@ async def _launch_safely(owner_id: int, execution_id: str) -> None:
         await runner.launch_execution(owner_id, execution_id)
     except Exception:
         logger.exception("Lancement %s en échec", execution_id)
+
+
+async def handle_agent_reply(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, owner: int, text: str
+) -> None:
+    """« reply » : le texte est transmis à l'agent en cours (remote control, ADR-0010)."""
+    draft = draft_of(context)
+    execution_id = draft.get("execution_id")
+    if not execution_id:
+        clear_draft(context)
+        await update.message.reply_text("Cette demande de réponse a expiré : recommencez depuis la carte.")
+        return
+    try:
+        await runner.send_input_to_execution(owner, execution_id, text)
+    except service.NotFoundError:
+        clear_draft(context)
+        await update.message.reply_text("Exécution introuvable.")
+        return
+    except (service.ConflictError, ValueError, ConnectorError) as e:
+        detail = e.message if isinstance(e, ConnectorError) else str(e)
+        await update.message.reply_text(f"<b>Message non transmis.</b> {esc(detail)}")
+        return
+    clear_draft(context)
+    await update.message.reply_text("<b>Message transmis à l'agent.</b> Vous serez prévenu de la suite.")
+    try:
+        context.application.create_task(cards.update_cards(context.bot))
+    except Exception:
+        logger.debug("Actualisation de carte après réponse impossible", exc_info=True)
 
 
 async def launch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

@@ -6,6 +6,7 @@ donne accès à rien, le service ne retrouve que les données de l'appuyeur.
 """
 
 import logging
+import time
 
 from telegram import Update
 from telegram.error import BadRequest
@@ -14,7 +15,15 @@ from telegram.ext import CallbackQueryHandler, ContextTypes
 from src.models.user import User
 from src.orbi_dev import cards, runner, service
 from src.orbi_dev.access import can_use_orbi_dev
-from src.orbi_dev.notifier import CB_APPROVE, CB_CHECK, CB_IGNORE, CB_RETRY, build_keyboard
+from src.orbi_dev.notifier import (
+    CB_APPROVE,
+    CB_CHECK,
+    CB_IGNORE,
+    CB_REPLY,
+    CB_RETRY,
+    build_keyboard,
+)
+from src.orbi_dev.state import ExecutionStatus
 
 logger = logging.getLogger("orbi.handlers.orbi_dev")
 
@@ -117,6 +126,28 @@ async def ignore_execution(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await cards.update_cards(query.get_bot())
 
 
+async def reply_to_agent(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Remote control (ADR-0010) : « Répondre à l'agent » arme la saisie — le prochain message texte
+    est transmis à l'exécution par `dev_hub.messages` → `runner.send_input_to_execution`.
+    """
+    query = update.callback_query
+    owner_id = await _authorize(update, context)
+    if owner_id is None:
+        return
+    execution_id = query.data.removeprefix(CB_REPLY)
+    try:
+        execution = await service.get_execution(owner_id, execution_id)
+    except service.NotFoundError:
+        await query.answer("Exécution introuvable.", show_alert=True)
+        return
+    if execution.status not in (ExecutionStatus.RUNNING, ExecutionStatus.NEEDS_ATTENTION) or not execution.external_id:
+        await query.answer("L'agent n'accepte plus de message.", show_alert=True)
+        return
+    context.user_data["dev"] = {"step": "reply", "execution_id": execution_id, "at": time.monotonic()}
+    await query.answer("Envoyez votre message : il sera transmis à l'agent.")
+
+
 async def _drop_action(query, execution) -> None:
     """Retire le bouton d'action (évite un double clic) en gardant « Ouvrir » et « Voir la PR »."""
     try:
@@ -130,3 +161,4 @@ def register_orbi_dev_handlers(application) -> None:
     application.add_handler(CallbackQueryHandler(check_execution, pattern=rf"^{CB_CHECK}"))
     application.add_handler(CallbackQueryHandler(approve_execution, pattern=rf"^{CB_APPROVE}"))
     application.add_handler(CallbackQueryHandler(ignore_execution, pattern=rf"^{CB_IGNORE}"))
+    application.add_handler(CallbackQueryHandler(reply_to_agent, pattern=rf"^{CB_REPLY}"))

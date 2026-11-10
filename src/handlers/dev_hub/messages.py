@@ -13,14 +13,15 @@ from src.orbi_dev.inputs import MAX_PROMPT, MIN_PROMPT, clean_text
 
 from .common import DRAFT_TTL, allowed, back, clear_draft, draft_of, is_stale
 from .projects import cancel_markup, handle_edit_text, handle_repo_text
-from .tasks import advance
+from .tasks import advance, handle_agent_reply
 
-STEPS = ("repo", "prompt", "rename", "branch")
+STEPS = ("repo", "prompt", "rename", "branch", "reply")
 WAITING_FOR = {
     "repo": "l'adresse du dépôt",
     "prompt": "la consigne de la tâche",
     "rename": "le nouveau nom",
     "branch": "le nom de la branche",
+    "reply": "votre réponse à l'agent",
 }
 
 
@@ -50,6 +51,8 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     if step == "repo":
         await handle_repo_text(update, context, text)
+    elif step == "reply":
+        await handle_agent_reply(update, context, owner, text)
     elif step in ("rename", "branch"):
         await handle_edit_text(update, context, owner, step, text)
     else:

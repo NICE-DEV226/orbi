@@ -8,7 +8,8 @@ from telegram.error import BadRequest, NetworkError
 
 from src.handlers import dev_hub
 from src.models.user import User
-from src.orbi_dev import cards, service
+from src.orbi_dev import cards, runner, service
+from src.orbi_dev.connectors.fake import FakeConnector
 from src.orbi_dev.inputs import parse_repo
 from src.orbi_dev.models import Execution, Project, Task
 from src.orbi_dev.state import ExecutionStatus
@@ -56,6 +57,7 @@ class Chat:
     def button(self, data: str):
         query = MagicMock()
         query.data = data
+        query.from_user.id = self.user.telegram_id
         query.message.photo = ()
         query.message.chat_id = self.user.telegram_id
         query.message.message_id = 700
@@ -920,3 +922,55 @@ class TestStructure:
         await Execution.get_pymongo_collection().update_one({"_id": ex.id}, {"$set": {"status": "succeeded"}})
         await chat.press(dev_hub.show_home, "dv:home")  # tâches terminées seulement
         assert "Rien en cours." in chat.last and "✓" in chat.last and not emojis_in(all_text(chat))
+
+
+class TestAgentReply:
+    """Remote control (ADR-0010) : « Répondre à l'agent » puis le prochain texte part au fournisseur."""
+
+    async def _waiting_execution(self, owner: int, chat: Chat):
+        FakeConnector.reset()
+        project = await service.create_project(owner, "demo", REPO)
+        integration = await runner.connect_integration(owner, "fake", "secret-key")
+        task = await service.create_task(owner, str(project.id), str(integration.id), "question [ask]")
+        execution = await service.create_execution(owner, str(task.id))
+        await runner.launch_execution(owner, str(execution.id))
+        await runner.refresh_execution(owner, str(execution.id))
+        await runner.refresh_execution(owner, str(execution.id))
+        execution = await service.get_execution(owner, str(execution.id))
+        assert execution.status == ExecutionStatus.NEEDS_ATTENTION
+        return execution
+
+    async def test_reply_button_arms_the_flow_and_text_reaches_the_agent(self):
+        from src.handlers import orbi_dev as notifications
+        from src.orbi_dev.notifier import CB_REPLY
+
+        chat = Chat(await admin(9201))
+        execution = await self._waiting_execution(9201, chat)
+
+        await chat.press(notifications.reply_to_agent, f"{CB_REPLY}{execution.id}")
+        assert chat.context.user_data["dev"]["step"] == "reply"
+        assert "transmis" in chat.alerts[-1]
+
+        await chat.say(dev_hub.on_text, "Utilise Python 3.12")
+        assert FakeConnector._runs[execution.external_id]["messages"] == ["Utilise Python 3.12"]
+        assert "dev" not in chat.context.user_data  # le brouillon est oublié après envoi
+        assert "transmis à l'agent" in chat.last.lower()
+
+    async def test_reply_button_refuses_a_finished_execution(self):
+        from src.handlers import orbi_dev as notifications
+        from src.orbi_dev.notifier import CB_REPLY
+
+        chat = Chat(await admin(9202))
+        project = await service.create_project(9202, "demo", REPO)
+        integration = await service.create_integration(9202, "fake", "k")
+        task = await service.create_task(9202, str(project.id), str(integration.id), "t")
+        execution = await service.create_execution(9202, str(task.id))
+
+        await chat.press(notifications.reply_to_agent, f"{CB_REPLY}{execution.id}")
+        assert "n'accepte plus de message" in chat.alerts[-1]
+        assert "dev" not in chat.context.user_data
+
+    async def test_text_without_armed_reply_is_ignored(self):
+        chat = Chat(await admin(9203))
+        await chat.say(dev_hub.on_text, "un message au hasard")
+        assert chat.shown == []

@@ -21,12 +21,13 @@ Chaque personne connecte sa propre clé : elle est rattachée à son compte Orbi
 | Lancer | `GET /v1alpha/sources` pour retrouver le nom de la source du dépôt, puis `POST /v1alpha/sessions` (`prompt`, `title`, `sourceContext.githubRepoContext.startingBranch`, `automationMode: AUTO_CREATE_PR`) |
 | Suivre | `GET /v1alpha/sessions/{id}` ; `GET .../activities` pour la raison d'un échec ou le dernier message de l'agent |
 | Pull request | `outputs[].pullRequest.url` |
+| Répondre (remote control, ADR-0010) | `POST /v1alpha/sessions/{id}:sendMessage` (`prompt`) — transmet un message à la session active ; n'approuve pas un plan (`approvePlan` non exposé) |
 | Annuler | **Non déclarée** : aucune annulation n'est documentée. Orbi masque le bouton « Arrêter » et refuse explicitement la demande. |
 
 ## Différences avec Cursor, et ce qu'Orbi en fait
 
 - **Pas d'identifiant choisi par le client.** Un lancement dont la réponse est perdue ne peut pas être « adopté » par un identifiant connu d'avance. Orbi place donc un repère `[orbi:<référence>]` dans le **titre** de la session, ne réessaie jamais un `POST` après un délai dépassé (risque de doublon), et retrouve la session en listant les sessions (`find_by_client_ref`). Introuvable : `needs_attention`, jamais de relance à l'aveugle ; la recherche reprend à chaque passage de suivi.
-- **L'agent peut attendre l'utilisateur** (`AWAITING_USER_FEEDBACK`, `AWAITING_PLAN_APPROVAL`, `PAUSED`). Orbi passe l'exécution en « À vérifier », affiche la dernière question de l'agent, envoie la notification Telegram avec un lien vers la session, et reprend le suivi quand vous avez répondu dans Jules.
+- **L'agent peut attendre l'utilisateur** (`AWAITING_USER_FEEDBACK`, `AWAITING_PLAN_APPROVAL`, `PAUSED`). Orbi passe l'exécution en « À vérifier », affiche la dernière question de l'agent, envoie la notification Telegram avec un lien vers la session, et — puisque Jules expose `sendMessage` — propose « Répondre à l'agent » dans Telegram et sur le web (ADR-0010). L'approbation d'un plan reste à faire dans Jules : `sendMessage` ne couvre pas `approvePlan`.
 - **Clé invalide en HTTP 400.** Google renvoie `INVALID_ARGUMENT` (raison `API_KEY_INVALID`), pas 401 : les deux sont reconnus comme « clé refusée ».
 - **Quota.** `RESOURCE_EXHAUSTED` est traité comme un quota épuisé (non réessayé), sauf si la réponse indique un délai d'attente (alors limite de débit, réessayée avec ce délai).
 
