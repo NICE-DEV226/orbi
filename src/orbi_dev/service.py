@@ -421,7 +421,7 @@ async def add_event(
 
 async def set_execution_fields(execution: Execution, **fields: Any) -> None:
     """Met à jour des champs de suivi sans changer de statut (ex. identifiant externe, compteurs)."""
-    allowed = _TRANSITION_FIELDS | {"poll_count", "last_polled_at", "attempt"}
+    allowed = _TRANSITION_FIELDS | {"poll_count", "last_polled_at", "attempt", "ci_verified_at"}
     unknown = set(fields) - allowed
     if unknown:
         raise ValueError(f"Champs non autorisés : {sorted(unknown)}")

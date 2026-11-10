@@ -21,7 +21,9 @@ def encryption_key(monkeypatch):
     get_settings.cache_clear()
 
 
-def _ci_log(conclusion="failure", repository=REPO, event_type="check_run", delivery="d-1") -> GithubWebhookLog:
+def _ci_log(
+    conclusion="failure", repository=REPO, event_type="check_run", delivery="d-1", branch=""
+) -> GithubWebhookLog:
     return GithubWebhookLog(
         event_type=event_type,
         action="completed",
@@ -31,6 +33,7 @@ def _ci_log(conclusion="failure", repository=REPO, event_type="check_run", deliv
             "conclusion": conclusion,
             "check_name": "tests",
             "sha": "abc123",
+            "branch": branch,
             "url": "https://github.com/acme/demo/runs/1",
         },
         delivery_id=delivery,
@@ -110,6 +113,62 @@ class TestCiRouting:
         prompt = build_ci_prompt(REPO, "tests", "abc123", "https://x")
         assert "acme/demo" in prompt and "abc123" in prompt and "https://x" in prompt
         assert "pull request" in prompt
+
+
+class TestCiVerification:
+    """CI verte sur la branche d'une PR : l'exécution est marquée et le propriétaire notifié (ADR-0009)."""
+
+    async def _succeeded_with_pr(self, owner=ALICE, branch="fix/bug", pr_url="https://github.com/acme/demo/pull/1"):
+        project = await service.create_project(owner, "demo", "https://github.com/acme/demo")
+        integration = await service.create_integration(owner, "fake", SECRET, capabilities=["launch"])
+        task = await service.create_task(owner, str(project.id), str(integration.id), "Corrige")
+        execution = await service.create_execution(owner, str(task.id))
+        await Execution.get_pymongo_collection().update_one(
+            {"_id": execution.id},
+            {"$set": {"status": "succeeded", "branch": branch, "pr_url": pr_url}},
+        )
+        return await Execution.get(execution.id)
+
+    async def test_green_ci_on_pr_branch_marks_the_execution(self):
+        execution = await self._succeeded_with_pr()
+
+        assert await route_ci_event(_ci_log(conclusion="success", branch="fix/bug")) == 0
+
+        updated = await Execution.get(execution.id)
+        assert updated.ci_verified_at is not None
+        events = await service.list_events(ALICE, str(execution.id))
+        assert any("vérifié" in e.message for e in events)
+
+    async def test_verification_is_announced_once(self):
+        execution = await self._succeeded_with_pr()
+
+        await route_ci_event(_ci_log(conclusion="success", branch="fix/bug", delivery="v-1"))
+        await route_ci_event(_ci_log(conclusion="success", branch="fix/bug", delivery="v-2"))
+
+        updated = await Execution.get(execution.id)
+        assert updated.ci_verified_at is not None
+        events = [e for e in await service.list_events(ALICE, str(execution.id)) if "vérifié" in e.message]
+        assert len(events) == 1
+
+    async def test_green_ci_elsewhere_verifies_nothing(self):
+        await self._succeeded_with_pr(branch="fix/bug")
+
+        assert await route_ci_event(_ci_log(conclusion="success", branch="main")) == 0
+        assert (await Execution.find(Execution.branch == "fix/bug").to_list())[0].ci_verified_at is None
+
+    async def test_execution_without_pr_is_not_verified(self):
+        execution = await self._succeeded_with_pr(pr_url=None)
+
+        await route_ci_event(_ci_log(conclusion="success", branch="fix/bug"))
+
+        assert (await Execution.get(execution.id)).ci_verified_at is None
+
+    async def test_other_repository_is_ignored(self):
+        await self._succeeded_with_pr()
+
+        await route_ci_event(_ci_log(conclusion="success", repository="other/repo", branch="fix/bug"))
+
+        assert (await Execution.find(Execution.branch == "fix/bug").to_list())[0].ci_verified_at is None
 
 
 class TestApproval:

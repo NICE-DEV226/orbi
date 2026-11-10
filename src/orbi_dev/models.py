@@ -138,6 +138,7 @@ class Execution(Document):
     # Suivi
     version: int = 0  # incrémenté à chaque transition (contrôle de concurrence)
     notified_status: str | None = None  # dernier état signalé au propriétaire sur Telegram (voir notifier.py)
+    ci_verified_at: datetime | None = None  # CI verte observée sur la branche de la PR (voir ci.py, ADR-0009)
     notify_attempts: int = 0
     # Carte de suivi dans Telegram : un message unique, édité à chaque changement d'état (voir cards.py)
     card_chat_id: int | None = None

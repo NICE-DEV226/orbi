@@ -23,14 +23,14 @@ from src.core.security import check_bearer
 logger = logging.getLogger("orbi.main")
 
 
-async def _process_github_event(event_type: str, payload: dict, delivery_id: str) -> None:
-    """Journalise le webhook puis route les échecs CI vers Orbi Dev (ADR-0009)."""
+async def _process_github_event(event_type: str, payload: dict, delivery_id: str, bot=None) -> None:
+    """Journalise le webhook puis route les événements CI vers Orbi Dev (ADR-0009)."""
     from src.orbi_dev.ci import route_ci_event
     from src.services.developer_service import process_github_webhook
 
     log = await process_github_webhook(event_type, payload, delivery_id)
     try:
-        await route_ci_event(log)
+        await route_ci_event(log, bot)
     except Exception:
         logger.exception("Routage CI du webhook GitHub %s en échec", delivery_id)
 
@@ -239,8 +239,12 @@ def create_app() -> FastAPI:
         except Exception:
             return {"status": "error", "reason": "invalid_json"}
 
-        # Journaliser puis router l'événement en arrière-plan
-        background_tasks.add_task(_process_github_event, event_type, payload, delivery_id)
+        # Journaliser puis router l'événement en arrière-plan (bot si déjà démarré, pour les notifications)
+        bot_app = getattr(request.app.state, "bot_app", None)
+        background_tasks.add_task(
+            _process_github_event, event_type, payload, delivery_id,
+            bot_app.bot if bot_app is not None else None,
+        )
 
         return {"status": "accepted"}
 

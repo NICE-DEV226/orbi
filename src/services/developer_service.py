@@ -21,13 +21,14 @@ logger = logging.getLogger("orbi.services.developer")
 _CI_FAILURE_EVENTS = ("check_run", "check_suite", "workflow_run")
 
 
-def _ci_failure_details(event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
-    """Extrait ce qu'il faut pour une tâche de correction : quoi, quel commit, où voir le détail."""
+def _ci_details(event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Extrait ce qu'il faut pour une tâche de correction ou sa vérification : quoi, quel commit, quelle branche, où voir."""
     if event_type == "check_run":
         run = payload.get("check_run") or {}
         return {
             "check_name": run.get("name", ""),
             "sha": run.get("head_sha", ""),
+            "branch": run.get("head_branch") or "",
             "url": run.get("html_url") or run.get("details_url") or "",
         }
     if event_type == "check_suite":
@@ -35,12 +36,14 @@ def _ci_failure_details(event_type: str, payload: dict[str, Any]) -> dict[str, A
         return {
             "check_name": suite.get("app", {}).get("slug", "") if isinstance(suite.get("app"), dict) else "",
             "sha": suite.get("head_sha", ""),
+            "branch": suite.get("head_branch") or "",
             "url": suite.get("url", ""),
         }
     run = payload.get("workflow_run") or {}
     return {
         "check_name": run.get("name", ""),
         "sha": run.get("head_sha", ""),
+        "branch": run.get("head_branch") or "",
         "url": run.get("html_url", ""),
     }
 
@@ -108,7 +111,7 @@ async def process_github_webhook(
         details["state"] = item.get("state", "")
     elif event_type in _CI_FAILURE_EVENTS:
         details["conclusion"] = _ci_conclusion(event_type, payload)
-        details.update(_ci_failure_details(event_type, payload))
+        details.update(_ci_details(event_type, payload))
 
     log = GithubWebhookLog(
         event_type=event_type,
