@@ -144,7 +144,9 @@ async def retry_task(task_id: str, background: BackgroundTasks, request: Request
 # Exécutions
 # ─────────────────────────────────────
 
-async def _panel_context(admin: User, execution_id: str) -> dict[str, Any]:
+async def _panel_context(
+    admin: User, execution_id: str, action_error: str | None = None
+) -> dict[str, Any]:
     execution: Execution = await service.get_execution(admin.telegram_id, execution_id)
     task = await service.get_task(admin.telegram_id, execution.task_id)
     events = await service.list_events(admin.telegram_id, execution_id)
@@ -158,12 +160,17 @@ async def _panel_context(admin: User, execution_id: str) -> dict[str, Any]:
     except service.NotFoundError:
         can_cancel = False
     awaiting = execution.status == ExecutionStatus.AWAITING_APPROVAL
+    can_interact = (
+        execution.status in (ExecutionStatus.RUNNING, ExecutionStatus.NEEDS_ATTENTION)
+        and bool(execution.external_id)
+        and await service.execution_interact_capable(admin.telegram_id, execution)
+    )
     return {
         "execution": execution, "task": task, "project": project, "events": list(reversed(events)),
         "active": execution.status in ACTIVE_STATUSES or awaiting,
         "terminal": is_terminal(execution.status), "node_var": status_info(execution.status)["var"],
         "can_cancel": can_cancel or awaiting,  # en attente : rien n'est lancé, l'« annulation » est locale
-        "can_approve": awaiting,
+        "can_approve": awaiting, "can_interact": can_interact, "action_error": action_error,
     }
 
 
@@ -186,11 +193,15 @@ async def execution_panel(execution_id: str, request: Request, admin: User = Dep
     return render(request, "runs/_panel.html", admin, **context)
 
 
-async def _after_action(request: Request, admin: User, execution_id: str):
+async def _after_action(
+    request: Request, admin: User, execution_id: str, action_error: str | None = None
+):
     """Après une action : le fragment mis à jour pour htmx, sinon retour sur la page."""
     if not is_htmx(request):
         return RedirectResponse(f"/dev/executions/{execution_id}", status_code=303)
-    return render(request, "runs/_panel.html", admin, **await _panel_context(admin, execution_id))
+    return render(
+        request, "runs/_panel.html", admin, **await _panel_context(admin, execution_id, action_error)
+    )
 
 
 @router.post("/executions/{execution_id}/refresh", dependencies=[Depends(csrf_protect)])
@@ -214,6 +225,22 @@ async def approve(
     except service.ConflictError:
         return RedirectResponse("/dev/", status_code=303)
     background.add_task(_launch_safely, admin.telegram_id, execution_id)
+    return await _after_action(request, admin, execution_id)
+
+
+@router.post("/executions/{execution_id}/message", dependencies=[Depends(csrf_protect)])
+async def send_message(
+    execution_id: str, request: Request, admin: User = Depends(require_admin), message: str = Form(...)
+):
+    """Remote control (ADR-0010) : transmet un message à l'agent en cours, si le fournisseur le permet."""
+    try:
+        await runner.send_input_to_execution(admin.telegram_id, execution_id, message)
+    except service.NotFoundError:
+        return not_found(request, admin)
+    except (service.ConflictError, ValueError) as e:
+        return await _after_action(request, admin, execution_id, str(e))
+    except ConnectorError as e:
+        return await _after_action(request, admin, execution_id, friendly(e))
     return await _after_action(request, admin, execution_id)
 
 

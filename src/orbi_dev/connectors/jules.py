@@ -143,7 +143,10 @@ class JulesConnector(HttpConnector):
     provider = "jules"
     display_name = "Jules"
     # Pas d'annulation : l'API v1alpha n'en documente aucune (voir docs/connectors/jules.md).
-    capabilities = frozenset({Capability.LAUNCH, Capability.STATUS, Capability.PULL_REQUEST})
+    # INTERACT : sessions.sendMessage (docs API, ADR-0010) — n'approuve pas un plan (approvePlan séparé).
+    capabilities = frozenset(
+        {Capability.LAUNCH, Capability.STATUS, Capability.PULL_REQUEST, Capability.INTERACT}
+    )
 
     def __init__(
         self,
@@ -190,6 +193,12 @@ class JulesConnector(HttpConnector):
         if state in ("COMPLETED", "FAILED", "AWAITING_USER_FEEDBACK"):
             remote = await self._with_activity_details(remote, session)
         return remote
+
+    async def send_input(self, external_id: str, message: str) -> None:
+        """POST sessions/{id}:sendMessage — réponse à une session active (remote control, ADR-0010)."""
+        await self._request(
+            "POST", f"{API}/sessions/{self._session_id(external_id)}:sendMessage", json={"prompt": message}
+        )
 
     async def find_by_client_ref(self, client_ref: str) -> RemoteRun | None:
         marker = self._marker(client_ref)

@@ -18,6 +18,8 @@ from typing import Any
 from beanie import PydanticObjectId
 from pymongo import ReturnDocument
 
+from src.orbi_dev.connectors.base import Capability
+from src.orbi_dev.connectors.registry import provider_capabilities
 from src.orbi_dev.crypto import encrypt_secret
 from src.orbi_dev.inputs import parse_name, parse_repo, valid_branch
 from src.orbi_dev.models import (
@@ -417,6 +419,20 @@ async def add_event(
 ) -> ExecutionEvent:
     execution = await get_execution(owner_id, execution_id)
     return await _append_event(execution, kind, message=message, data=data)
+
+
+async def execution_interact_capable(owner_id: int, execution: Execution) -> bool:
+    """
+    L'interface peut proposer « Répondre à l'agent » si le fournisseur déclare INTERACT et que
+    l'intégration est active (indice d'interface, ADR-0010 ; le garde-fou réel est à l'appel chez le runner).
+    """
+    if Capability.INTERACT not in provider_capabilities(execution.provider):
+        return False
+    try:
+        integration = await get_integration(owner_id, execution.integration_id)
+    except NotFoundError:
+        return False
+    return integration.status == IntegrationStatus.ACTIVE
 
 
 async def set_execution_fields(execution: Execution, **fields: Any) -> None:

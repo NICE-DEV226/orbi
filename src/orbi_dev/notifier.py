@@ -45,6 +45,7 @@ CB_RETRY = "devx:retry:"
 CB_CHECK = "devx:check:"
 CB_APPROVE = "devx:approve:"
 CB_IGNORE = "devx:ignore:"
+CB_REPLY = "dv:rep:"  # remote control : armé puis le prochain texte est transmis à l'agent (ADR-0010)
 
 _HEADLINES: dict[ExecutionStatus, str] = {
     status: f"{STATUS_ICON[status]} <b>{STATUS_INFO[status][0]}</b>" for status in NOTIFY_STATUSES
@@ -79,7 +80,9 @@ def _safe_https(url: str | None) -> str | None:
     return url if url and url.startswith("https://") and " " not in url else None
 
 
-def build_keyboard(execution: Execution, *, with_action: bool = True) -> InlineKeyboardMarkup | None:
+def build_keyboard(
+    execution: Execution, *, with_action: bool = True, can_interact: bool = False
+) -> InlineKeyboardMarkup | None:
     """Ouvrir (Mini App, seulement si l'URL publique est en https), voir la PR, puis l'action qui convient."""
     settings = get_settings()
     status = ExecutionStatus(execution.status)
@@ -107,6 +110,8 @@ def build_keyboard(execution: Execution, *, with_action: bool = True) -> InlineK
         ])
     elif status in (S.QUEUED, S.RUNNING, S.CANCEL_REQUESTED):
         rows.append([InlineKeyboardButton(f"{REFRESH} Actualiser", callback_data=f"{CB_CHECK}{execution.id}")])
+    if with_action and can_interact and status in (S.RUNNING, S.NEEDS_ATTENTION):
+        rows.append([InlineKeyboardButton("Répondre à l'agent", callback_data=f"{CB_REPLY}{execution.id}")])
     return InlineKeyboardMarkup(rows) if rows else None
 
 
@@ -143,10 +148,13 @@ async def _announce(bot: Bot, execution: Execution) -> str:
     reply = {}
     if execution.card_message_id:
         reply["reply_parameters"] = ReplyParameters(message_id=execution.card_message_id, allow_sending_without_reply=True)
+    can_interact = execution.status in (S.RUNNING, S.NEEDS_ATTENTION) and await service.execution_interact_capable(
+        execution.owner_id, execution
+    )
     try:
         await bot.send_message(
             chat_id=execution.owner_id, text=build_text(execution, prompt, project),
-            reply_markup=build_keyboard(execution), **reply,
+            reply_markup=build_keyboard(execution, can_interact=can_interact), **reply,
         )
     except Forbidden:
         logger.info("Notification Orbi Dev non remise : l'utilisateur %s a bloqué le bot", execution.owner_id)

@@ -34,6 +34,7 @@ class FakeJules:
         }]
         self.sessions: dict[str, dict] = {}
         self.activities: dict[str, list[dict]] = {}
+        self.messages: dict[str, list[str]] = {}
         self.requests: list[httpx.Request] = []
         self.lose_next_create = False
         self.fail_activities = False
@@ -80,6 +81,15 @@ class FakeJules:
                 return httpx.Response(503, json={"error": {"status": "UNAVAILABLE", "message": "down"}})
             session_id = path.split("/")[3]
             return httpx.Response(200, json={"activities": self.activities.get(session_id, [])})
+        if path.startswith("/v1alpha/sessions/") and path.endswith(":sendMessage") and method == "POST":
+            session_id = path.split("/")[3].split(":")[0]
+            session = self.sessions.get(session_id)
+            if session is None:
+                return httpx.Response(404, json={"error": {"status": "NOT_FOUND", "message": "no such session"}})
+            self.messages.setdefault(session_id, []).append(json.loads(request.content)["prompt"])
+            if session.get("state") == "AWAITING_USER_FEEDBACK":
+                session["state"] = "IN_PROGRESS"
+            return httpx.Response(200, json={})
         if path.startswith("/v1alpha/sessions/") and method == "GET":
             session = self.sessions.get(path.rsplit("/", 1)[1])
             if session is None:
@@ -330,6 +340,46 @@ class TestStateMapping:
             await connector(FakeJules()).cancel("s1")
         assert exc.value.category == ErrorCategory.UNSUPPORTED_CAPABILITY
 
+
+class TestSendMessage:
+    """sessions.sendMessage : le remote control de Jules (ADR-0010)."""
+
+    async def test_send_message_posts_the_prompt_to_the_session(self):
+        server = FakeJules()
+        c = connector(server)
+        await c.launch(REQUEST)
+        await c.send_input("s1", "Utilise Python 3.12")
+
+        call = [r for r in server.requests if r.url.path.endswith(":sendMessage")][0]
+        assert call.method == "POST" and call.url.path == "/v1alpha/sessions/s1:sendMessage"
+        assert json.loads(call.content) == {"prompt": "Utilise Python 3.12"}
+        assert server.messages["s1"] == ["Utilise Python 3.12"]
+
+    async def test_send_message_resumes_a_session_waiting_for_feedback(self):
+        server = FakeJules()
+        c = connector(server)
+        await c.launch(REQUEST)
+        finish(server, "s1", "AWAITING_USER_FEEDBACK")
+        await c.send_input("s1", "voici la réponse")
+        assert server.sessions["s1"]["state"] == "IN_PROGRESS"
+
+    async def test_send_message_on_unknown_session_is_not_found(self):
+        with pytest.raises(ConnectorError) as exc:
+            await connector(FakeJules()).send_input("nope", "salut")
+        assert exc.value.category == ErrorCategory.NOT_FOUND
+
+    @pytest.mark.parametrize("bad", ["../sessions", "a/b", "s1?x=1", "", "a b"])
+    async def test_session_ids_cannot_change_the_request_path(self, bad):
+        server = FakeJules()
+        with pytest.raises(ConnectorError):
+            await connector(server).send_input(bad, "salut")
+        assert not server.requests
+
+    async def test_interact_is_declared_as_a_capability(self):
+        server = FakeJules()
+        result = await connector(server).verify()
+        assert Capability.INTERACT in result.capabilities
+
     async def test_the_key_is_not_in_any_error_message(self):
         server = FakeJules()
         server.sources = []
@@ -365,7 +415,7 @@ async def jules_execution(prompt="Ajoute un README"):
 class TestThroughTheRunner:
     async def test_connecting_stores_capabilities_without_cancel(self, server):
         integration = await runner.connect_integration(ALICE, "jules", API_KEY)
-        assert set(integration.capabilities) == {"launch", "status", "pull_request"}
+        assert set(integration.capabilities) == {"launch", "status", "pull_request", "interact"}
 
     async def test_launch_follow_and_pull_request(self, server):
         _, execution = await jules_execution()
@@ -431,6 +481,17 @@ class TestThroughTheRunner:
         with pytest.raises(ConnectorError) as exc:
             await runner.request_cancel(ALICE, str(execution.id))
         assert exc.value.category == ErrorCategory.UNSUPPORTED_CAPABILITY
+
+    async def test_reply_reaches_the_jules_session(self, server):
+        """Remote control de bout en bout : needs_attention -> message -> running (ADR-0010)."""
+        _, execution = await jules_execution()
+        await runner.launch_execution(ALICE, str(execution.id))
+        finish(server, "s1", "AWAITING_USER_FEEDBACK")
+        await runner.refresh_execution(ALICE, str(execution.id))
+
+        sent = await runner.send_input_to_execution(ALICE, str(execution.id), "voici la réponse")
+
+        assert sent.status == S.RUNNING and server.messages["s1"] == ["voici la réponse"]
 
 
 class TestInterface:

@@ -406,6 +406,61 @@ async def dismiss_execution(owner_id: int, execution_id: str) -> Execution:
 
 
 # ─────────────────────────────────────
+# Remote control : réponse à l'agent (ADR-0010)
+# ─────────────────────────────────────
+
+MAX_INPUT_LENGTH = 4000
+
+
+async def send_input_to_execution(owner_id: int, execution_id: str, message: str) -> Execution:
+    """
+    Transmet un message utilisateur à l'exécution en cours chez le fournisseur (capacité INTERACT).
+
+    Orbi relaie, il ne décide pas : le message part tel quel (nettoyé, borné). En cas de succès et si
+    l'exécution attendait une réponse (`needs_attention`), elle repasse `running` de façon optimiste —
+    le prochain passage du worker fait converger l'état réel rapporté par le fournisseur.
+    """
+    message = message.strip()
+    if not message:
+        raise ValueError("Message vide")
+    if len(message) > MAX_INPUT_LENGTH:
+        raise ValueError(f"Message trop long ({MAX_INPUT_LENGTH} caractères au plus)")
+
+    execution = await service.get_execution(owner_id, execution_id)
+    if is_terminal(execution.status):
+        raise service.ConflictError("Exécution terminée : plus personne à qui parler")
+    if execution.status in (ExecutionStatus.QUEUED, ExecutionStatus.AWAITING_APPROVAL):
+        raise service.ConflictError("L'agent n'a pas encore démarré")
+    if not execution.external_id:
+        raise service.ConflictError("L'agent n'a pas encore de session chez le fournisseur")
+
+    integration = await service.get_integration(owner_id, execution.integration_id)
+    try:
+        async with _Session(integration) as connector:
+            if Capability.INTERACT not in connector.capabilities:
+                raise ConnectorError(
+                    ErrorCategory.UNSUPPORTED_CAPABILITY,
+                    f"{integration.provider} ne permet pas de répondre à une exécution en cours",
+                )
+            await connector.send_input(execution.external_id, message)
+    except ConnectorError as e:
+        if e.category == ErrorCategory.AUTH_INVALID and integration.status == IntegrationStatus.ACTIVE:
+            await service.mark_integration_invalid(integration)
+        await service.add_event(
+            owner_id, execution_id, EventKind.ERROR, f"Message non transmis : {e.category.value}"
+        )
+        raise
+
+    excerpt = message if len(message) <= 120 else message[:119] + "…"
+    await service.add_event(owner_id, execution_id, EventKind.NOTE, f"Message envoyé à l'agent : {excerpt}")
+    if execution.status == ExecutionStatus.NEEDS_ATTENTION:
+        execution = await _safe_transition(
+            execution, ExecutionStatus.RUNNING, message="Réponse transmise à l'agent"
+        )
+    return await service.get_execution(owner_id, execution_id)
+
+
+# ─────────────────────────────────────
 # Annulation
 # ─────────────────────────────────────
 
