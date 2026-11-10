@@ -14,7 +14,7 @@ from telegram.ext import CallbackQueryHandler, ContextTypes
 from src.models.user import User
 from src.orbi_dev import cards, runner, service
 from src.orbi_dev.access import can_use_orbi_dev
-from src.orbi_dev.notifier import CB_CHECK, CB_RETRY, build_keyboard
+from src.orbi_dev.notifier import CB_APPROVE, CB_CHECK, CB_IGNORE, CB_RETRY, build_keyboard
 
 logger = logging.getLogger("orbi.handlers.orbi_dev")
 
@@ -74,6 +74,49 @@ async def check_execution(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await _drop_action(query, execution)
 
 
+async def approve_execution(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Validation humaine : l'exécution en attente passe en file et est lancée."""
+    query = update.callback_query
+    owner_id = await _authorize(update, context)
+    if owner_id is None:
+        return
+    try:
+        execution = await runner.approve_execution(owner_id, query.data.removeprefix(CB_APPROVE))
+    except service.NotFoundError:
+        await query.answer("Exécution introuvable.", show_alert=True)
+        return
+    except service.ConflictError:
+        await query.answer("Cette exécution a déjà été traitée.", show_alert=True)
+        return
+    context.application.create_task(_launch_safely(owner_id, str(execution.id)))
+    await query.answer("Exécution lancée.")
+    await _drop_action(query, execution)
+    if execution.card_message_id:
+        await cards.update_cards(query.get_bot())
+    else:
+        await cards.post_card(query.get_bot(), execution)
+
+
+async def ignore_execution(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Refus humain : l'exécution en attente est annulée, rien n'est lancé."""
+    query = update.callback_query
+    owner_id = await _authorize(update, context)
+    if owner_id is None:
+        return
+    try:
+        execution = await runner.dismiss_execution(owner_id, query.data.removeprefix(CB_IGNORE))
+    except service.NotFoundError:
+        await query.answer("Exécution introuvable.", show_alert=True)
+        return
+    except service.ConflictError:
+        await query.answer("Cette exécution a déjà été traitée.", show_alert=True)
+        return
+    await query.answer("Exécution ignorée.")
+    await _drop_action(query, execution)
+    if execution.card_message_id:
+        await cards.update_cards(query.get_bot())
+
+
 async def _drop_action(query, execution) -> None:
     """Retire le bouton d'action (évite un double clic) en gardant « Ouvrir » et « Voir la PR »."""
     try:
@@ -85,3 +128,5 @@ async def _drop_action(query, execution) -> None:
 def register_orbi_dev_handlers(application) -> None:
     application.add_handler(CallbackQueryHandler(retry_execution, pattern=rf"^{CB_RETRY}"))
     application.add_handler(CallbackQueryHandler(check_execution, pattern=rf"^{CB_CHECK}"))
+    application.add_handler(CallbackQueryHandler(approve_execution, pattern=rf"^{CB_APPROVE}"))
+    application.add_handler(CallbackQueryHandler(ignore_execution, pattern=rf"^{CB_IGNORE}"))

@@ -33,7 +33,9 @@ logger = logging.getLogger("orbi.dev.notifier")
 
 S = ExecutionStatus
 
-NOTIFY_STATUSES: frozenset[ExecutionStatus] = frozenset({S.SUCCEEDED, S.FAILED, S.TIMED_OUT, S.NEEDS_ATTENTION})
+NOTIFY_STATUSES: frozenset[ExecutionStatus] = frozenset(
+    {S.SUCCEEDED, S.FAILED, S.TIMED_OUT, S.NEEDS_ATTENTION, S.AWAITING_APPROVAL}
+)
 MAX_AGE = timedelta(hours=6)
 MAX_ATTEMPTS = 5
 BATCH = 50
@@ -41,6 +43,8 @@ BATCH = 50
 # Préfixes des boutons du message (gérés par src/handlers/orbi_dev.py)
 CB_RETRY = "devx:retry:"
 CB_CHECK = "devx:check:"
+CB_APPROVE = "devx:approve:"
+CB_IGNORE = "devx:ignore:"
 
 _HEADLINES: dict[ExecutionStatus, str] = {
     status: f"{STATUS_ICON[status]} <b>{STATUS_INFO[status][0]}</b>" for status in NOTIFY_STATUSES
@@ -49,6 +53,7 @@ _FALLBACK_DETAIL: dict[ExecutionStatus, str] = {
     S.FAILED: "L'agent n'a pas abouti.",
     S.TIMED_OUT: "Arrêté : durée maximale dépassée.",
     S.NEEDS_ATTENTION: "Une vérification est nécessaire chez le fournisseur.",
+    S.AWAITING_APPROVAL: "Une action attend votre décision.",
 }
 
 
@@ -95,6 +100,11 @@ def build_keyboard(execution: Execution, *, with_action: bool = True) -> InlineK
         rows.append([InlineKeyboardButton(f"{REFRESH} Réessayer", callback_data=f"{CB_RETRY}{execution.id}", style=PRIMARY)])
     elif status == S.NEEDS_ATTENTION:
         rows.append([InlineKeyboardButton(f"{REFRESH} Vérifier maintenant", callback_data=f"{CB_CHECK}{execution.id}")])
+    elif status == S.AWAITING_APPROVAL:
+        rows.append([
+            InlineKeyboardButton("Lancer", callback_data=f"{CB_APPROVE}{execution.id}", style=PRIMARY),
+            InlineKeyboardButton("Ignorer", callback_data=f"{CB_IGNORE}{execution.id}"),
+        ])
     elif status in (S.QUEUED, S.RUNNING, S.CANCEL_REQUESTED):
         rows.append([InlineKeyboardButton(f"{REFRESH} Actualiser", callback_data=f"{CB_CHECK}{execution.id}")])
     return InlineKeyboardMarkup(rows) if rows else None

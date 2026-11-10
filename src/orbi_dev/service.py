@@ -19,7 +19,7 @@ from beanie import PydanticObjectId
 from pymongo import ReturnDocument
 
 from src.orbi_dev.crypto import encrypt_secret
-from src.orbi_dev.inputs import parse_name, valid_branch
+from src.orbi_dev.inputs import parse_name, parse_repo, valid_branch
 from src.orbi_dev.models import (
     AuditRecord,
     EventKind,
@@ -69,8 +69,17 @@ async def record_audit(
 # Projets
 # ─────────────────────────────────────
 
+def _github_repo(repo_url: str) -> str | None:
+    """« owner/repo » pour les dépôts github.com, None sinon (correspondance des webhooks CI, ADR-0009)."""
+    repo = parse_repo(repo_url)
+    return repo.full_name if repo else None
+
+
 async def create_project(owner_id: int, name: str, repo_url: str, default_branch: str = "") -> Project:
-    project = Project(owner_id=owner_id, name=name, repo_url=repo_url, default_branch=default_branch)
+    project = Project(
+        owner_id=owner_id, name=name, repo_url=repo_url,
+        github_repo=_github_repo(repo_url), default_branch=default_branch,
+    )
     await project.insert()
     await record_audit(owner_id, "project.create", "project", str(project.id))
     return project
@@ -200,12 +209,17 @@ async def revoke_integration(owner_id: int, integration_id: str) -> Integration:
 # Tâches
 # ─────────────────────────────────────
 
-async def create_task(owner_id: int, project_id: str, integration_id: str, prompt: str) -> Task:
+async def create_task(
+    owner_id: int, project_id: str, integration_id: str, prompt: str, source_ref: str | None = None
+) -> Task:
     project = await get_active_project(owner_id, project_id)
     integration = await get_integration(owner_id, integration_id)
     if integration.status != IntegrationStatus.ACTIVE:
         raise ConflictError("Intégration inactive")
-    task = Task(owner_id=owner_id, project_id=str(project.id), integration_id=str(integration.id), prompt=prompt)
+    task = Task(
+        owner_id=owner_id, project_id=str(project.id), integration_id=str(integration.id),
+        prompt=prompt, source_ref=source_ref,
+    )
     await task.insert()
     await record_audit(owner_id, "task.create", "task", str(task.id))
     return task
@@ -407,7 +421,7 @@ async def add_event(
 
 async def set_execution_fields(execution: Execution, **fields: Any) -> None:
     """Met à jour des champs de suivi sans changer de statut (ex. identifiant externe, compteurs)."""
-    allowed = _TRANSITION_FIELDS | {"poll_count", "last_polled_at", "attempt"}
+    allowed = _TRANSITION_FIELDS | {"poll_count", "last_polled_at", "attempt", "ci_verified_at"}
     unknown = set(fields) - allowed
     if unknown:
         raise ValueError(f"Champs non autorisés : {sorted(unknown)}")
