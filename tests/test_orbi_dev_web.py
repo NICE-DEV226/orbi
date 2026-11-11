@@ -89,7 +89,6 @@ class TestIsolation:
 class TestCsrf:
     @pytest.mark.parametrize("path", ["/dev/projects", "/dev/integrations", "/dev/tasks",
                                       "/dev/executions/abc/cancel", "/dev/executions/abc/refresh",
-                                      "/dev/executions/abc/message",
                                       "/dev/tasks/abc/retry", "/dev/integrations/abc/revoke"])
     async def test_post_without_token_is_forbidden(self, path):
         client, _, _ = await login()
@@ -114,8 +113,7 @@ class TestCsrf:
         client, _, _ = await login()
         _, _, _, execution = await seed(500)
         async with client:
-            for path in (f"/dev/executions/{execution.id}/cancel", f"/dev/executions/{execution.id}/refresh",
-                         f"/dev/executions/{execution.id}/message"):
+            for path in (f"/dev/executions/{execution.id}/cancel", f"/dev/executions/{execution.id}/refresh"):
                 assert (await client.get(path)).status_code == 405
 
 
@@ -180,99 +178,6 @@ class TestFullJourney:
         assert 'hx-trigger="every 3s"' not in done and "Nouvelle tentative" in done
 
 
-class TestRemoteControl:
-    """Remote control (ADR-0010) : répondre à l'agent depuis le panneau web."""
-
-    async def _waiting(self, owner: int = 500, prompt: str = "Réponds à ma question [ask]"):
-        _, _, _, execution = await seed(owner, prompt=prompt)
-        await runner.launch_execution(owner, str(execution.id))
-        await runner.refresh_execution(owner, str(execution.id))
-        await runner.refresh_execution(owner, str(execution.id))
-        execution = await service.get_execution(owner, str(execution.id))
-        assert execution.status.value == "needs_attention"
-        return execution
-
-    async def test_message_is_sent_to_the_agent(self):
-        client, _, token = await login()
-        execution = await self._waiting()
-        async with client:
-            r = await client.post(
-                f"/dev/executions/{execution.id}/message",
-                data={"csrf_token": token, "message": "Réponse : Python 3.12"},
-            )
-            assert r.status_code == 303
-        assert FakeConnector._runs[execution.external_id]["messages"] == ["Réponse : Python 3.12"]
-        assert (await service.get_execution(500, str(execution.id))).status.value == "running"
-
-    async def test_other_user_cannot_message_the_agent(self):
-        _, _, bob_token = await login(telegram_id=502)
-        execution = await self._waiting()
-        bob, _, token = await login(telegram_id=503)
-        async with bob:
-            r = await bob.post(
-                f"/dev/executions/{execution.id}/message",
-                data={"csrf_token": token, "message": "intrusion"},
-            )
-            assert r.status_code == 404
-        assert "messages" not in FakeConnector._runs[execution.external_id]
-
-    async def test_reply_form_is_offered_while_the_agent_waits_and_hidden_after(self):
-        client, _, token = await login()
-        execution = await self._waiting()
-        async with client:
-            html = (await client.get(f"/dev/executions/{execution.id}")).text
-            assert "Répondre à l'agent" in html and f"/dev/executions/{execution.id}/message" in html
-
-            await runner.send_input_to_execution(500, str(execution.id), "d'accord")
-            await runner.refresh_execution(500, str(execution.id))  # SUCCEEDED
-            done = (await client.get(f"/dev/executions/{execution.id}")).text
-            assert f"/dev/executions/{execution.id}/message" not in done
-
-            # une exécution terminée refuse le message, et l'erreur est montrée dans le panneau htmx
-            r = await client.post(
-                f"/dev/executions/{execution.id}/message",
-                data={"csrf_token": token, "message": "encore"},
-                headers={"HX-Request": "true"},
-            )
-            assert r.status_code == 200 and "terminée" in r.text
-
-
-class TestThread:
-    """Fil de discussion (capacité HISTORY) : lu à la demande, jamais dans le polling."""
-
-    async def _waiting(self, owner: int = 500, prompt: str = "Réponds à ma question [ask]"):
-        _, _, _, execution = await seed(owner, prompt=prompt)
-        await runner.launch_execution(owner, str(execution.id))
-        await runner.refresh_execution(owner, str(execution.id))
-        await runner.refresh_execution(owner, str(execution.id))
-        return await service.get_execution(owner, str(execution.id))
-
-    async def test_thread_endpoint_returns_the_conversation(self):
-        client, _, _ = await login()
-        execution = await self._waiting()
-        await runner.send_input_to_execution(500, str(execution.id), "Python 3.12")
-        async with client:
-            r = await client.get(f"/dev/executions/{execution.id}/thread")
-        assert r.status_code == 200
-        assert "Python 3.12" in r.text and "Question de l'agent" not in r.text  # répondu : question passée
-        assert "Vous" in r.text and "Agent" in r.text
-
-    async def test_thread_button_is_offered_and_loads_lazily(self):
-        client, _, _ = await login()
-        execution = await self._waiting()
-        async with client:
-            panel = (await client.get(f"/dev/executions/{execution.id}")).text
-            assert f"/dev/executions/{execution.id}/thread" in panel
-            assert "Conversation avec l'agent" in panel
-            # le fil n'est PAS chargé dans le panneau : pas d'appel fournisseur au polling
-            assert "Question de l'agent" not in panel
-
-    async def test_other_user_gets_404_on_the_thread(self):
-        _, _, _ = await login()
-        execution = await self._waiting()
-        other, _, _ = await login(telegram_id=777)
-        async with other:
-            assert (await other.get(f"/dev/executions/{execution.id}/thread")).status_code == 404
 
 
 class TestIntegrationsSafety:

@@ -256,16 +256,6 @@ a.row:hover .row-title { text-decoration: underline; text-decoration-color: var(
 .log li:first-child::before { background: var(--node, var(--brume)); border-color: var(--node, var(--brume)); }
 .log .when { color: var(--brume); font-size: 0.875rem; }
 
-/* ── Fil de discussion (remote control) ── */
-.thread-sheet .thread-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-.thread-sheet .thread-head h2 { margin: 0; }
-.thread { list-style: none; margin: 1rem 0 0; padding: 0; display: grid; gap: 0.9rem; }
-.thread-msg { border-left: 3px solid var(--filet); padding-left: 0.9rem; }
-.thread-msg.thread-user { border-left-color: var(--orbite); }
-.thread-msg.thread-agent { border-left-color: var(--ok); }
-.thread-who { color: var(--brume); font-size: 0.8rem; }
-.thread-text { margin: 0.2rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-
 /* ── Tableaux de bord et systèmes ── */
 .facts { display: grid; gap: 0; margin: 0; }
 .facts > div { display: flex; justify-content: space-between; gap: 1rem; padding: 0.85rem 0; border-top: 1px solid var(--filet); }
