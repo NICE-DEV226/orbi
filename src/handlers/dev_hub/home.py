@@ -15,12 +15,10 @@ from telegram.error import TelegramError
 from telegram.ext import ContextTypes
 
 from src.bot.keyboards import CB_MORE
-from src.core.text import esc
 from src.models.user import NotificationPreferences
 from src.orbi_dev import service
 from src.orbi_dev.look import PLUS, PRIMARY
-from src.orbi_dev.models import IntegrationStatus
-from src.orbi_dev.present import STATUS_ICON, capabilities, provider_name
+from src.orbi_dev.present import STATUS_ICON
 
 from .common import (
     CB_CONNECTIONS,
@@ -56,8 +54,8 @@ ADMIN_COMMANDS = [
 
 
 def connections_button(style: str | None = None):
-    """Mini App quand l'URL publique est en https, sinon l'écran qui explique comment ouvrir la page web."""
-    return web_button("Connexions", "/dev/integrations", style) or button("Connexions", CB_CONNECTIONS, style)
+    """La gestion des connexions vit dans Telegram (ajout de clé, révocation) — le web reste une page annexe."""
+    return button("Connexions", CB_CONNECTIONS, style)
 
 
 async def build_home(owner: int) -> tuple[str, InlineKeyboardMarkup]:
@@ -126,32 +124,14 @@ async def show_home(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 # Connexions
 # ─────────────────────────────────────
 
-STATE_LINES = {
-    IntegrationStatus.ACTIVE: "● Actif",
-    IntegrationStatus.INVALID: "▲ Clé refusée par le fournisseur",
-}
-
-
 async def show_connections(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Délègue à connections.py : toute la gestion des clés vit dans Telegram."""
     owner = await authorize(update, context)
     if owner is None:
         return
-    integrations = [i for i in await service.list_integrations(owner) if i.status in STATE_LINES]
-    lines = [title("Connexions", "Les clés se saisissent sur la page web, jamais dans ce chat.")]
-    for integration in integrations:
-        name = esc(integration.label or provider_name(integration.provider))
-        what = capabilities(integration.capabilities)
-        lines.append(f"<b>{name}</b>  <i>{esc(provider_name(integration.provider))}</i>")
-        lines.append(f"      {STATE_LINES[integration.status]}" + (f" · {esc(what)}" if what else ""))
-    if not integrations:
-        lines.append("Aucun fournisseur connecté.")
+    from .connections import connections_view
 
-    manage = web_button("Gérer les clés", "/dev/integrations", PRIMARY)
-    rows = [[manage]] if manage else []
-    if manage is None:
-        lines += ["", "Envoyez /web pour recevoir votre lien de connexion, puis ouvrez <b>Connexions</b>."]
-    rows.append([back()])
-    await show(update, "\n".join(lines), InlineKeyboardMarkup(rows))
+    await show(update, *await connections_view(owner))
 
 
 # ─────────────────────────────────────

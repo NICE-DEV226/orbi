@@ -39,6 +39,13 @@ STATUS_ICON: dict[ExecutionStatus, str] = {
 
 PROVIDER_NAMES = {"cursor": "Cursor", "jules": "Jules (Google)", "devin": "Devin", "fake": "Démonstration (factice)"}
 
+# Où créer la clé de chaque fournisseur (partagé par le web et Telegram)
+PROVIDER_HELP = {
+    "cursor": "Clé d'API créée dans le tableau de bord Cursor (de préférence un compte de service).",
+    "jules": "Clé créée dans les réglages de Jules (jules.google.com), puis application GitHub de Jules installée sur chaque dépôt à confier.",
+    "devin": "Clé de service Devin (cog_…, Settings → Devin API) avec les permissions UseDevinSessions et ManageOrgSessions ; l'organisation est détectée automatiquement.",
+}
+
 
 def provider_name(value: str) -> str:
     return PROVIDER_NAMES.get(value, value)
@@ -74,7 +81,8 @@ def ago(value: datetime | None, now: datetime | None = None) -> str:
 
 CAPABILITY_WORDS = {
     "launch": "lancer des tâches", "status": "suivre leur avancement", "cancel": "les annuler",
-    "pull_request": "proposer une pull request",
+    "pull_request": "proposer une pull request", "interact": "recevoir vos réponses",
+    "history": "lire la conversation",
 }
 
 

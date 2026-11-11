@@ -11,7 +11,7 @@ from src.models.user import User
 from src.orbi_dev import cards, runner, service
 from src.orbi_dev.connectors.fake import FakeConnector
 from src.orbi_dev.inputs import parse_repo
-from src.orbi_dev.models import Execution, Project, Task
+from src.orbi_dev.models import Execution, IntegrationStatus, Project, Task
 from src.orbi_dev.state import ExecutionStatus
 
 REPO = "https://github.com/acme/demo"
@@ -41,6 +41,7 @@ class Chat:
         self.context.user_data = {"db_user": user}
         self.context.args = []
         self.context.bot.set_my_commands = AsyncMock()
+        self.context.bot.send_message = AsyncMock(side_effect=lambda **kw: self._record(kw.get("text"), kw.get("reply_markup")))
         self.context.application.create_task = self._launch
         self.shown: list[str] = []
         self.markups: list = []
@@ -77,6 +78,7 @@ class Chat:
         update.effective_user.id = self.user.telegram_id
         update.message.text = text
         update.message.reply_text = AsyncMock(side_effect=self._record)
+        update.message.delete = AsyncMock()
         update.effective_message = update.message
         return update
 
@@ -893,7 +895,7 @@ class TestStructure:
         await chat.press(dev_hub.show_connections, "dv:conn")
         assert "agent-perso" in chat.last and "Actif" in chat.last
         assert "super-secret-key-123" not in all_text(chat)
-        assert "/web" in chat.last  # sans https public, on explique comment ouvrir la page web
+        assert "Ajouter une connexion" in chat.last_buttons()  # gestion complète dans Telegram
 
     async def test_alerts_can_be_switched_off_and_on(self):
         user = await admin(1)
@@ -1108,3 +1110,86 @@ class TestAgentChoices:
         execution = await self._waiting(9306)
         await chat.press(dev_tasks.show_execution, f"dv:e:{execution.id}")
         assert "Réécrire le module" in chat.last_buttons()
+
+
+class TestTelegramConnections:
+    """Connexions fournisseurs entièrement dans Telegram : ajout de clé, vérification, révocation."""
+
+    async def _admin(self, tid: int):
+        return Chat(await admin(tid))
+
+    async def test_connections_screen_offers_add_and_revoke(self):
+        from src.handlers.dev_hub.common import CB_CONN_ADD, CB_CONN_REVOKE
+
+        chat = await self._admin(9400)
+        integration = await runner.connect_integration(9400, "fake", "key-9400")
+        await chat.press(dev_hub.show_connections, "dv:conn")
+
+        data = chat.last_data()
+        assert CB_CONN_ADD in data
+        assert f"{CB_CONN_REVOKE}{integration.id}" in data
+        assert "Actif" in chat.last
+
+    async def test_add_fake_connection_end_to_end(self):
+        from src.handlers.dev_hub.common import CB_CONN_PICK
+
+        chat = await self._admin(9401)
+        await chat.press(dev_hub.show_connect_providers, "dv:cad")
+        assert "Démonstration (factice)" in chat.last
+
+        await chat.press(dev_hub.pick_connect_provider, f"{CB_CONN_PICK}fake")
+        assert chat.context.user_data["dev"]["step"] == "apikey"
+
+        await chat.say(dev_hub.on_text, "ma-cle-secrete-9401")
+        integrations = await service.list_integrations(9400 + 1)
+        assert len(integrations) == 1 and integrations[0].provider == "fake"
+        assert integrations[0].status == IntegrationStatus.ACTIVE
+        assert "connecté" in chat.last.lower()
+        # le message contenant la clé a été effacé du chat
+        assert chat.context.bot.send_message.await_count >= 1
+
+    async def test_invalid_key_is_refused_and_nothing_stored(self, monkeypatch):
+        from src.handlers.dev_hub.common import CB_CONN_PICK
+        from src.orbi_dev.connectors.base import ConnectorError, ErrorCategory
+
+        async def refused(self):
+            raise ConnectorError(ErrorCategory.AUTH_INVALID, "Clé refusée par le fournisseur")
+
+        monkeypatch.setattr(FakeConnector, "verify", refused)
+        chat = await self._admin(9402)
+        await chat.press(dev_hub.pick_connect_provider, f"{CB_CONN_PICK}fake")
+        await chat.say(dev_hub.on_text, "cle-valide-plus-longue")
+
+        assert await service.list_integrations(9402) == []
+        assert "refusée" in chat.last.lower()
+
+    async def test_multiline_or_too_short_key_is_rejected(self):
+        from src.handlers.dev_hub.common import CB_CONN_PICK
+
+        chat = await self._admin(9403)
+        await chat.press(dev_hub.pick_connect_provider, f"{CB_CONN_PICK}fake")
+        await chat.say(dev_hub.on_text, "abc")
+        assert await service.list_integrations(9403) == []
+        assert "invalide" in chat.last.lower()
+
+    async def test_revoke_requires_confirmation_then_revokes(self):
+        from src.handlers.dev_hub.common import CB_CONN_REVOKE, CB_CONN_REVOKE_OK
+
+        chat = await self._admin(9404)
+        integration = await runner.connect_integration(9404, "fake", "key-9404")
+
+        await chat.press(dev_hub.confirm_revoke, f"{CB_CONN_REVOKE}{integration.id}")
+        assert "Révoquer" in chat.last and "tableau de bord" in chat.last
+
+        await chat.press(dev_hub.revoke, f"{CB_CONN_REVOKE_OK}{integration.id}")
+        integration = await service.get_integration(9404, str(integration.id))
+        assert integration.status == IntegrationStatus.REVOKED
+        assert "révoquée" in chat.last.lower()
+
+    async def test_pick_unknown_provider_is_refused(self):
+        from src.handlers.dev_hub.common import CB_CONN_PICK
+
+        chat = await self._admin(9405)
+        await chat.press(dev_hub.pick_connect_provider, f"{CB_CONN_PICK}inconnu")
+        assert "indisponible" in chat.alerts[-1].lower()
+        assert "dev" not in chat.context.user_data

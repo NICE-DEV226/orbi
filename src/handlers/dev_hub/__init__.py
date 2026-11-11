@@ -2,10 +2,10 @@
 Orbi — Orbi Dev dans Telegram : l'accueil des administrateurs.
 
 Tout le parcours se fait dans la conversation : voir l'état de ses tâches, ajouter un dépôt en collant son adresse,
-écrire une consigne, confirmer, suivre l'avancement sur une carte qui se met à jour seule. La seule chose qui reste sur
-le web est la saisie d'une clé d'API (elle ne doit jamais passer par un chat).
+écrire une consigne, confirmer, suivre l'avancement sur une carte qui se met à jour seule — et gérer ses connexions
+fournisseurs (clé API saisie dans le chat puis effacée, révocation) sans passer par le web.
 
-Un module par domaine : `common` (accès, brouillon, boutons), `home` (accueil, connexions, réglages), `tasks`,
+Un module par domaine : `common` (accès, brouillon, boutons), `home` (accueil, réglages), `connections`, `tasks`,
 `projects`, `messages` (texte libre attendu par un parcours). Ce fichier les assemble.
 """
 
@@ -16,6 +16,10 @@ from .common import (
     CB_BRANCH,
     CB_CHANGE_PROJECT,
     CB_CHANGE_PROVIDER,
+    CB_CONN_ADD,
+    CB_CONN_PICK,
+    CB_CONN_REVOKE,
+    CB_CONN_REVOKE_OK,
     CB_CONNECTIONS,
     CB_DISCARD,
     CB_EDIT,
@@ -41,6 +45,7 @@ from .common import (
     MAX_PROMPT,
     logger,
 )
+from .connections import confirm_revoke, pick_connect_provider, revoke, show_connect_providers
 from .home import ADMIN_COMMANDS, build_home, show_connections, show_home, show_settings, toggle_notifications
 from .messages import on_text, on_unsupported
 from .projects import (
@@ -105,6 +110,10 @@ def register_dev_hub_handlers(application) -> None:
     on(CallbackQueryHandler(pick_project, pattern=rf"^{CB_PICK_PROJECT}"))
     on(CallbackQueryHandler(pick_provider, pattern=rf"^{CB_PICK_PROVIDER}"))
     on(CallbackQueryHandler(show_execution, pattern=rf"^{CB_OPEN}"))
+    on(CallbackQueryHandler(show_connect_providers, pattern=f"^{CB_CONN_ADD}$"))
+    on(CallbackQueryHandler(pick_connect_provider, pattern=rf"^{CB_CONN_PICK}"))
+    on(CallbackQueryHandler(confirm_revoke, pattern=rf"^{CB_CONN_REVOKE}"))
+    on(CallbackQueryHandler(revoke, pattern=rf"^{CB_CONN_REVOKE_OK}"))
     # Groupe 1 : ne retire rien aux autres parcours (support, productivité) qui lisent aussi les messages texte
     on(MessageHandler(filters.TEXT & ~filters.COMMAND & private, on_text), group=1)
     on(MessageHandler(~filters.TEXT & ~filters.COMMAND & ~filters.StatusUpdate.ALL & private, on_unsupported), group=1)
