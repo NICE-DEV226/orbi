@@ -108,10 +108,14 @@ async def pick_connect_provider(update: Update, context: ContextTypes.DEFAULT_TY
 async def handle_apikey_text(
     update: Update, context: ContextTypes.DEFAULT_TYPE, owner: int, text: str
 ) -> None:
-    """« apikey » : vérifie et enregistre la clé, puis efface le message qui la contenait."""
+    """« apikey » : vérifie et enregistre la clé, puis efface le message qui la contenait.
+
+    Le brouillon n'est consommé qu'une fois la clé validée côté format : en cas d'erreur
+    imprévue, l'étape est réarmée pour que l'utilisateur puisse renvoyer sa clé — un handler
+    ne doit jamais laisser l'utilisateur sans réponse.
+    """
     draft = draft_of(context)
-    provider = draft.pop("conn_provider", None)
-    draft.pop("step", None)
+    provider = draft.get("conn_provider")
     chat_id = update.effective_chat.id
     bot = context.bot
 
@@ -119,6 +123,8 @@ async def handle_apikey_text(
         await bot.send_message(chat_id=chat_id, text=text_html, reply_markup=markup)
 
     if provider not in available_providers():
+        draft.pop("step", None)
+        draft.pop("conn_provider", None)
         await say("Ce parcours de connexion a expiré : recommencez depuis « Connexions ».")
         return
     key = clean_text(text)
@@ -145,8 +151,14 @@ async def handle_apikey_text(
         await say("<b>Connexion impossible.</b> Réessayez dans un instant.")
         return
 
-    view_text, markup = await connections_view(owner)
-    await say(f"<b>{provider_name(provider)} connecté.</b>\n\n" + view_text, markup)
+    draft.pop("step", None)
+    draft.pop("conn_provider", None)
+    try:
+        view_text, markup = await connections_view(owner)
+        await say(f"<b>{provider_name(provider)} connecté.</b>\n\n" + view_text, markup)
+    except Exception:
+        logger.exception("Affichage des connexions en échec")
+        await say(f"<b>{provider_name(provider)} connecté.</b>")
 
 
 async def confirm_revoke(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

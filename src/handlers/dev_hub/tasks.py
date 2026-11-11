@@ -337,6 +337,10 @@ async def handle_agent_reply(
         detail = e.message if isinstance(e, ConnectorError) else str(e)
         await update.message.reply_text(f"<b>Message non transmis.</b> {esc(detail)}")
         return
+    except Exception:
+        logger.exception("Transmission du message à l'agent en échec")
+        await update.message.reply_text("<b>Message non transmis.</b> Réessayez dans un instant.")
+        return
     clear_draft(context)
     await update.message.reply_text("<b>Message transmis à l'agent.</b> Vous serez prévenu de la suite.")
     try:
