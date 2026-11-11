@@ -84,6 +84,7 @@ def repo_label(url: str) -> str:
 PROVIDER_HELP = {
     "cursor": "Clé d'API créée dans le tableau de bord Cursor (de préférence un compte de service).",
     "jules": "Clé créée dans les réglages de Jules (jules.google.com), puis application GitHub de Jules installée sur chaque dépôt à confier.",
+    "devin": "Clé de service Devin (cog_…, Settings → Devin API) avec les permissions UseDevinSessions et ManageOrgSessions ; l'organisation est détectée automatiquement.",
 }
 templates.env.filters.update({
     "ago": ago, "duration": duration, "fmt_dt": fmt_dt, "safe_link": safe_link, "repo": repo_label,

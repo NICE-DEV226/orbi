@@ -3,6 +3,7 @@
 from src.core.config import get_settings
 from src.orbi_dev.connectors.base import AgentConnectorType, Capability, ConnectorError, ErrorCategory
 from src.orbi_dev.connectors.cursor import CursorCloudAgentsConnector
+from src.orbi_dev.connectors.devin import DevinConnector
 from src.orbi_dev.connectors.fake import FakeConnector
 from src.orbi_dev.connectors.jules import JulesConnector
 
@@ -10,6 +11,7 @@ from src.orbi_dev.connectors.jules import JulesConnector
 # indépendamment des factories éventuellement substituées dans `_PROVIDERS` (tests).
 _PROVIDER_CLASSES: dict[str, type[AgentConnectorType]] = {
     CursorCloudAgentsConnector.provider: CursorCloudAgentsConnector,
+    DevinConnector.provider: DevinConnector,
     JulesConnector.provider: JulesConnector,
     FakeConnector.provider: FakeConnector,
 }
