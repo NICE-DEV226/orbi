@@ -47,6 +47,7 @@ CB_CHECK = "devx:check:"
 CB_APPROVE = "devx:approve:"
 CB_IGNORE = "devx:ignore:"
 CB_REPLY = "dv:rep:"  # remote control : armé puis le prochain texte est transmis à l'agent (ADR-0010)
+CB_CHAT = "dv:cht:"  # remote control : mode conversation persistant (texte libre → agent, ADR-0010)
 CB_THREAD = "dv:thread:"  # fil de discussion de la session (capacité HISTORY, ADR-0010)
 
 _HEADLINES: dict[ExecutionStatus, str] = {
@@ -115,6 +116,7 @@ def build_keyboard(
         rows.append([InlineKeyboardButton(f"{REFRESH} Actualiser", callback_data=f"{CB_CHECK}{execution.id}")])
     if with_action and can_interact and status in (S.RUNNING, S.NEEDS_ATTENTION):
         rows.append([InlineKeyboardButton("Répondre à l'agent", callback_data=f"{CB_REPLY}{execution.id}")])
+        rows.append([InlineKeyboardButton("Discuter", callback_data=f"{CB_CHAT}{execution.id}")])
     if can_history and execution.external_id:
         rows.append([InlineKeyboardButton("Fil de discussion", callback_data=f"{CB_THREAD}{execution.id}")])
     if choice_buttons:

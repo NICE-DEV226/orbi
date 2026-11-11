@@ -62,6 +62,14 @@ Les fournisseurs n'exposent pas de question à choix structurée : le message de
 
 Après un choix envoyé, les boutons de choix sont retirés du message (anti double-envoi) et la carte est rafraîchie. Le texte libre (« Répondre à l'agent ») reste toujours disponible en complément.
 
+### 3quater. Mode conversation (`chat.py`)
+
+« Répondre à l'agent » reste le mode **une réponse** ; le bouton « Discuter » ouvre un **mode conversation persistant** : tant qu'il est actif, tout texte libre du propriétaire est transmis à l'exécution la plus récemment active (`RUNNING`/`NEEDS_ATTENTION`, session fournisseur, `INTERACT`) — résolution à chaque envoi, donc la conversation suit automatiquement le dernier agent quand plusieurs tournent. « Quitter la discussion » désarme.
+
+- **État dans Redis** (`orbi_dev:chat:{owner}`, JSON `anchor` + `exec`), pas dans `user_data` : il survit au redémarrage et reste lisible par le worker — qui n'a pas accès aux données de contexte Telegram.
+- **Remontée des réponses** : à chaque passage du worker (`ORBI_DEV_REFRESH_INTERVAL`), `push_replies` relit le fil (`HISTORY`) des discussions ouvertes et pousse les nouveaux messages `agent` dans le chat, ancrés par une empreinte `role + SHA-1(texte)` du dernier message vu — aucun doublon, aucun historique renvoyé à l'armement. Sans `HISTORY` (Cursor), l'envoi fonctionne mais rien ne remonte : dégradé honnête.
+- **Succès silencieux côté envoi** : pas d'accusé de réception — l'agent répond dans le fil, comme une vraie conversation ; les erreurs sont toujours explicites.
+
 ### 4. Limites assumées
 
 - `sendMessage` Jules reprend la session mais **n'approuve pas un plan** (`AWAITING_PLAN_APPROVAL` a son endpoint `approvePlan`, non exposé ici) : l'agent peut répondre en redemandant l'approbation, et l'état repasse `needs_attention`. Couvrir l'approbation de plan est un incrément ultérieur.

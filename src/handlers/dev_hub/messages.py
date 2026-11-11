@@ -9,8 +9,10 @@ reste sans réponse : saisie trop courte ou trop longue, photo ou vocal à la pl
 from telegram import InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
+from src.orbi_dev import chat as dev_chat
 from src.orbi_dev.inputs import MAX_PROMPT, MIN_PROMPT, clean_text
 
+from .chat import handle_chat_text
 from .common import DRAFT_TTL, allowed, back, clear_draft, draft_of, is_stale
 from .connections import handle_apikey_text
 from .projects import cancel_markup, handle_edit_text, handle_repo_text
@@ -36,7 +38,11 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not allowed(context):
         return
     raw = _waiting(context)
+    owner = update.effective_user.id
     if raw is None:
+        # Mode conversation actif (Redis, indépendant du brouillon) : tout texte va à l'agent.
+        if await dev_chat.is_enabled(owner):
+            await handle_chat_text(update, context, owner, clean_text(update.message.text or ""))
         return
     if is_stale(raw):
         clear_draft(context)
@@ -48,7 +54,6 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     draft = draft_of(context)
     step = draft["step"]
-    owner = update.effective_user.id
     text = clean_text(update.message.text or "")
 
     if step == "repo":
@@ -81,7 +86,13 @@ async def on_unsupported(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not allowed(context):
         return
     raw = _waiting(context)
-    if raw is None or is_stale(raw):
+    if raw is None:
+        if await dev_chat.is_enabled(update.effective_user.id):
+            await update.message.reply_text(
+                "<b>J'attends du texte</b> pour l'agent : images, vocaux et fichiers ne sont pas transmis."
+            )
+        return
+    if is_stale(raw):
         return
     await update.message.reply_text(
         f"<b>J'attends du texte</b> : {WAITING_FOR[raw['step']]}. Les images, vocaux et fichiers ne sont pas lus.",

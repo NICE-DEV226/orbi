@@ -1193,3 +1193,105 @@ class TestTelegramConnections:
         await chat.press(dev_hub.pick_connect_provider, f"{CB_CONN_PICK}inconnu")
         assert "indisponible" in chat.alerts[-1].lower()
         assert "dev" not in chat.context.user_data
+
+
+class TestChatMode:
+    """Mode conversation (ADR-0010) : « Discuter » puis tout texte va à l'agent, réponses poussées."""
+
+    async def _waiting_execution(self, owner: int):
+        FakeConnector.reset()
+        project = await service.create_project(owner, "demo", REPO)
+        integration = await runner.connect_integration(owner, "fake", "secret-key")
+        task = await service.create_task(owner, str(project.id), str(integration.id), "question [ask]")
+        execution = await service.create_execution(owner, str(task.id))
+        await runner.launch_execution(owner, str(execution.id))
+        await runner.refresh_execution(owner, str(execution.id))
+        await runner.refresh_execution(owner, str(execution.id))
+        return await service.get_execution(owner, str(execution.id))
+
+    async def test_discuter_arms_chat_and_plain_text_reaches_the_agent(self):
+        from src.orbi_dev import chat as dev_chat
+
+        chat = Chat(await admin(9501))
+        execution = await self._waiting_execution(9501)
+
+        await chat.press(dev_hub.start_chat, f"dv:cht:{execution.id}")
+        assert await dev_chat.is_enabled(9501)
+        assert "Mode conversation" in chat.last
+        assert "Quitter la discussion" in chat.last_buttons()
+
+        await chat.say(dev_hub.on_text, "Réponds en français")
+        assert FakeConnector._runs[execution.external_id]["messages"] == ["Réponds en français"]
+        # succès silencieux : pas d'accusé de réception, comme une vraie conversation
+        assert chat.shown[-1] == chat.shown[0] or "transmis" not in chat.last.lower()
+
+    async def test_chat_mode_survives_without_draft_and_exit_disarms(self):
+        from src.orbi_dev import chat as dev_chat
+
+        chat = Chat(await admin(9502))
+        execution = await self._waiting_execution(9502)
+        await chat.press(dev_hub.start_chat, f"dv:cht:{execution.id}")
+        assert "dev" not in chat.context.user_data  # l'état vit dans Redis, pas dans le brouillon
+
+        await chat.press(dev_hub.exit_chat, "dv:chate")
+        assert not await dev_chat.is_enabled(9502)
+
+        await chat.say(dev_hub.on_text, "toujours là ?")
+        assert FakeConnector._runs[execution.external_id].get("messages", []) == []
+
+    async def test_chat_text_without_active_agent_is_answered(self):
+        from src.orbi_dev import chat as dev_chat
+
+        chat = Chat(await admin(9503))
+        await dev_chat.enable(9503)
+        await chat.say(dev_hub.on_text, "bonjour")
+        assert "Aucun agent" in chat.last
+
+    async def test_push_replies_delivers_new_agent_messages_once(self):
+        from src.orbi_dev import chat as dev_chat
+
+        chat = Chat(await admin(9504))
+        execution = await self._waiting_execution(9504)
+        await chat.press(dev_hub.start_chat, f"dv:cht:{execution.id}")
+
+        await runner.send_input_to_execution(9504, str(execution.id), "continue")
+        bot = MagicMock()
+        bot.send_message = AsyncMock()
+
+        assert await dev_chat.push_replies(bot) == 1
+        text = bot.send_message.await_args.kwargs["text"]
+        assert "Message reçu, je continue." in text and "Agent" in text
+
+        # deuxième passage : l'ancre a avancé, rien à renvoyer
+        assert await dev_chat.push_replies(bot) == 0
+        assert bot.send_message.await_count == 1
+
+    async def test_push_replies_without_history_pushes_nothing(self, monkeypatch):
+        from src.orbi_dev import chat as dev_chat
+        from src.orbi_dev.connectors.base import ConnectorError, ErrorCategory
+
+        chat = Chat(await admin(9505))
+        execution = await self._waiting_execution(9505)
+        await chat.press(dev_hub.start_chat, f"dv:cht:{execution.id}")
+
+        async def no_history(owner_id, execution_id, *, limit=30):
+            raise ConnectorError(ErrorCategory.UNSUPPORTED_CAPABILITY, "pas de fil")
+
+        monkeypatch.setattr(dev_chat.runner, "get_execution_thread", no_history)
+        bot = MagicMock()
+        bot.send_message = AsyncMock()
+        assert await dev_chat.push_replies(bot) == 0
+        bot.send_message.assert_not_awaited()
+
+    async def test_resolve_target_picks_most_recently_active(self):
+        from src.orbi_dev import chat as dev_chat
+
+        owner = 9506
+        first = await self._waiting_execution(owner)
+        second = await self._waiting_execution(owner)
+        # la plus récente est celle dont l'activité est la plus fraîche
+        await Execution.get_pymongo_collection().update_one(
+            {"_id": first.id}, {"$set": {"updated_at": datetime.now(UTC) - timedelta(days=1)}}
+        )
+        target = await dev_chat.resolve_target(owner)
+        assert target is not None and target.id == second.id

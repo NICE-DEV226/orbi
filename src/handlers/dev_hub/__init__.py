@@ -11,11 +11,14 @@ Un module par domaine : `common` (accès, brouillon, boutons), `home` (accueil, 
 
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler, filters
 
+from .chat import exit_chat, start_chat
 from .common import (
     CB_ADD_PROJECT,
     CB_BRANCH,
     CB_CHANGE_PROJECT,
     CB_CHANGE_PROVIDER,
+    CB_CHAT,
+    CB_CHAT_END,
     CB_CONN_ADD,
     CB_CONN_PICK,
     CB_CONN_REVOKE,
@@ -114,6 +117,8 @@ def register_dev_hub_handlers(application) -> None:
     on(CallbackQueryHandler(pick_connect_provider, pattern=rf"^{CB_CONN_PICK}"))
     on(CallbackQueryHandler(confirm_revoke, pattern=rf"^{CB_CONN_REVOKE}"))
     on(CallbackQueryHandler(revoke, pattern=rf"^{CB_CONN_REVOKE_OK}"))
+    on(CallbackQueryHandler(start_chat, pattern=rf"^{CB_CHAT}"))
+    on(CallbackQueryHandler(exit_chat, pattern=f"^{CB_CHAT_END}$"))
     # Groupe 1 : ne retire rien aux autres parcours (support, productivité) qui lisent aussi les messages texte
     on(MessageHandler(filters.TEXT & ~filters.COMMAND & private, on_text), group=1)
     on(MessageHandler(~filters.TEXT & ~filters.COMMAND & ~filters.StatusUpdate.ALL & private, on_unsupported), group=1)
