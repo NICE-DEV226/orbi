@@ -81,8 +81,14 @@ class FakeConnector(BaseConnector):
         if run is None:
             raise ConnectorError(ErrorCategory.NOT_FOUND, "Agent introuvable")
         run.setdefault("messages", []).append(message)
+        reply = (
+            "Message reçu, **je continue** avec `get_execution_thread`.\n\n"
+            "```python\nif a < b:\n    print(\"<ok>\")\n```"
+            if "[md]" in run["prompt"]
+            else "Message reçu, je continue."
+        )
         run.setdefault("thread", []).extend(
-            [self._msg("user", message), self._msg("agent", "Message reçu, je continue.")]
+            [self._msg("user", message), self._msg("agent", reply)]
         )
         run["answered"] = True
 

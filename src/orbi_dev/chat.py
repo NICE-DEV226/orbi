@@ -20,9 +20,9 @@ from telegram import Bot
 from telegram.constants import ChatAction, ParseMode
 
 from src.core.redis import get_redis
-from src.core.text import esc
 from src.orbi_dev import runner, service
 from src.orbi_dev.connectors.base import RemoteMessage
+from src.orbi_dev.mdformat import to_telegram_html
 from src.orbi_dev.models import ExecutionStatus
 
 logger = logging.getLogger("orbi.dev.chat")
@@ -178,7 +178,7 @@ async def _push_for_owner(bot: Bot, owner_id: int) -> int:
         await asyncio.sleep(_typing_delay(text))
         await bot.send_message(
             chat_id=owner_id,
-            text=f"💬 <b>Agent{stamp}</b>\n{esc(text)}",
+            text=f"💬 <b>Agent{stamp}</b>\n{to_telegram_html(text)}",
             parse_mode=ParseMode.HTML,
         )
         delivered += 1

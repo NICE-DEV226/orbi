@@ -12,7 +12,6 @@ from telegram import ReplyParameters, Update
 from telegram.error import BadRequest
 from telegram.ext import CallbackQueryHandler, ContextTypes
 
-from src.core.text import esc
 from src.models.user import User
 from src.orbi_dev import cards, runner, service
 from src.orbi_dev.access import can_use_orbi_dev
@@ -24,6 +23,7 @@ from src.orbi_dev.choices import (
     parsed_options,
 )
 from src.orbi_dev.connectors.base import ConnectorError, RemoteMessage
+from src.orbi_dev.mdformat import to_telegram_html
 from src.orbi_dev.notifier import (
     CB_APPROVE,
     CB_CHECK,
@@ -173,7 +173,7 @@ def _thread_text(messages: list[RemoteMessage]) -> list[str]:
     for m in messages:
         label = _ROLE_LABEL.get(m.role, m.role)
         when = f" · {ago(m.at)}" if m.at else ""
-        block = f"<b>{label}</b><i>{when}</i>\n{esc(m.text)}\n\n"
+        block = f"<b>{label}</b><i>{when}</i>\n{to_telegram_html(m.text)}\n\n"
         if len(current) + len(block) > _THREAD_LIMIT - 100 and current:
             chunks.append(current.rstrip())
             current = ""
