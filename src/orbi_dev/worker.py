@@ -16,6 +16,7 @@ from telegram import Bot
 from src.core.config import get_settings
 from src.core.redis import get_redis
 from src.orbi_dev.cards import update_cards
+from src.orbi_dev.chat import push_replies
 from src.orbi_dev.notifier import notify_pending
 from src.orbi_dev.runner import refresh_active_executions
 
@@ -37,6 +38,10 @@ async def run_once(bot: Bot | None = None) -> int | None:
     if bot is not None:
         await update_cards(bot)
         await notify_pending(bot)
+        try:
+            await push_replies(bot)
+        except Exception:
+            logger.exception("Remontée des réponses de conversation en échec")
     return processed
 
 

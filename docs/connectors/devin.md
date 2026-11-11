@@ -21,6 +21,7 @@ Source : [API Devin v3](https://docs.devin.ai/api-reference/v3) et sa [spécific
 | Suivre | `GET /v3/organizations/{org}/sessions/{id}` |
 | Annuler | `DELETE /v3/organizations/{org}/sessions/{id}` — seule forme d'annulation documentée (« terminate session ») |
 | Répondre (remote control, ADR-0010) | `POST /v3/organizations/{org}/sessions/{id}/messages` (`message`) — une session suspendue est relancée automatiquement |
+| Fil de discussion (HISTORY) | `GET /v3/organizations/{org}/sessions/{id}/messages` (`first`, curseur `after`) — `source: user\|devin` → `user\|agent` |
 | Pull request | `pull_requests[].pr_url` |
 
 ## Mapping des statuts

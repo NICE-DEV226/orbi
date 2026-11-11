@@ -36,19 +36,6 @@
 
   {% if action_error %}<div class="alert" role="alert">{{ action_error }}</div>{% endif %}
 
-  {% if can_interact %}
-  <form class="reply-form" method="post" action="/dev/executions/{{ execution.id }}/message"
-        hx-post="/dev/executions/{{ execution.id }}/message" hx-target="#run-panel" hx-swap="outerHTML" hx-boost="false">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <div class="field">
-      <label for="agent-message">Répondre à l'agent</label>
-      <textarea id="agent-message" name="message" maxlength="4000" required rows="2"
-                placeholder="Précision, correction, réponse à sa question…"></textarea>
-    </div>
-    <button class="btn btn-quiet" type="submit">{{ icon('send') }} Envoyer</button>
-  </form>
-  {% endif %}
-
   <div class="actions">
     {% set provider_link = execution.external_url|safe_link %}
     {% if active %}

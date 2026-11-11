@@ -80,6 +80,8 @@ class FakeJules:
             if self.fail_activities:
                 return httpx.Response(503, json={"error": {"status": "UNAVAILABLE", "message": "down"}})
             session_id = path.split("/")[3]
+            if session_id not in self.sessions:
+                return httpx.Response(404, json={"error": {"status": "NOT_FOUND", "message": "no such session"}})
             return httpx.Response(200, json={"activities": self.activities.get(session_id, [])})
         if path.startswith("/v1alpha/sessions/") and path.endswith(":sendMessage") and method == "POST":
             session_id = path.split("/")[3].split(":")[0]
@@ -388,6 +390,51 @@ class TestSendMessage:
         assert API_KEY not in exc.value.message
 
 
+class TestListMessages:
+    """sessions/{id}/activities : le fil de discussion Jules (capacité HISTORY)."""
+
+    async def test_conversation_activities_become_messages(self):
+        server = FakeJules()
+        c = connector(server)
+        await c.launch(REQUEST)
+        server.activities["s1"] = [
+            {"createTime": "2026-01-01T00:00:01Z", "userMessaged": {"userMessage": "corrige le test"}},
+            {"createTime": "2026-01-01T00:00:02Z", "agentMessaged": {"agentMessage": "Quelle version ?"}},
+            {"createTime": "2026-01-01T00:00:03Z", "progressUpdated": {"title": "Tests", "description": "en cours"}},
+            {"createTime": "2026-01-01T00:00:04Z", "planGenerated": {"plan": {}}},
+            {"createTime": "2026-01-01T00:00:05Z", "sessionFailed": {"reason": "ignoré : pas un message"}},
+        ]
+        messages = await c.list_messages("s1")
+
+        assert [(m.role, m.text) for m in messages] == [
+            ("user", "corrige le test"),
+            ("agent", "Quelle version ?"),
+            ("system", "Tests — en cours"),
+            ("system", "Plan proposé par l'agent."),
+        ]
+        assert messages[0].at is not None
+
+    async def test_only_the_latest_messages_are_kept(self):
+        server = FakeJules()
+        c = connector(server)
+        await c.launch(REQUEST)
+        server.activities["s1"] = [
+            {"createTime": f"2026-01-01T00:00:{i:02d}Z", "agentMessaged": {"agentMessage": f"m{i}"}}
+            for i in range(60)
+        ]
+        messages = await c.list_messages("s1", limit=5)
+        assert [m.text for m in messages] == [f"m{i}" for i in range(55, 60)]
+
+    async def test_unknown_session_is_not_found(self):
+        with pytest.raises(ConnectorError) as exc:
+            await connector(FakeJules()).list_messages("nope")
+        assert exc.value.category == ErrorCategory.NOT_FOUND
+
+    async def test_history_is_declared_as_a_capability(self):
+        result = await connector(FakeJules()).verify()
+        assert Capability.HISTORY in result.capabilities
+
+
 @pytest.fixture
 def env(monkeypatch):
     monkeypatch.setenv("SECRETS_ENCRYPTION_KEY", Fernet.generate_key().decode())
@@ -415,7 +462,7 @@ async def jules_execution(prompt="Ajoute un README"):
 class TestThroughTheRunner:
     async def test_connecting_stores_capabilities_without_cancel(self, server):
         integration = await runner.connect_integration(ALICE, "jules", API_KEY)
-        assert set(integration.capabilities) == {"launch", "status", "pull_request", "interact"}
+        assert set(integration.capabilities) == {"launch", "status", "pull_request", "interact", "history"}
 
     async def test_launch_follow_and_pull_request(self, server):
         _, execution = await jules_execution()

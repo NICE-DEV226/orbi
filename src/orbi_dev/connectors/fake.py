@@ -10,7 +10,10 @@ Le comportement se pilote avec des marqueurs dans le prompt :
   [lost]     le lancement réussit côté fournisseur mais la réponse est perdue (timeout)
   [slow]     l'exécution ne se termine jamais
   [ask]      l'agent pose une question et attend une réponse (remote control) jusqu'à send_input
+  [askopts]  idem, mais la question propose des options numérotées (test des choix cliquables)
 """
+
+from datetime import UTC, datetime
 
 from src.orbi_dev.connectors.base import (
     BaseConnector,
@@ -18,6 +21,7 @@ from src.orbi_dev.connectors.base import (
     ConnectorError,
     ErrorCategory,
     LaunchRequest,
+    RemoteMessage,
     RemoteRun,
     RemoteStatus,
     VerifyResult,
@@ -27,7 +31,10 @@ from src.orbi_dev.connectors.base import (
 class FakeConnector(BaseConnector):
     provider = "fake"
     capabilities = frozenset(
-        {Capability.LAUNCH, Capability.STATUS, Capability.CANCEL, Capability.PULL_REQUEST, Capability.INTERACT}
+        {
+            Capability.LAUNCH, Capability.STATUS, Capability.CANCEL,
+            Capability.PULL_REQUEST, Capability.INTERACT, Capability.HISTORY,
+        }
     )
 
     # État « côté fournisseur », partagé dans le process.
@@ -55,6 +62,7 @@ class FakeConnector(BaseConnector):
         if external_id not in self._runs:  # idempotent : un doublon adopte l'existant
             self._runs[external_id] = {
                 "polls": 0, "cancelled": False, "prompt": request.prompt, "repo": request.repo_url,
+                "thread": [self._msg("user", request.prompt)],
             }
         if "[lost]" in request.prompt and self._runs[external_id]["polls"] == 0 and not self._runs[external_id].get("lost"):
             self._runs[external_id]["lost"] = True
@@ -73,7 +81,44 @@ class FakeConnector(BaseConnector):
         if run is None:
             raise ConnectorError(ErrorCategory.NOT_FOUND, "Agent introuvable")
         run.setdefault("messages", []).append(message)
+        reply = (
+            "Message reçu, **je continue** avec `get_execution_thread`.\n\n"
+            "```python\nif a < b:\n    print(\"<ok>\")\n```"
+            if "[md]" in run["prompt"]
+            else "Message reçu, je continue."
+        )
+        run.setdefault("thread", []).extend(
+            [self._msg("user", message), self._msg("agent", reply)]
+        )
         run["answered"] = True
+
+    async def list_messages(self, external_id: str, *, limit: int = 50) -> list[RemoteMessage]:
+        run = self._runs.get(external_id)
+        if run is None:
+            raise ConnectorError(ErrorCategory.NOT_FOUND, "Agent introuvable")
+        thread = list(run.get("thread") or [])
+        if FakeConnector._asking(run) and not run.get("answered"):
+            thread.append(self._msg("agent", self._question(run)))
+        return thread[-limit:]
+
+    @staticmethod
+    def _msg(role: str, text: str) -> RemoteMessage:
+        return RemoteMessage(role=role, text=text, at=datetime.now(UTC))
+
+    @staticmethod
+    def _asking(run: dict) -> bool:
+        return "[ask]" in run["prompt"] or "[askopts]" in run["prompt"]
+
+    @staticmethod
+    def _question(run: dict) -> str:
+        if "[askopts]" in run["prompt"]:
+            return (
+                "Quelle approche préfères-tu ?\n\n"
+                "1) Garder la structure actuelle\n"
+                "2) Réécrire le module\n"
+                "3) Attendre mon avis"
+            )
+        return "Question de l'agent : puis-je continuer ?"
 
     async def cancel(self, external_id: str) -> RemoteRun:
         run = self._runs.get(external_id)
@@ -92,7 +137,7 @@ class FakeConnector(BaseConnector):
         polls, prompt = run["polls"], run["prompt"]
         if "[slow]" in prompt or polls < 2:
             return RemoteRun(RemoteStatus.PENDING if polls == 0 else RemoteStatus.RUNNING, external_id, url)
-        if "[ask]" in prompt and not run.get("answered"):
+        if self._asking(run) and not run.get("answered"):
             return RemoteRun(
                 RemoteStatus.WAITING, external_id, url, error_message="L'agent attend une réponse."
             )

@@ -181,6 +181,32 @@ class TestSendInput:
         assert len(rec.requests) == 2  # self + un seul POST messages
 
 
+class TestListMessages:
+    async def test_messages_are_mapped_and_tail_limited(self):
+        items = [
+            {"event_id": f"e{i}", "source": "user" if i % 2 else "devin",
+             "message": f"message {i}", "created_at": 1700000000 + i}
+            for i in range(5)
+        ]
+        rec = Recorder(json_response(200, SELF_SERVICE),
+                       json_response(200, {"items": items, "has_next_page": False, "end_cursor": None}))
+        messages = await connector(rec).list_messages(SESSION, limit=3)
+
+        assert [m.role for m in messages] == ["agent", "user", "agent"]
+        assert [m.text for m in messages] == ["message 2", "message 3", "message 4"]
+        assert messages[0].at is not None
+        assert rec.requests[1].url.params["first"] == "200"
+
+    async def test_empty_thread_is_an_empty_list(self):
+        rec = Recorder(json_response(200, SELF_SERVICE), json_response(200, {"items": []}))
+        assert await connector(rec).list_messages(SESSION) == []
+
+    async def test_history_is_declared(self):
+        rec = Recorder(json_response(200, SELF_SERVICE), json_response(200, {"items": []}))
+        result = await connector(rec).verify()
+        assert Capability.HISTORY in result.capabilities
+
+
 class TestErrors:
     @pytest.mark.parametrize(
         "status,body,category",

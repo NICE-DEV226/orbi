@@ -24,6 +24,7 @@ from src.core.text import esc
 from src.models.user import NotificationPreferences, User
 from src.orbi_dev import service
 from src.orbi_dev.access import can_use_orbi_dev
+from src.orbi_dev.choices import agent_choice_buttons
 from src.orbi_dev.look import EXTERNAL, PRIMARY, REFRESH, quote
 from src.orbi_dev.models import Execution
 from src.orbi_dev.present import STATUS_ICON, STATUS_INFO
@@ -46,6 +47,8 @@ CB_CHECK = "devx:check:"
 CB_APPROVE = "devx:approve:"
 CB_IGNORE = "devx:ignore:"
 CB_REPLY = "dv:rep:"  # remote control : armé puis le prochain texte est transmis à l'agent (ADR-0010)
+CB_CHAT = "dv:cht:"  # remote control : mode conversation persistant (texte libre → agent, ADR-0010)
+CB_THREAD = "dv:thread:"  # fil de discussion de la session (capacité HISTORY, ADR-0010)
 
 _HEADLINES: dict[ExecutionStatus, str] = {
     status: f"{STATUS_ICON[status]} <b>{STATUS_INFO[status][0]}</b>" for status in NOTIFY_STATUSES
@@ -81,7 +84,8 @@ def _safe_https(url: str | None) -> str | None:
 
 
 def build_keyboard(
-    execution: Execution, *, with_action: bool = True, can_interact: bool = False
+    execution: Execution, *, with_action: bool = True, can_interact: bool = False,
+    can_history: bool = False, choice_buttons: list[InlineKeyboardButton] | None = None,
 ) -> InlineKeyboardMarkup | None:
     """Ouvrir (Mini App, seulement si l'URL publique est en https), voir la PR, puis l'action qui convient."""
     settings = get_settings()
@@ -112,6 +116,12 @@ def build_keyboard(
         rows.append([InlineKeyboardButton(f"{REFRESH} Actualiser", callback_data=f"{CB_CHECK}{execution.id}")])
     if with_action and can_interact and status in (S.RUNNING, S.NEEDS_ATTENTION):
         rows.append([InlineKeyboardButton("Répondre à l'agent", callback_data=f"{CB_REPLY}{execution.id}")])
+        rows.append([InlineKeyboardButton("Discuter", callback_data=f"{CB_CHAT}{execution.id}")])
+    if can_history and execution.external_id:
+        rows.append([InlineKeyboardButton("Fil de discussion", callback_data=f"{CB_THREAD}{execution.id}")])
+    if choice_buttons:
+        for i in range(0, len(choice_buttons), 2):
+            rows.append(choice_buttons[i : i + 2])
     return InlineKeyboardMarkup(rows) if rows else None
 
 
@@ -151,10 +161,17 @@ async def _announce(bot: Bot, execution: Execution) -> str:
     can_interact = execution.status in (S.RUNNING, S.NEEDS_ATTENTION) and await service.execution_interact_capable(
         execution.owner_id, execution
     )
+    can_history = bool(execution.external_id) and await service.execution_history_capable(
+        execution.owner_id, execution
+    )
+    choice_buttons = await agent_choice_buttons(execution.owner_id, execution)
     try:
         await bot.send_message(
             chat_id=execution.owner_id, text=build_text(execution, prompt, project),
-            reply_markup=build_keyboard(execution, can_interact=can_interact), **reply,
+            reply_markup=build_keyboard(
+                execution, can_interact=can_interact, can_history=can_history,
+                choice_buttons=choice_buttons,
+            ), **reply,
         )
     except Forbidden:
         logger.info("Notification Orbi Dev non remise : l'utilisateur %s a bloqué le bot", execution.owner_id)

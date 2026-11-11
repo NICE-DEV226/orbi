@@ -11,6 +11,7 @@ import asyncio
 import logging
 import re
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -20,6 +21,7 @@ from src.orbi_dev.connectors.base import (
     ConnectorError,
     ErrorCategory,
     LaunchRequest,
+    RemoteMessage,
     RemoteRun,
     RemoteStatus,
     VerifyResult,
@@ -97,7 +99,10 @@ class DevinConnector(HttpConnector):
     provider = "devin"
     display_name = "Devin"
     capabilities = frozenset(
-        {Capability.LAUNCH, Capability.STATUS, Capability.CANCEL, Capability.PULL_REQUEST, Capability.INTERACT}
+        {
+            Capability.LAUNCH, Capability.STATUS, Capability.CANCEL,
+            Capability.PULL_REQUEST, Capability.INTERACT, Capability.HISTORY,
+        }
     )
 
     def __init__(
@@ -195,6 +200,26 @@ class DevinConnector(HttpConnector):
             self._org_path(org, f"/sessions/{session_id}/messages"),
             json={"message": message},
         )
+
+    async def list_messages(self, external_id: str, *, limit: int = 50) -> list[RemoteMessage]:
+        """GET /sessions/{id}/messages : fil chronologique, on garde les `limit` plus récents."""
+        session_id = self._session_id(external_id)
+        org = await self._org()
+        data = await self._request(
+            "GET", self._org_path(org, f"/sessions/{session_id}/messages"), params={"first": 200}
+        )
+        items = [m for m in data.get("items") or [] if isinstance(m, dict)]
+        messages = []
+        for m in items[-limit:]:
+            role = "user" if m.get("source") == "user" else "agent"
+            text = sanitize_text(str(m.get("message") or ""), 2000)
+            if not text:
+                continue
+            at = None
+            if isinstance(m.get("created_at"), int | float):
+                at = datetime.fromtimestamp(m["created_at"], UTC)
+            messages.append(RemoteMessage(role=role, text=text, at=at))
+        return messages
 
     # ── mapping ──
 

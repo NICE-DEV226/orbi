@@ -322,11 +322,11 @@ class TestBotEntryPoints:
         from src.handlers.dev_hub.home import connections_button
 
         assert web_button("Application", "/dev/") is None  # BASE_URL http://localhost : Telegram refuserait
-        assert connections_button().callback_data == "dv:conn"  # repli : l'écran qui explique /web
+        assert connections_button().callback_data == "dv:conn"  # la gestion des clés vit dans Telegram
         monkeypatch.setenv("BASE_URL", "https://orbi.example.org")
         get_settings.cache_clear()
         assert web_button("Application", "/dev/").web_app.url == "https://orbi.example.org/dev/"
-        assert connections_button().web_app.url == "https://orbi.example.org/dev/integrations"
+        assert connections_button().callback_data == "dv:conn"  # inchangé : jamais de Mini App pour les clés
 
     async def test_admin_menu_has_an_administration_entry_non_admin_does_not(self):
         from src.bot.keyboards import main_menu_keyboard

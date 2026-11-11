@@ -6,6 +6,7 @@ Une opération non supportée lève `ConnectorError(UNSUPPORTED_CAPABILITY)`, ja
 """
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import StrEnum
 
 
@@ -15,6 +16,7 @@ class Capability(StrEnum):
     CANCEL = "cancel"
     PULL_REQUEST = "pull_request"
     INTERACT = "interact"  # remote control : envoyer un message à une exécution en cours (ADR-0010)
+    HISTORY = "history"  # lire le fil de discussion d'une session (ADR-0010)
 
 
 class ErrorCategory(StrEnum):
@@ -84,6 +86,15 @@ class RemoteRun:
 
 
 @dataclass(frozen=True)
+class RemoteMessage:
+    """Un message du fil de discussion d'une session, dans l'ordre chronologique."""
+
+    role: str  # "user" | "agent" | "system"
+    text: str
+    at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class VerifyResult:
     capabilities: frozenset[Capability]
     scopes: list[str] = field(default_factory=list)
@@ -121,6 +132,12 @@ class BaseConnector:
     async def send_input(self, external_id: str, message: str) -> None:
         """Envoie un message utilisateur à une exécution existante (remote control, ADR-0010)."""
         raise self._unsupported(Capability.INTERACT)
+
+    async def list_messages(self, external_id: str, *, limit: int = 50) -> list[RemoteMessage]:
+        """
+        Les `limit` messages les plus récents de la session, en ordre chronologique (capacité HISTORY).
+        """
+        raise self._unsupported(Capability.HISTORY)
 
     async def aclose(self) -> None:
         return None

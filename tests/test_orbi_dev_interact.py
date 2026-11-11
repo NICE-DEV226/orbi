@@ -158,3 +158,63 @@ class TestFakeConnectorInteract:
         with pytest.raises(ConnectorError) as exc:
             await FakeConnector(SECRET).send_input("fake-nope", "salut")
         assert exc.value.category == ErrorCategory.NOT_FOUND
+
+
+class TestExecutionThread:
+    """runner.get_execution_thread : le fil de discussion (capacité HISTORY)."""
+
+    async def test_thread_returns_the_provider_conversation(self):
+        execution = await waiting_execution()
+        await runner.send_input_to_execution(ALICE, str(execution.id), "Utilise Python 3.12")
+
+        messages = await runner.get_execution_thread(ALICE, str(execution.id))
+
+        roles = [m.role for m in messages]
+        assert "user" in roles and "agent" in roles
+        assert any("Utilise Python 3.12" in m.text for m in messages)
+        assert any(m.role == "agent" and "Question de l'agent" in m.text for m in messages) is False
+
+    async def test_waiting_agent_question_is_in_the_thread(self):
+        execution = await waiting_execution()
+        messages = await runner.get_execution_thread(ALICE, str(execution.id))
+        assert any(m.role == "agent" and "Question de l'agent" in m.text for m in messages)
+
+    async def test_thread_works_on_a_finished_execution(self):
+        _, _, execution = await make_execution(prompt="ok")
+        await runner.launch_execution(ALICE, str(execution.id))
+        await runner.refresh_execution(ALICE, str(execution.id))
+        await runner.refresh_execution(ALICE, str(execution.id))
+        assert (await service.get_execution(ALICE, str(execution.id))).status == S.SUCCEEDED
+
+        messages = await runner.get_execution_thread(ALICE, str(execution.id))
+        assert messages and messages[0].role == "user"
+
+    async def test_queued_execution_has_no_thread_yet(self):
+        _, _, execution = await make_execution()
+        with pytest.raises(service.ConflictError):
+            await runner.get_execution_thread(ALICE, str(execution.id))
+
+    async def test_other_owner_cannot_read_the_thread(self):
+        execution = await waiting_execution()
+        with pytest.raises(service.NotFoundError):
+            await runner.get_execution_thread(BOB, str(execution.id))
+
+
+class _NoHistoryConnector(_NoInteractConnector):
+    """Connecteur factice sans HISTORY : le runner doit refuser le fil explicitement."""
+
+    capabilities = frozenset({Capability.LAUNCH, Capability.STATUS, Capability.INTERACT})
+
+    async def list_messages(self, external_id: str, *, limit: int = 50):  # pragma: no cover
+        raise AssertionError("list_messages ne devrait pas être appelé sans la capacité")
+
+
+class TestThreadUnsupportedProvider:
+    async def test_provider_without_history_is_refused(self, monkeypatch):
+        execution = await waiting_execution()
+        monkeypatch.setattr(runner, "build_connector", lambda provider, secret: _NoHistoryConnector(secret))
+
+        with pytest.raises(ConnectorError) as exc:
+            await runner.get_execution_thread(ALICE, str(execution.id))
+
+        assert exc.value.category == ErrorCategory.UNSUPPORTED_CAPABILITY

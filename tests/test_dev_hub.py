@@ -11,7 +11,7 @@ from src.models.user import User
 from src.orbi_dev import cards, runner, service
 from src.orbi_dev.connectors.fake import FakeConnector
 from src.orbi_dev.inputs import parse_repo
-from src.orbi_dev.models import Execution, Project, Task
+from src.orbi_dev.models import Execution, IntegrationStatus, Project, Task
 from src.orbi_dev.state import ExecutionStatus
 
 REPO = "https://github.com/acme/demo"
@@ -41,6 +41,7 @@ class Chat:
         self.context.user_data = {"db_user": user}
         self.context.args = []
         self.context.bot.set_my_commands = AsyncMock()
+        self.context.bot.send_message = AsyncMock(side_effect=lambda **kw: self._record(kw.get("text"), kw.get("reply_markup")))
         self.context.application.create_task = self._launch
         self.shown: list[str] = []
         self.markups: list = []
@@ -62,6 +63,8 @@ class Chat:
         query.message.chat_id = self.user.telegram_id
         query.message.message_id = 700
         query.edit_message_text = AsyncMock(side_effect=self._record)
+        query.edit_message_reply_markup = AsyncMock()
+        query.message.reply_text = AsyncMock(side_effect=self._record)
         query.answer = AsyncMock(side_effect=lambda text=None, show_alert=False: self.alerts.append(text) if text else None)
         update = MagicMock()
         update.callback_query = query
@@ -75,6 +78,7 @@ class Chat:
         update.effective_user.id = self.user.telegram_id
         update.message.text = text
         update.message.reply_text = AsyncMock(side_effect=self._record)
+        update.message.delete = AsyncMock()
         update.effective_message = update.message
         return update
 
@@ -790,7 +794,7 @@ class TestLook:
         chat = Chat(await admin_user(1))
         await chat.say(dev_hub.show_home, "/start")
         sent = chat.context.bot.set_my_commands.await_args
-        assert [c.command for c in sent.args[0]] == ["start", "task", "tasks", "web"]
+        assert [c.command for c in sent.args[0]] == ["start", "task", "tasks", "chat", "web"]
         assert sent.kwargs["scope"].chat_id == 1
         chat.context.bot.set_my_commands.reset_mock()
         await chat.press(dev_hub.show_home, "dv:home")  # un simple bouton ne rappelle pas Telegram
@@ -891,7 +895,7 @@ class TestStructure:
         await chat.press(dev_hub.show_connections, "dv:conn")
         assert "agent-perso" in chat.last and "Actif" in chat.last
         assert "super-secret-key-123" not in all_text(chat)
-        assert "/web" in chat.last  # sans https public, on explique comment ouvrir la page web
+        assert "Ajouter une connexion" in chat.last_buttons()  # gestion complète dans Telegram
 
     async def test_alerts_can_be_switched_off_and_on(self):
         user = await admin(1)
@@ -974,3 +978,356 @@ class TestAgentReply:
         chat = Chat(await admin(9203))
         await chat.say(dev_hub.on_text, "un message au hasard")
         assert chat.shown == []
+
+
+class TestAgentThread:
+    """« Fil de discussion » : lit la conversation de la session chez le fournisseur (HISTORY)."""
+
+    async def _execution(self, owner: int, prompt: str = "question [ask]"):
+        FakeConnector.reset()
+        project = await service.create_project(owner, "demo", REPO)
+        integration = await runner.connect_integration(owner, "fake", "secret-key")
+        task = await service.create_task(owner, str(project.id), str(integration.id), prompt)
+        execution = await service.create_execution(owner, str(task.id))
+        await runner.launch_execution(owner, str(execution.id))
+        await runner.refresh_execution(owner, str(execution.id))
+        return await service.get_execution(owner, str(execution.id))
+
+    async def test_thread_button_sends_the_conversation(self):
+        from src.handlers import orbi_dev as notifications
+        from src.orbi_dev.notifier import CB_THREAD
+
+        chat = Chat(await admin(9210))
+        execution = await self._execution(9210)
+
+        await chat.press(notifications.show_thread, f"{CB_THREAD}{execution.id}")
+
+        assert "Question de l'agent" in chat.last
+        assert "Vous" in chat.last and "Agent" in chat.last
+        assert "question [ask]" in chat.last
+
+    async def test_thread_reflects_sent_messages(self):
+        from src.handlers import orbi_dev as notifications
+        from src.orbi_dev.notifier import CB_THREAD
+
+        chat = Chat(await admin(9211))
+        execution = await self._execution(9211)
+        await runner.send_input_to_execution(9211, str(execution.id), "Python 3.12")
+
+        await chat.press(notifications.show_thread, f"{CB_THREAD}{execution.id}")
+        assert "Python 3.12" in chat.last
+        assert "Message reçu" in chat.last
+
+    async def test_thread_button_refuses_another_owner(self):
+        from src.handlers import orbi_dev as notifications
+        from src.orbi_dev.notifier import CB_THREAD
+
+        chat = Chat(await admin(9212))
+        execution = await self._execution(9210)  # appartient à 9210
+        await chat.press(notifications.show_thread, f"{CB_THREAD}{execution.id}")
+        assert "introuvable" in chat.alerts[-1].lower()
+
+
+class TestAgentChoices:
+    """Choix cliquables (ADR-0010) : options parsées du message de l'agent ou réponses génériques."""
+
+    async def _waiting(self, owner: int, prompt: str = "quelle approche ? [askopts]"):
+        FakeConnector.reset()
+        project = await service.create_project(owner, "demo", REPO)
+        integration = await runner.connect_integration(owner, "fake", "secret-key")
+        task = await service.create_task(owner, str(project.id), str(integration.id), prompt)
+        execution = await service.create_execution(owner, str(task.id))
+        await runner.launch_execution(owner, str(execution.id))
+        await runner.refresh_execution(owner, str(execution.id))
+        await runner.refresh_execution(owner, str(execution.id))
+        execution = await service.get_execution(owner, str(execution.id))
+        assert execution.status == ExecutionStatus.NEEDS_ATTENTION
+        return execution
+
+    @staticmethod
+    def _opt_data(execution, index: int, text: str) -> str:
+        from src.orbi_dev.choices import CB_OPT, option_fingerprint
+
+        return f"{CB_OPT}{execution.id}:{index}:{option_fingerprint(text)}"
+
+    async def test_parsed_option_is_sent_to_the_agent(self):
+        from src.handlers import orbi_dev as notifications
+
+        chat = Chat(await admin(9300))
+        execution = await self._waiting(9300)
+        await chat.press(notifications.choose_parsed_option, self._opt_data(execution, 1, "Réécrire le module"))
+
+        assert FakeConnector._runs[execution.external_id]["messages"] == ["Réécrire le module"]
+        assert "transmis" in chat.alerts[-1]
+
+    async def test_stale_fingerprint_sends_nothing(self):
+        from src.handlers import orbi_dev as notifications
+
+        chat = Chat(await admin(9301))
+        execution = await self._waiting(9301)
+        # le fil a changé depuis le rendu : l'empreinte ne correspond plus
+        await chat.press(notifications.choose_parsed_option, self._opt_data(execution, 0, "autre chose"))
+
+        assert "messages" not in FakeConnector._runs[execution.external_id]
+        assert "actualité" in chat.alerts[-1]
+
+    async def test_generic_choice_is_sent(self):
+        from src.handlers import orbi_dev as notifications
+        from src.orbi_dev.choices import CB_GEN, GENERIC_CHOICES
+
+        chat = Chat(await admin(9302))
+        execution = await self._waiting(9302, "question [ask]")
+        await chat.press(notifications.choose_generic, f"{CB_GEN}{execution.id}:0")
+
+        assert FakeConnector._runs[execution.external_id]["messages"] == [GENERIC_CHOICES[0]]
+        assert "transmis" in chat.alerts[-1]
+
+    async def test_out_of_range_index_sends_nothing(self):
+        from src.handlers import orbi_dev as notifications
+        from src.orbi_dev.choices import CB_GEN
+
+        chat = Chat(await admin(9303))
+        execution = await self._waiting(9303, "question [ask]")
+        await chat.press(notifications.choose_generic, f"{CB_GEN}{execution.id}:99")
+
+        assert "messages" not in FakeConnector._runs[execution.external_id]
+        assert "actualité" in chat.alerts[-1]
+
+    async def test_choice_refuses_another_owner(self):
+        from src.handlers import orbi_dev as notifications
+        from src.orbi_dev.choices import CB_GEN
+
+        await self._waiting(9304)
+        chat = Chat(await admin(9305))
+        execution = await service.get_execution(9304, (await service.list_executions(9304))[0].id)
+        await chat.press(notifications.choose_generic, f"{CB_GEN}{execution.id}:0")
+        assert "introuvable" in chat.alerts[-1].lower()
+
+    async def test_choice_buttons_appear_on_the_execution_card(self):
+        from src.handlers.dev_hub import tasks as dev_tasks
+
+        chat = Chat(await admin(9306))
+        execution = await self._waiting(9306)
+        await chat.press(dev_tasks.show_execution, f"dv:e:{execution.id}")
+        assert "Réécrire le module" in chat.last_buttons()
+
+
+class TestTelegramConnections:
+    """Connexions fournisseurs entièrement dans Telegram : ajout de clé, vérification, révocation."""
+
+    async def _admin(self, tid: int):
+        return Chat(await admin(tid))
+
+    async def test_connections_screen_offers_add_and_revoke(self):
+        from src.handlers.dev_hub.common import CB_CONN_ADD, CB_CONN_REVOKE
+
+        chat = await self._admin(9400)
+        integration = await runner.connect_integration(9400, "fake", "key-9400")
+        await chat.press(dev_hub.show_connections, "dv:conn")
+
+        data = chat.last_data()
+        assert CB_CONN_ADD in data
+        assert f"{CB_CONN_REVOKE}{integration.id}" in data
+        assert "Actif" in chat.last
+
+    async def test_add_fake_connection_end_to_end(self):
+        from src.handlers.dev_hub.common import CB_CONN_PICK
+
+        chat = await self._admin(9401)
+        await chat.press(dev_hub.show_connect_providers, "dv:cad")
+        assert "Démonstration (factice)" in chat.last
+
+        await chat.press(dev_hub.pick_connect_provider, f"{CB_CONN_PICK}fake")
+        assert chat.context.user_data["dev"]["step"] == "apikey"
+
+        await chat.say(dev_hub.on_text, "ma-cle-secrete-9401")
+        integrations = await service.list_integrations(9400 + 1)
+        assert len(integrations) == 1 and integrations[0].provider == "fake"
+        assert integrations[0].status == IntegrationStatus.ACTIVE
+        assert "connecté" in chat.last.lower()
+        # le message contenant la clé a été effacé du chat
+        assert chat.context.bot.send_message.await_count >= 1
+
+    async def test_invalid_key_is_refused_and_nothing_stored(self, monkeypatch):
+        from src.handlers.dev_hub.common import CB_CONN_PICK
+        from src.orbi_dev.connectors.base import ConnectorError, ErrorCategory
+
+        async def refused(self):
+            raise ConnectorError(ErrorCategory.AUTH_INVALID, "Clé refusée par le fournisseur")
+
+        monkeypatch.setattr(FakeConnector, "verify", refused)
+        chat = await self._admin(9402)
+        await chat.press(dev_hub.pick_connect_provider, f"{CB_CONN_PICK}fake")
+        await chat.say(dev_hub.on_text, "cle-valide-plus-longue")
+
+        assert await service.list_integrations(9402) == []
+        assert "refusée" in chat.last.lower()
+
+    async def test_multiline_or_too_short_key_is_rejected(self):
+        from src.handlers.dev_hub.common import CB_CONN_PICK
+
+        chat = await self._admin(9403)
+        await chat.press(dev_hub.pick_connect_provider, f"{CB_CONN_PICK}fake")
+        await chat.say(dev_hub.on_text, "abc")
+        assert await service.list_integrations(9403) == []
+        assert "invalide" in chat.last.lower()
+
+    async def test_revoke_requires_confirmation_then_revokes(self):
+        from src.handlers.dev_hub.common import CB_CONN_REVOKE, CB_CONN_REVOKE_OK
+
+        chat = await self._admin(9404)
+        integration = await runner.connect_integration(9404, "fake", "key-9404")
+
+        await chat.press(dev_hub.confirm_revoke, f"{CB_CONN_REVOKE}{integration.id}")
+        assert "Révoquer" in chat.last and "tableau de bord" in chat.last
+
+        await chat.press(dev_hub.revoke, f"{CB_CONN_REVOKE_OK}{integration.id}")
+        integration = await service.get_integration(9404, str(integration.id))
+        assert integration.status == IntegrationStatus.REVOKED
+        assert "révoquée" in chat.last.lower()
+
+    async def test_pick_unknown_provider_is_refused(self):
+        from src.handlers.dev_hub.common import CB_CONN_PICK
+
+        chat = await self._admin(9405)
+        await chat.press(dev_hub.pick_connect_provider, f"{CB_CONN_PICK}inconnu")
+        assert "indisponible" in chat.alerts[-1].lower()
+        assert "dev" not in chat.context.user_data
+
+
+class TestChatMode:
+    """Mode conversation (ADR-0010) : « Discuter » puis tout texte va à l'agent, réponses poussées."""
+
+    async def _waiting_execution(self, owner: int):
+        FakeConnector.reset()
+        project = await service.create_project(owner, "demo", REPO)
+        integration = await runner.connect_integration(owner, "fake", "secret-key")
+        task = await service.create_task(owner, str(project.id), str(integration.id), "question [ask]")
+        execution = await service.create_execution(owner, str(task.id))
+        await runner.launch_execution(owner, str(execution.id))
+        await runner.refresh_execution(owner, str(execution.id))
+        await runner.refresh_execution(owner, str(execution.id))
+        return await service.get_execution(owner, str(execution.id))
+
+    async def test_discuter_arms_chat_and_plain_text_reaches_the_agent(self):
+        from src.orbi_dev import chat as dev_chat
+
+        chat = Chat(await admin(9501))
+        execution = await self._waiting_execution(9501)
+
+        await chat.press(dev_hub.start_chat, f"dv:cht:{execution.id}")
+        assert await dev_chat.is_enabled(9501)
+        assert "Mode conversation" in chat.last
+        assert "Quitter la discussion" in chat.last_buttons()
+
+        await chat.say(dev_hub.on_text, "Réponds en français")
+        assert FakeConnector._runs[execution.external_id]["messages"] == ["Réponds en français"]
+        # succès silencieux : pas d'accusé de réception, comme une vraie conversation
+        assert chat.shown[-1] == chat.shown[0] or "transmis" not in chat.last.lower()
+
+    async def test_chat_mode_survives_without_draft_and_exit_disarms(self):
+        from src.orbi_dev import chat as dev_chat
+
+        chat = Chat(await admin(9502))
+        execution = await self._waiting_execution(9502)
+        await chat.press(dev_hub.start_chat, f"dv:cht:{execution.id}")
+        assert "dev" not in chat.context.user_data  # l'état vit dans Redis, pas dans le brouillon
+
+        await chat.press(dev_hub.exit_chat, "dv:chate")
+        assert not await dev_chat.is_enabled(9502)
+
+        await chat.say(dev_hub.on_text, "toujours là ?")
+        assert FakeConnector._runs[execution.external_id].get("messages", []) == []
+
+    async def test_chat_text_without_active_agent_is_answered(self):
+        from src.orbi_dev import chat as dev_chat
+
+        chat = Chat(await admin(9503))
+        await dev_chat.enable(9503)
+        await chat.say(dev_hub.on_text, "bonjour")
+        assert "Aucun agent" in chat.last
+
+    async def test_push_replies_delivers_new_agent_messages_once(self):
+        from src.orbi_dev import chat as dev_chat
+
+        chat = Chat(await admin(9504))
+        execution = await self._waiting_execution(9504)
+        await chat.press(dev_hub.start_chat, f"dv:cht:{execution.id}")
+
+        await runner.send_input_to_execution(9504, str(execution.id), "continue")
+        bot = MagicMock()
+        bot.send_message = AsyncMock()
+
+        assert await dev_chat.push_replies(bot) == 1
+        text = bot.send_message.await_args.kwargs["text"]
+        assert "Message reçu, je continue." in text and "Agent" in text
+
+        # deuxième passage : l'ancre a avancé, rien à renvoyer
+        assert await dev_chat.push_replies(bot) == 0
+        assert bot.send_message.await_count == 1
+
+    async def test_push_replies_without_history_pushes_nothing(self, monkeypatch):
+        from src.orbi_dev import chat as dev_chat
+        from src.orbi_dev.connectors.base import ConnectorError, ErrorCategory
+
+        chat = Chat(await admin(9505))
+        execution = await self._waiting_execution(9505)
+        await chat.press(dev_hub.start_chat, f"dv:cht:{execution.id}")
+
+        async def no_history(owner_id, execution_id, *, limit=30):
+            raise ConnectorError(ErrorCategory.UNSUPPORTED_CAPABILITY, "pas de fil")
+
+        monkeypatch.setattr(dev_chat.runner, "get_execution_thread", no_history)
+        bot = MagicMock()
+        bot.send_message = AsyncMock()
+        assert await dev_chat.push_replies(bot) == 0
+        bot.send_message.assert_not_awaited()
+
+    async def test_resolve_target_picks_most_recently_active(self):
+        from src.orbi_dev import chat as dev_chat
+
+        owner = 9506
+        first = await self._waiting_execution(owner)
+        second = await self._waiting_execution(owner)
+        # la plus récente est celle dont l'activité est la plus fraîche
+        await Execution.get_pymongo_collection().update_one(
+            {"_id": first.id}, {"$set": {"updated_at": datetime.now(UTC) - timedelta(days=1)}}
+        )
+        target = await dev_chat.resolve_target(owner)
+        assert target is not None and target.id == second.id
+
+    async def test_chat_command_toggles_the_mode(self):
+        from src.orbi_dev import chat as dev_chat
+
+        chat = Chat(await admin(9507))
+        await self._waiting_execution(9507)
+
+        await chat.say(dev_hub.chat_command, "/chat")
+        assert await dev_chat.is_enabled(9507)
+        assert "Mode conversation" in chat.last
+
+        await chat.say(dev_hub.chat_command, "/chat")
+        assert not await dev_chat.is_enabled(9507)
+        assert "désactivé" in chat.last.lower()
+
+    async def test_chat_command_without_agent_keeps_mode_armed(self):
+        from src.orbi_dev import chat as dev_chat
+
+        chat = Chat(await admin(9508))
+        await chat.say(dev_hub.chat_command, "/chat")
+        assert await dev_chat.is_enabled(9508)
+        assert "Aucun agent actif" in chat.last
+
+    async def test_push_shows_typing_before_agent_reply(self):
+        from src.orbi_dev import chat as dev_chat
+
+        chat = Chat(await admin(9509))
+        execution = await self._waiting_execution(9509)
+        await chat.press(dev_hub.start_chat, f"dv:cht:{execution.id}")
+        await runner.send_input_to_execution(9509, str(execution.id), "continue")
+
+        bot = MagicMock()
+        bot.send_message = AsyncMock()
+        bot.send_chat_action = AsyncMock()
+        assert await dev_chat.push_replies(bot) == 1
+        bot.send_chat_action.assert_awaited()
