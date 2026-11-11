@@ -53,6 +53,15 @@ Répondre à l'aveugle ne suffit pas : l'utilisateur doit voir ce que l'agent a 
 
 `runner.get_execution_thread` est en lecture seule : autorisé même sur une exécution terminée, sans restriction d'état tant qu'une session externe existe. Côté interface, le fil est **chargé à la demande** — bouton « Fil de discussion » en réponse à la carte Telegram — jamais dans le polling : zéro appel fournisseur supplémentaire tant que l'utilisateur ne l'ouvre pas.
 
+### 3ter. Choix cliquables (`choices.py`)
+
+Les fournisseurs n'exposent pas de question à choix structurée : le message de l'agent est du texte brut. Quand une exécution est `needs_attention` et que le fournisseur déclare `INTERACT`, la carte/notification propose des boutons :
+
+- **Options parsées** (si `HISTORY` est déclaré) : le dernier message de l'agent contient une liste numérotée ou à puces **dans une question** (« ? » requis, ≥ 2 items, ≤ 4, ≤ 200 caractères) → chaque item devient un bouton. Le callback porte une empreinte SHA-1 tronquée du texte ; au clic, le fil est relu et l'option vérifiée — un fil changé entre-temps refuse le choix plutôt que d'envoyer autre chose que ce que l'utilisateur a vu.
+- **Réponses génériques** sinon (pas de liste lisible, ou fournisseur sans `HISTORY` comme Cursor) : « Oui, continue. », « Non. », « Explique-moi les options. » — des amorces, l'agent peut redemander une précision.
+
+Après un choix envoyé, les boutons de choix sont retirés du message (anti double-envoi) et la carte est rafraîchie. Le texte libre (« Répondre à l'agent ») reste toujours disponible en complément.
+
 ### 4. Limites assumées
 
 - `sendMessage` Jules reprend la session mais **n'approuve pas un plan** (`AWAITING_PLAN_APPROVAL` a son endpoint `approvePlan`, non exposé ici) : l'agent peut répondre en redemandant l'approbation, et l'état repasse `needs_attention`. Couvrir l'approbation de plan est un incrément ultérieur.

@@ -11,6 +11,7 @@ from telegram.ext import ContextTypes
 from src.bot.screen import edit_screen
 from src.core.text import esc
 from src.orbi_dev import cards, runner, service
+from src.orbi_dev.choices import agent_choice_buttons
 from src.orbi_dev.connectors.base import ConnectorError
 from src.orbi_dev.look import PLUS, PRIMARY, SUCCESS, quote
 from src.orbi_dev.models import IntegrationStatus
@@ -105,7 +106,10 @@ async def show_execution(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await service.execution_interact_capable(owner, execution)
     )
     can_history = bool(execution.external_id) and await service.execution_history_capable(owner, execution)
-    keyboard = build_keyboard(execution, can_interact=can_interact, can_history=can_history)
+    keyboard = build_keyboard(
+        execution, can_interact=can_interact, can_history=can_history,
+        choice_buttons=await agent_choice_buttons(owner, execution),
+    )
     rows = [list(row) for row in keyboard.inline_keyboard] if keyboard else []
     rows.append([back("Tâches", CB_LIST)])
     await show(update, text, InlineKeyboardMarkup(rows))

@@ -16,6 +16,13 @@ from src.core.text import esc
 from src.models.user import User
 from src.orbi_dev import cards, runner, service
 from src.orbi_dev.access import can_use_orbi_dev
+from src.orbi_dev.choices import (
+    CB_GEN,
+    CB_OPT,
+    GENERIC_CHOICES,
+    option_fingerprint,
+    parsed_options,
+)
 from src.orbi_dev.connectors.base import ConnectorError, RemoteMessage
 from src.orbi_dev.notifier import (
     CB_APPROVE,
@@ -207,6 +214,108 @@ async def show_thread(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await query.message.reply_text(chunk, **kwargs)
 
 
+async def _drop_choices(query, execution) -> None:
+    """Retire les boutons de choix (évite un double envoi) en gardant Répondre, Fil et liens."""
+    try:
+        can_interact = execution.status in (ExecutionStatus.RUNNING, ExecutionStatus.NEEDS_ATTENTION) and (
+            await service.execution_interact_capable(execution.owner_id, execution)
+        )
+        can_history = bool(execution.external_id) and await service.execution_history_capable(
+            execution.owner_id, execution
+        )
+        await query.edit_message_reply_markup(
+            reply_markup=build_keyboard(execution, can_interact=can_interact, can_history=can_history)
+        )
+    except BadRequest as e:
+        logger.debug("Clavier après choix inchangé : %s", e)
+
+
+async def _send_choice(update: Update, context: ContextTypes.DEFAULT_TYPE, owner_id: int,
+                       execution_id: str, resolve) -> None:
+    """Valide l'exécution puis transmet le choix résolu à l'agent (remote control, ADR-0010)."""
+    query = update.callback_query
+    try:
+        execution = await service.get_execution(owner_id, execution_id)
+    except service.NotFoundError:
+        await query.answer("Exécution introuvable.", show_alert=True)
+        return
+    if execution.status not in (ExecutionStatus.RUNNING, ExecutionStatus.NEEDS_ATTENTION) or not execution.external_id:
+        await query.answer("L'agent n'accepte plus de message.", show_alert=True)
+        return
+    text = await resolve(owner_id, execution)
+    if text is None:
+        await query.answer("Ce choix n'est plus d'actualité — ouvrez le fil de discussion.", show_alert=True)
+        return
+    try:
+        await runner.send_input_to_execution(owner_id, execution_id, text)
+    except service.NotFoundError:
+        await query.answer("Exécution introuvable.", show_alert=True)
+        return
+    except (service.ConflictError, ValueError) as e:
+        await query.answer(str(e), show_alert=True)
+        return
+    except ConnectorError as e:
+        await query.answer(f"Message non transmis ({e.category.value}).", show_alert=True)
+        return
+    await query.answer("Choix transmis à l'agent.")
+    try:
+        fresh = await service.get_execution(owner_id, execution_id)
+        await _drop_choices(query, fresh)
+    except service.NotFoundError:
+        pass
+    try:
+        context.application.create_task(cards.update_cards(context.bot))
+    except Exception:
+        logger.debug("Actualisation de carte après choix impossible", exc_info=True)
+
+
+async def choose_parsed_option(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Option lue dans le message de l'agent : renvoyée telle quelle, après vérification d'empreinte."""
+    query = update.callback_query
+    owner_id = await _authorize(update, context)
+    if owner_id is None:
+        return
+    parts = query.data.removeprefix(CB_OPT).split(":")
+    if len(parts) != 3:
+        await query.answer("Bouton invalide.", show_alert=True)
+        return
+    execution_id, index_s, fingerprint = parts
+
+    async def resolve(owner, execution):
+        try:
+            index = int(index_s)
+        except ValueError:
+            return None
+        options = await parsed_options(owner, execution)
+        if not 0 <= index < len(options) or option_fingerprint(options[index]) != fingerprint:
+            return None
+        return options[index]
+
+    await _send_choice(update, context, owner_id, execution_id, resolve)
+
+
+async def choose_generic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Réponse générique suggérée quand le message de l'agent n'a pas de liste d'options lisible."""
+    query = update.callback_query
+    owner_id = await _authorize(update, context)
+    if owner_id is None:
+        return
+    parts = query.data.removeprefix(CB_GEN).split(":")
+    if len(parts) != 2:
+        await query.answer("Bouton invalide.", show_alert=True)
+        return
+    execution_id, index_s = parts
+
+    async def resolve(owner, execution):
+        try:
+            index = int(index_s)
+        except ValueError:
+            return None
+        return GENERIC_CHOICES[index] if 0 <= index < len(GENERIC_CHOICES) else None
+
+    await _send_choice(update, context, owner_id, execution_id, resolve)
+
+
 async def _drop_action(query, execution) -> None:
     """Retire le bouton d'action (évite un double clic) en gardant « Ouvrir » et « Voir la PR »."""
     try:
@@ -222,3 +331,5 @@ def register_orbi_dev_handlers(application) -> None:
     application.add_handler(CallbackQueryHandler(ignore_execution, pattern=rf"^{CB_IGNORE}"))
     application.add_handler(CallbackQueryHandler(reply_to_agent, pattern=rf"^{CB_REPLY}"))
     application.add_handler(CallbackQueryHandler(show_thread, pattern=rf"^{CB_THREAD}"))
+    application.add_handler(CallbackQueryHandler(choose_parsed_option, pattern=rf"^{CB_OPT}"))
+    application.add_handler(CallbackQueryHandler(choose_generic, pattern=rf"^{CB_GEN}"))

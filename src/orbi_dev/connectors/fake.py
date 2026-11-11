@@ -10,6 +10,7 @@ Le comportement se pilote avec des marqueurs dans le prompt :
   [lost]     le lancement réussit côté fournisseur mais la réponse est perdue (timeout)
   [slow]     l'exécution ne se termine jamais
   [ask]      l'agent pose une question et attend une réponse (remote control) jusqu'à send_input
+  [askopts]  idem, mais la question propose des options numérotées (test des choix cliquables)
 """
 
 from datetime import UTC, datetime
@@ -90,13 +91,28 @@ class FakeConnector(BaseConnector):
         if run is None:
             raise ConnectorError(ErrorCategory.NOT_FOUND, "Agent introuvable")
         thread = list(run.get("thread") or [])
-        if "[ask]" in run["prompt"] and not run.get("answered"):
-            thread.append(self._msg("agent", "Question de l'agent : puis-je continuer ?"))
+        if FakeConnector._asking(run) and not run.get("answered"):
+            thread.append(self._msg("agent", self._question(run)))
         return thread[-limit:]
 
     @staticmethod
     def _msg(role: str, text: str) -> RemoteMessage:
         return RemoteMessage(role=role, text=text, at=datetime.now(UTC))
+
+    @staticmethod
+    def _asking(run: dict) -> bool:
+        return "[ask]" in run["prompt"] or "[askopts]" in run["prompt"]
+
+    @staticmethod
+    def _question(run: dict) -> str:
+        if "[askopts]" in run["prompt"]:
+            return (
+                "Quelle approche préfères-tu ?\n\n"
+                "1) Garder la structure actuelle\n"
+                "2) Réécrire le module\n"
+                "3) Attendre mon avis"
+            )
+        return "Question de l'agent : puis-je continuer ?"
 
     async def cancel(self, external_id: str) -> RemoteRun:
         run = self._runs.get(external_id)
@@ -115,7 +131,7 @@ class FakeConnector(BaseConnector):
         polls, prompt = run["polls"], run["prompt"]
         if "[slow]" in prompt or polls < 2:
             return RemoteRun(RemoteStatus.PENDING if polls == 0 else RemoteStatus.RUNNING, external_id, url)
-        if "[ask]" in prompt and not run.get("answered"):
+        if self._asking(run) and not run.get("answered"):
             return RemoteRun(
                 RemoteStatus.WAITING, external_id, url, error_message="L'agent attend une réponse."
             )

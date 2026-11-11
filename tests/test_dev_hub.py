@@ -62,6 +62,7 @@ class Chat:
         query.message.chat_id = self.user.telegram_id
         query.message.message_id = 700
         query.edit_message_text = AsyncMock(side_effect=self._record)
+        query.edit_message_reply_markup = AsyncMock()
         query.message.reply_text = AsyncMock(side_effect=self._record)
         query.answer = AsyncMock(side_effect=lambda text=None, show_alert=False: self.alerts.append(text) if text else None)
         update = MagicMock()
@@ -1023,3 +1024,87 @@ class TestAgentThread:
         execution = await self._execution(9210)  # appartient à 9210
         await chat.press(notifications.show_thread, f"{CB_THREAD}{execution.id}")
         assert "introuvable" in chat.alerts[-1].lower()
+
+
+class TestAgentChoices:
+    """Choix cliquables (ADR-0010) : options parsées du message de l'agent ou réponses génériques."""
+
+    async def _waiting(self, owner: int, prompt: str = "quelle approche ? [askopts]"):
+        FakeConnector.reset()
+        project = await service.create_project(owner, "demo", REPO)
+        integration = await runner.connect_integration(owner, "fake", "secret-key")
+        task = await service.create_task(owner, str(project.id), str(integration.id), prompt)
+        execution = await service.create_execution(owner, str(task.id))
+        await runner.launch_execution(owner, str(execution.id))
+        await runner.refresh_execution(owner, str(execution.id))
+        await runner.refresh_execution(owner, str(execution.id))
+        execution = await service.get_execution(owner, str(execution.id))
+        assert execution.status == ExecutionStatus.NEEDS_ATTENTION
+        return execution
+
+    @staticmethod
+    def _opt_data(execution, index: int, text: str) -> str:
+        from src.orbi_dev.choices import CB_OPT, option_fingerprint
+
+        return f"{CB_OPT}{execution.id}:{index}:{option_fingerprint(text)}"
+
+    async def test_parsed_option_is_sent_to_the_agent(self):
+        from src.handlers import orbi_dev as notifications
+
+        chat = Chat(await admin(9300))
+        execution = await self._waiting(9300)
+        await chat.press(notifications.choose_parsed_option, self._opt_data(execution, 1, "Réécrire le module"))
+
+        assert FakeConnector._runs[execution.external_id]["messages"] == ["Réécrire le module"]
+        assert "transmis" in chat.alerts[-1]
+
+    async def test_stale_fingerprint_sends_nothing(self):
+        from src.handlers import orbi_dev as notifications
+
+        chat = Chat(await admin(9301))
+        execution = await self._waiting(9301)
+        # le fil a changé depuis le rendu : l'empreinte ne correspond plus
+        await chat.press(notifications.choose_parsed_option, self._opt_data(execution, 0, "autre chose"))
+
+        assert "messages" not in FakeConnector._runs[execution.external_id]
+        assert "actualité" in chat.alerts[-1]
+
+    async def test_generic_choice_is_sent(self):
+        from src.handlers import orbi_dev as notifications
+        from src.orbi_dev.choices import CB_GEN, GENERIC_CHOICES
+
+        chat = Chat(await admin(9302))
+        execution = await self._waiting(9302, "question [ask]")
+        await chat.press(notifications.choose_generic, f"{CB_GEN}{execution.id}:0")
+
+        assert FakeConnector._runs[execution.external_id]["messages"] == [GENERIC_CHOICES[0]]
+        assert "transmis" in chat.alerts[-1]
+
+    async def test_out_of_range_index_sends_nothing(self):
+        from src.handlers import orbi_dev as notifications
+        from src.orbi_dev.choices import CB_GEN
+
+        chat = Chat(await admin(9303))
+        execution = await self._waiting(9303, "question [ask]")
+        await chat.press(notifications.choose_generic, f"{CB_GEN}{execution.id}:99")
+
+        assert "messages" not in FakeConnector._runs[execution.external_id]
+        assert "actualité" in chat.alerts[-1]
+
+    async def test_choice_refuses_another_owner(self):
+        from src.handlers import orbi_dev as notifications
+        from src.orbi_dev.choices import CB_GEN
+
+        await self._waiting(9304)
+        chat = Chat(await admin(9305))
+        execution = await service.get_execution(9304, (await service.list_executions(9304))[0].id)
+        await chat.press(notifications.choose_generic, f"{CB_GEN}{execution.id}:0")
+        assert "introuvable" in chat.alerts[-1].lower()
+
+    async def test_choice_buttons_appear_on_the_execution_card(self):
+        from src.handlers.dev_hub import tasks as dev_tasks
+
+        chat = Chat(await admin(9306))
+        execution = await self._waiting(9306)
+        await chat.press(dev_tasks.show_execution, f"dv:e:{execution.id}")
+        assert "Réécrire le module" in chat.last_buttons()
