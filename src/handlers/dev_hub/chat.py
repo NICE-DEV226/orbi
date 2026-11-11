@@ -9,6 +9,7 @@ sont poussées par le worker. « Quitter la discussion » (ou un autre parcours)
 import logging
 
 from telegram import InlineKeyboardMarkup, Update
+from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
 from src.core.text import esc
@@ -24,6 +25,29 @@ CHAT_HINT = (
     "<b>Mode conversation activé.</b> Écrivez simplement : chaque message part à l'agent "
     "le plus récemment actif. Ses réponses arrivent ici automatiquement."
 )
+
+
+async def chat_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """« /chat » : active ou désactive le mode conversation (inverse le bouton « Discuter »)."""
+    owner = await authorize(update, context)
+    if owner is None:
+        return
+    if await dev_chat.is_enabled(owner):
+        await dev_chat.disable(owner)
+        clear_draft(context)
+        await update.message.reply_text("<b>Discussion terminée.</b> Le mode conversation est désactivé.")
+        return
+    execution = await dev_chat.resolve_target(owner)
+    anchor = await dev_chat.anchor_for(owner, str(execution.id)) if execution else None
+    await dev_chat.enable(owner, execution_id=str(execution.id) if execution else None, anchor=anchor)
+    clear_draft(context)
+    hint = CHAT_HINT
+    if execution is None:
+        hint += "\n<i>Aucun agent actif pour l'instant : le mode reste armé, vos messages attendront une session.</i>"
+    await update.message.reply_text(
+        hint + "\n<i>« /chat » ou « Quitter la discussion » pour arrêter.</i>",
+        reply_markup=InlineKeyboardMarkup([[button("Quitter la discussion", CB_CHAT_END)]]),
+    )
 
 
 async def start_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -74,5 +98,9 @@ async def handle_chat_text(update: Update, context: ContextTypes.DEFAULT_TYPE, o
         logger.exception("Envoi du message de conversation en échec")
         await update.message.reply_text("<b>Message non transmis.</b> Réessayez dans un instant.")
         return
-    # Succès volontairement silencieux : l'agent répondra dans le fil, poussé par le worker —
-    # comme une vraie conversation, pas un accusé de réception à chaque message.
+    # Succès silencieux : l'agent répondra dans le fil, poussé par le worker — comme une vraie
+    # conversation. « En train d'écrire » le temps qu'il travaille (5 s max côté Telegram).
+    try:
+        await context.bot.send_chat_action(chat_id=owner, action=ChatAction.TYPING)
+    except Exception:
+        logger.debug("Action « typing » impossible", exc_info=True)

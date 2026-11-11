@@ -794,7 +794,7 @@ class TestLook:
         chat = Chat(await admin_user(1))
         await chat.say(dev_hub.show_home, "/start")
         sent = chat.context.bot.set_my_commands.await_args
-        assert [c.command for c in sent.args[0]] == ["start", "task", "tasks", "web"]
+        assert [c.command for c in sent.args[0]] == ["start", "task", "tasks", "chat", "web"]
         assert sent.kwargs["scope"].chat_id == 1
         chat.context.bot.set_my_commands.reset_mock()
         await chat.press(dev_hub.show_home, "dv:home")  # un simple bouton ne rappelle pas Telegram
@@ -1295,3 +1295,39 @@ class TestChatMode:
         )
         target = await dev_chat.resolve_target(owner)
         assert target is not None and target.id == second.id
+
+    async def test_chat_command_toggles_the_mode(self):
+        from src.orbi_dev import chat as dev_chat
+
+        chat = Chat(await admin(9507))
+        await self._waiting_execution(9507)
+
+        await chat.say(dev_hub.chat_command, "/chat")
+        assert await dev_chat.is_enabled(9507)
+        assert "Mode conversation" in chat.last
+
+        await chat.say(dev_hub.chat_command, "/chat")
+        assert not await dev_chat.is_enabled(9507)
+        assert "désactivé" in chat.last.lower()
+
+    async def test_chat_command_without_agent_keeps_mode_armed(self):
+        from src.orbi_dev import chat as dev_chat
+
+        chat = Chat(await admin(9508))
+        await chat.say(dev_hub.chat_command, "/chat")
+        assert await dev_chat.is_enabled(9508)
+        assert "Aucun agent actif" in chat.last
+
+    async def test_push_shows_typing_before_agent_reply(self):
+        from src.orbi_dev import chat as dev_chat
+
+        chat = Chat(await admin(9509))
+        execution = await self._waiting_execution(9509)
+        await chat.press(dev_hub.start_chat, f"dv:cht:{execution.id}")
+        await runner.send_input_to_execution(9509, str(execution.id), "continue")
+
+        bot = MagicMock()
+        bot.send_message = AsyncMock()
+        bot.send_chat_action = AsyncMock()
+        assert await dev_chat.push_replies(bot) == 1
+        bot.send_chat_action.assert_awaited()

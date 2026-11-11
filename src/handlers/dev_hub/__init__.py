@@ -11,7 +11,7 @@ Un module par domaine : `common` (accès, brouillon, boutons), `home` (accueil, 
 
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler, filters
 
-from .chat import exit_chat, start_chat
+from .chat import chat_command, exit_chat, start_chat
 from .common import (
     CB_ADD_PROJECT,
     CB_BRANCH,
@@ -94,6 +94,7 @@ def register_dev_hub_handlers(application) -> None:
     on(CommandHandler("dev", show_home, filters=private))
     on(CommandHandler("task", task_command, filters=private))
     on(CommandHandler("tasks", tasks_command, filters=private))
+    on(CommandHandler("chat", chat_command, filters=private))
     for pattern, callback in (
         (CB_HOME, show_home), (CB_NEW, start_task), (CB_PROJECTS, show_projects),
         (CB_ADD_PROJECT, ask_repo_from_projects), (CB_NEW_REPO, ask_repo_for_task),

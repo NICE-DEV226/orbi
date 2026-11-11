@@ -11,12 +11,13 @@ exécution active, sans rien reconfigurer. Les réponses ne sont poussées que p
 déclarant HISTORY (lecture du fil) ; pour les autres, l'envoi fonctionne mais rien ne remonte.
 """
 
+import asyncio
 import hashlib
 import json
 import logging
 
 from telegram import Bot
-from telegram.constants import ParseMode
+from telegram.constants import ChatAction, ParseMode
 
 from src.core.redis import get_redis
 from src.core.text import esc
@@ -30,6 +31,19 @@ _PREFIX = "orbi_dev:chat:"
 _ACTIVE_STATUSES = (ExecutionStatus.RUNNING, ExecutionStatus.NEEDS_ATTENTION)
 _THREAD_LIMIT = 50
 _MAX_PUSH_CHARS = 3800
+
+
+def _typing_delay(text: str) -> float:
+    """Pause « en train d'écrire » proportionnée à la longueur, plafonnée — jamais bloquante pour le worker."""
+    return min(0.6 + len(text) / 500, 3.0)
+
+
+async def _typing(bot: Bot, chat_id: int) -> None:
+    """Montre « Orbi est en train d'écrire… » le temps d'une frappe humaine ; silencieux si ça échoue."""
+    try:
+        await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+    except Exception:
+        logger.debug("Action « typing » impossible", exc_info=True)
 
 
 def _key(owner_id: int) -> str:
@@ -160,6 +174,8 @@ async def _push_for_owner(bot: Bot, owner_id: int) -> int:
         if len(text) > _MAX_PUSH_CHARS:
             text = text[:_MAX_PUSH_CHARS] + "…"
         stamp = f" ({message.at:%H:%M})" if message.at else ""
+        await _typing(bot, owner_id)
+        await asyncio.sleep(_typing_delay(text))
         await bot.send_message(
             chat_id=owner_id,
             text=f"💬 <b>Agent{stamp}</b>\n{esc(text)}",

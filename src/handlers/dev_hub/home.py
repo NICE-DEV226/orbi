@@ -49,6 +49,7 @@ ADMIN_COMMANDS = [
     BotCommand("start", "Accueil Orbi Dev"),
     BotCommand("task", "Lancer une tâche : /task votre consigne"),
     BotCommand("tasks", "Voir vos tâches"),
+    BotCommand("chat", "Discuter avec l'agent (activer/désactiver)"),
     BotCommand("web", "Lien vers l'application web"),
 ]
 
