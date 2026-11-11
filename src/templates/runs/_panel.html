@@ -49,6 +49,13 @@
   </form>
   {% endif %}
 
+  {% if can_history %}
+  <div id="thread-box">
+    <button class="btn btn-quiet" type="button"
+            hx-get="/dev/executions/{{ execution.id }}/thread" hx-target="#thread-box" hx-swap="innerHTML">{{ icon('pulse') }} Conversation avec l'agent</button>
+  </div>
+  {% endif %}
+
   <div class="actions">
     {% set provider_link = execution.external_url|safe_link %}
     {% if active %}

@@ -435,6 +435,20 @@ async def execution_interact_capable(owner_id: int, execution: Execution) -> boo
     return integration.status == IntegrationStatus.ACTIVE
 
 
+async def execution_history_capable(owner_id: int, execution: Execution) -> bool:
+    """
+    L'interface peut proposer le fil de discussion si le fournisseur déclare HISTORY et que
+    l'intégration est active (indice d'interface ; le garde-fou réel est à l'appel chez le runner).
+    """
+    if Capability.HISTORY not in provider_capabilities(execution.provider):
+        return False
+    try:
+        integration = await get_integration(owner_id, execution.integration_id)
+    except NotFoundError:
+        return False
+    return integration.status == IntegrationStatus.ACTIVE
+
+
 async def set_execution_fields(execution: Execution, **fields: Any) -> None:
     """Met à jour des champs de suivi sans changer de statut (ex. identifiant externe, compteurs)."""
     allowed = _TRANSITION_FIELDS | {"poll_count", "last_polled_at", "attempt", "ci_verified_at"}

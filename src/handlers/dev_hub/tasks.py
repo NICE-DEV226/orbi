@@ -104,7 +104,8 @@ async def show_execution(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     can_interact = execution.status in (ExecutionStatus.RUNNING, ExecutionStatus.NEEDS_ATTENTION) and (
         await service.execution_interact_capable(owner, execution)
     )
-    keyboard = build_keyboard(execution, can_interact=can_interact)
+    can_history = bool(execution.external_id) and await service.execution_history_capable(owner, execution)
+    keyboard = build_keyboard(execution, can_interact=can_interact, can_history=can_history)
     rows = [list(row) for row in keyboard.inline_keyboard] if keyboard else []
     rows.append([back("Tâches", CB_LIST)])
     await show(update, text, InlineKeyboardMarkup(rows))

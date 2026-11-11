@@ -22,6 +22,7 @@ Chaque personne connecte sa propre clé : elle est rattachée à son compte Orbi
 | Suivre | `GET /v1alpha/sessions/{id}` ; `GET .../activities` pour la raison d'un échec ou le dernier message de l'agent |
 | Pull request | `outputs[].pullRequest.url` |
 | Répondre (remote control, ADR-0010) | `POST /v1alpha/sessions/{id}:sendMessage` (`prompt`) — transmet un message à la session active ; n'approuve pas un plan (`approvePlan` non exposé) |
+| Fil de discussion (HISTORY) | `GET /v1alpha/sessions/{id}/activities` — `agentMessaged`/`userMessaged` → messages, `progressUpdated`/`planGenerated`/`planApproved` → jalons système |
 | Annuler | **Non déclarée** : aucune annulation n'est documentée. Orbi masque le bouton « Arrêter » et refuse explicitement la demande. |
 
 ## Différences avec Cursor, et ce qu'Orbi en fait

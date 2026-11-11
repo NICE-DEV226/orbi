@@ -21,6 +21,7 @@ from src.orbi_dev.connectors.base import (
     ConnectorError,
     ErrorCategory,
     LaunchRequest,
+    RemoteMessage,
     RemoteRun,
     RemoteStatus,
 )
@@ -458,6 +459,26 @@ async def send_input_to_execution(owner_id: int, execution_id: str, message: str
             execution, ExecutionStatus.RUNNING, message="Réponse transmise à l'agent"
         )
     return await service.get_execution(owner_id, execution_id)
+
+
+async def get_execution_thread(owner_id: int, execution_id: str, *, limit: int = 30) -> list[RemoteMessage]:
+    """
+    Fil de discussion de la session chez le fournisseur (capacité HISTORY, ADR-0010).
+
+    Lecture seule : autorisé même sur une exécution terminée — l'historique reste utile après coup.
+    """
+    execution = await service.get_execution(owner_id, execution_id)
+    if not execution.external_id:
+        raise service.ConflictError("L'agent n'a pas encore de session chez le fournisseur")
+
+    integration = await service.get_integration(owner_id, execution.integration_id)
+    async with _Session(integration) as connector:
+        if Capability.HISTORY not in connector.capabilities:
+            raise ConnectorError(
+                ErrorCategory.UNSUPPORTED_CAPABILITY,
+                f"{integration.provider} n'expose pas le fil de discussion",
+            )
+        return await connector.list_messages(execution.external_id, limit=limit)
 
 
 # ─────────────────────────────────────

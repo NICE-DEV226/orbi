@@ -12,12 +12,15 @@ Le comportement se pilote avec des marqueurs dans le prompt :
   [ask]      l'agent pose une question et attend une réponse (remote control) jusqu'à send_input
 """
 
+from datetime import UTC, datetime
+
 from src.orbi_dev.connectors.base import (
     BaseConnector,
     Capability,
     ConnectorError,
     ErrorCategory,
     LaunchRequest,
+    RemoteMessage,
     RemoteRun,
     RemoteStatus,
     VerifyResult,
@@ -27,7 +30,10 @@ from src.orbi_dev.connectors.base import (
 class FakeConnector(BaseConnector):
     provider = "fake"
     capabilities = frozenset(
-        {Capability.LAUNCH, Capability.STATUS, Capability.CANCEL, Capability.PULL_REQUEST, Capability.INTERACT}
+        {
+            Capability.LAUNCH, Capability.STATUS, Capability.CANCEL,
+            Capability.PULL_REQUEST, Capability.INTERACT, Capability.HISTORY,
+        }
     )
 
     # État « côté fournisseur », partagé dans le process.
@@ -55,6 +61,7 @@ class FakeConnector(BaseConnector):
         if external_id not in self._runs:  # idempotent : un doublon adopte l'existant
             self._runs[external_id] = {
                 "polls": 0, "cancelled": False, "prompt": request.prompt, "repo": request.repo_url,
+                "thread": [self._msg("user", request.prompt)],
             }
         if "[lost]" in request.prompt and self._runs[external_id]["polls"] == 0 and not self._runs[external_id].get("lost"):
             self._runs[external_id]["lost"] = True
@@ -73,7 +80,23 @@ class FakeConnector(BaseConnector):
         if run is None:
             raise ConnectorError(ErrorCategory.NOT_FOUND, "Agent introuvable")
         run.setdefault("messages", []).append(message)
+        run.setdefault("thread", []).extend(
+            [self._msg("user", message), self._msg("agent", "Message reçu, je continue.")]
+        )
         run["answered"] = True
+
+    async def list_messages(self, external_id: str, *, limit: int = 50) -> list[RemoteMessage]:
+        run = self._runs.get(external_id)
+        if run is None:
+            raise ConnectorError(ErrorCategory.NOT_FOUND, "Agent introuvable")
+        thread = list(run.get("thread") or [])
+        if "[ask]" in run["prompt"] and not run.get("answered"):
+            thread.append(self._msg("agent", "Question de l'agent : puis-je continuer ?"))
+        return thread[-limit:]
+
+    @staticmethod
+    def _msg(role: str, text: str) -> RemoteMessage:
+        return RemoteMessage(role=role, text=text, at=datetime.now(UTC))
 
     async def cancel(self, external_id: str) -> RemoteRun:
         run = self._runs.get(external_id)

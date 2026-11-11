@@ -54,10 +54,13 @@ def render_text(execution: Execution, prompt: str, project: str) -> str:
     return "\n".join(lines)
 
 
-def render_keyboard(execution: Execution, *, can_interact: bool = False) -> InlineKeyboardMarkup | None:
+def render_keyboard(
+    execution: Execution, *, can_interact: bool = False, can_history: bool = False
+) -> InlineKeyboardMarkup | None:
     """Pendant l'exécution : Ouvrir et Actualiser. Ensuite, seulement les liens : les actions sont dans l'alerte."""
     return build_keyboard(
-        execution, with_action=not is_terminal(ExecutionStatus(execution.status)), can_interact=can_interact
+        execution, with_action=not is_terminal(ExecutionStatus(execution.status)),
+        can_interact=can_interact, can_history=can_history,
     )
 
 
@@ -80,7 +83,12 @@ async def render(execution: Execution) -> tuple[str, InlineKeyboardMarkup | None
     can_interact = status in (ExecutionStatus.RUNNING, ExecutionStatus.NEEDS_ATTENTION) and (
         await service.execution_interact_capable(execution.owner_id, execution)
     )
-    return render_text(execution, prompt, project), render_keyboard(execution, can_interact=can_interact)
+    can_history = bool(execution.external_id) and await service.execution_history_capable(
+        execution.owner_id, execution
+    )
+    return render_text(execution, prompt, project), render_keyboard(
+        execution, can_interact=can_interact, can_history=can_history
+    )
 
 
 async def attach(execution: Execution, chat_id: int, message_id: int) -> None:

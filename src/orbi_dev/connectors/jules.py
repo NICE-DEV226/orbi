@@ -11,6 +11,7 @@ import logging
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
+from datetime import datetime
 from typing import Any
 
 import httpx
@@ -20,6 +21,7 @@ from src.orbi_dev.connectors.base import (
     ConnectorError,
     ErrorCategory,
     LaunchRequest,
+    RemoteMessage,
     RemoteRun,
     RemoteStatus,
     VerifyResult,
@@ -144,8 +146,12 @@ class JulesConnector(HttpConnector):
     display_name = "Jules"
     # Pas d'annulation : l'API v1alpha n'en documente aucune (voir docs/connectors/jules.md).
     # INTERACT : sessions.sendMessage (docs API, ADR-0010) — n'approuve pas un plan (approvePlan séparé).
+    # HISTORY : sessions/{id}/activities — messages agent/utilisateur et jalons (plan, progression).
     capabilities = frozenset(
-        {Capability.LAUNCH, Capability.STATUS, Capability.PULL_REQUEST, Capability.INTERACT}
+        {
+            Capability.LAUNCH, Capability.STATUS, Capability.PULL_REQUEST,
+            Capability.INTERACT, Capability.HISTORY,
+        }
     )
 
     def __init__(
@@ -199,6 +205,45 @@ class JulesConnector(HttpConnector):
         await self._request(
             "POST", f"{API}/sessions/{self._session_id(external_id)}:sendMessage", json={"prompt": message}
         )
+
+    async def list_messages(self, external_id: str, *, limit: int = 50) -> list[RemoteMessage]:
+        """GET sessions/{id}/activities : les activités conversationnelles, les `limit` plus récentes."""
+        activities = await self._activities(self._session_id(external_id))
+        messages = []
+        for activity in activities:
+            message = self._activity_message(activity)
+            if message is not None:
+                messages.append(message)
+        return messages[-limit:]
+
+    @staticmethod
+    def _activity_message(activity: dict[str, Any]) -> RemoteMessage | None:
+        at = None
+        raw = activity.get("createTime")
+        if isinstance(raw, str):
+            try:
+                at = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            except ValueError:
+                at = None
+        if "agentMessaged" in activity:
+            text = (activity["agentMessaged"] or {}).get("agentMessage")
+            role = "agent"
+        elif "userMessaged" in activity:
+            text = (activity["userMessaged"] or {}).get("userMessage")
+            role = "user"
+        elif "progressUpdated" in activity:
+            progress = activity["progressUpdated"] or {}
+            title, description = progress.get("title"), progress.get("description")
+            text = " — ".join(part for part in (title, description) if part) or "Progression"
+            role = "system"
+        elif "planGenerated" in activity:
+            text, role = "Plan proposé par l'agent.", "system"
+        elif "planApproved" in activity:
+            text, role = "Plan approuvé.", "system"
+        else:
+            return None
+        cleaned = sanitize_text(str(text or ""), 2000)
+        return RemoteMessage(role=role, text=cleaned, at=at) if cleaned else None
 
     async def find_by_client_ref(self, client_ref: str) -> RemoteRun | None:
         marker = self._marker(client_ref)

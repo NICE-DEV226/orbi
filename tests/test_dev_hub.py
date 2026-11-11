@@ -62,6 +62,7 @@ class Chat:
         query.message.chat_id = self.user.telegram_id
         query.message.message_id = 700
         query.edit_message_text = AsyncMock(side_effect=self._record)
+        query.message.reply_text = AsyncMock(side_effect=self._record)
         query.answer = AsyncMock(side_effect=lambda text=None, show_alert=False: self.alerts.append(text) if text else None)
         update = MagicMock()
         update.callback_query = query
@@ -974,3 +975,51 @@ class TestAgentReply:
         chat = Chat(await admin(9203))
         await chat.say(dev_hub.on_text, "un message au hasard")
         assert chat.shown == []
+
+
+class TestAgentThread:
+    """« Fil de discussion » : lit la conversation de la session chez le fournisseur (HISTORY)."""
+
+    async def _execution(self, owner: int, prompt: str = "question [ask]"):
+        FakeConnector.reset()
+        project = await service.create_project(owner, "demo", REPO)
+        integration = await runner.connect_integration(owner, "fake", "secret-key")
+        task = await service.create_task(owner, str(project.id), str(integration.id), prompt)
+        execution = await service.create_execution(owner, str(task.id))
+        await runner.launch_execution(owner, str(execution.id))
+        await runner.refresh_execution(owner, str(execution.id))
+        return await service.get_execution(owner, str(execution.id))
+
+    async def test_thread_button_sends_the_conversation(self):
+        from src.handlers import orbi_dev as notifications
+        from src.orbi_dev.notifier import CB_THREAD
+
+        chat = Chat(await admin(9210))
+        execution = await self._execution(9210)
+
+        await chat.press(notifications.show_thread, f"{CB_THREAD}{execution.id}")
+
+        assert "Question de l'agent" in chat.last
+        assert "Vous" in chat.last and "Agent" in chat.last
+        assert "question [ask]" in chat.last
+
+    async def test_thread_reflects_sent_messages(self):
+        from src.handlers import orbi_dev as notifications
+        from src.orbi_dev.notifier import CB_THREAD
+
+        chat = Chat(await admin(9211))
+        execution = await self._execution(9211)
+        await runner.send_input_to_execution(9211, str(execution.id), "Python 3.12")
+
+        await chat.press(notifications.show_thread, f"{CB_THREAD}{execution.id}")
+        assert "Python 3.12" in chat.last
+        assert "Message reçu" in chat.last
+
+    async def test_thread_button_refuses_another_owner(self):
+        from src.handlers import orbi_dev as notifications
+        from src.orbi_dev.notifier import CB_THREAD
+
+        chat = Chat(await admin(9212))
+        execution = await self._execution(9210)  # appartient à 9210
+        await chat.press(notifications.show_thread, f"{CB_THREAD}{execution.id}")
+        assert "introuvable" in chat.alerts[-1].lower()

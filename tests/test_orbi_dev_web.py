@@ -237,6 +237,44 @@ class TestRemoteControl:
             assert r.status_code == 200 and "terminée" in r.text
 
 
+class TestThread:
+    """Fil de discussion (capacité HISTORY) : lu à la demande, jamais dans le polling."""
+
+    async def _waiting(self, owner: int = 500, prompt: str = "Réponds à ma question [ask]"):
+        _, _, _, execution = await seed(owner, prompt=prompt)
+        await runner.launch_execution(owner, str(execution.id))
+        await runner.refresh_execution(owner, str(execution.id))
+        await runner.refresh_execution(owner, str(execution.id))
+        return await service.get_execution(owner, str(execution.id))
+
+    async def test_thread_endpoint_returns_the_conversation(self):
+        client, _, _ = await login()
+        execution = await self._waiting()
+        await runner.send_input_to_execution(500, str(execution.id), "Python 3.12")
+        async with client:
+            r = await client.get(f"/dev/executions/{execution.id}/thread")
+        assert r.status_code == 200
+        assert "Python 3.12" in r.text and "Question de l'agent" not in r.text  # répondu : question passée
+        assert "Vous" in r.text and "Agent" in r.text
+
+    async def test_thread_button_is_offered_and_loads_lazily(self):
+        client, _, _ = await login()
+        execution = await self._waiting()
+        async with client:
+            panel = (await client.get(f"/dev/executions/{execution.id}")).text
+            assert f"/dev/executions/{execution.id}/thread" in panel
+            assert "Conversation avec l'agent" in panel
+            # le fil n'est PAS chargé dans le panneau : pas d'appel fournisseur au polling
+            assert "Question de l'agent" not in panel
+
+    async def test_other_user_gets_404_on_the_thread(self):
+        _, _, _ = await login()
+        execution = await self._waiting()
+        other, _, _ = await login(telegram_id=777)
+        async with other:
+            assert (await other.get(f"/dev/executions/{execution.id}/thread")).status_code == 404
+
+
 class TestIntegrationsSafety:
     async def test_invalid_key_is_rejected_with_a_message_and_nothing_stored(self):
         client, _, token = await login()

@@ -1,0 +1,24 @@
+{% from "_macros.html" import icon %}
+{% if error %}
+<div class="alert" role="alert">{{ error }}</div>
+{% else %}
+<section class="sheet thread-sheet" aria-labelledby="thread-title">
+  <div class="thread-head">
+    <h2 id="thread-title">Conversation</h2>
+    <button class="btn btn-quiet" type="button"
+            hx-get="/dev/executions/{{ execution_id }}/thread" hx-target="#thread-box" hx-swap="innerHTML">{{ icon('refresh') }} Actualiser</button>
+  </div>
+  {% if messages %}
+  <ol class="thread">
+    {% for m in messages %}
+    <li class="thread-msg thread-{{ m.role }}">
+      <span class="thread-who">{{ {"user": "Vous", "agent": "Agent", "system": "Session"}.get(m.role, m.role) }}{% if m.at %} · {{ m.at|fmt_dt }}{% endif %}</span>
+      <p class="thread-text">{{ m.text }}</p>
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <p class="muted">Aucun message pour l'instant.</p>
+  {% endif %}
+</section>
+{% endif %}

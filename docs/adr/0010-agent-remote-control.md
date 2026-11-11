@@ -42,6 +42,17 @@ Le message utilisateur est nettoyé (`clean_text`), borné (1–4000 caractères
 - **Telegram** : bouton « Répondre à l'agent » sur la notification/carte d'une exécution `running` ou `needs_attention` dont le fournisseur supporte `INTERACT`. Il arme le parcours existant (`user_data["dev"]["step"] = "reply"`, TTL 15 min) : le prochain message texte est transmis, puis le brouillon est oublié. Un message non texte reçoit la réponse « j'attends du texte » du mécanisme existant.
 - **Web** : formulaire « Répondre à l'agent » (CSRF) dans le panneau d'exécution, visible sous les mêmes conditions.
 
+### 3bis. Fil de discussion (capacité `HISTORY`)
+
+Répondre à l'aveugle ne suffit pas : l'utilisateur doit voir ce que l'agent a dit. `BaseConnector.list_messages(external_id, limit)` lit le fil de la session — `RemoteMessage(role, text, at)` — déclarée par une capacité `history` distincte d'`INTERACT` (un fournisseur peut exposer l'un sans l'autre).
+
+- **Devin** : `GET /v3/organizations/{org}/sessions/{id}/messages` (`source: user|devin` → `user|agent`).
+- **Jules** : `GET /v1alpha/sessions/{id}/activities` — `agentMessaged`/`userMessaged` → messages, `progressUpdated`/`planGenerated`/`planApproved` → jalons système.
+- **Cursor** : non déclaré — l'API v1 n'expose que `runs/{id}/stream` (SSE), pas de liste de messages en REST.
+- **Fake** : fil simulé (`[ask]` ajoute la question de l'agent).
+
+`runner.get_execution_thread` est en lecture seule : autorisé même sur une exécution terminée, sans restriction d'état tant qu'une session externe existe. Côté interface, le fil est **chargé à la demande** — bouton « Fil de discussion » (Telegram, en réponse à la carte) et « Conversation avec l'agent » (web, fragment htmx `/executions/{id}/thread`) — jamais dans le polling : zéro appel fournisseur supplémentaire tant que l'utilisateur ne l'ouvre pas.
+
 ### 4. Limites assumées
 
 - `sendMessage` Jules reprend la session mais **n'approuve pas un plan** (`AWAITING_PLAN_APPROVAL` a son endpoint `approvePlan`, non exposé ici) : l'agent peut répondre en redemandant l'approbation, et l'état repasse `needs_attention`. Couvrir l'approbation de plan est un incrément ultérieur.
