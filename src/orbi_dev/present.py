@@ -37,7 +37,7 @@ STATUS_ICON: dict[ExecutionStatus, str] = {
     S.TIMED_OUT: "◷",
 }
 
-PROVIDER_NAMES = {"cursor": "Cursor", "jules": "Jules (Google)", "fake": "Démonstration (factice)"}
+PROVIDER_NAMES = {"cursor": "Cursor", "jules": "Jules (Google)", "devin": "Devin", "fake": "Démonstration (factice)"}
 
 
 def provider_name(value: str) -> str:

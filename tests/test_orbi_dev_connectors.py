@@ -349,7 +349,7 @@ class TestContractAndRegistry:
             build_connector("fake", "k")
 
     def test_providers_in_development(self):
-        assert set(available_providers()) == {"cursor", "jules", "fake"}
+        assert set(available_providers()) == {"cursor", "jules", "devin", "fake"}
 
     def test_unknown_provider(self):
         with pytest.raises(ConnectorError):
