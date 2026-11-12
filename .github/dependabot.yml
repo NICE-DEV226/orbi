@@ -8,6 +8,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # L'image de production reste sur la version de Python testée par la CI (ADR-0006) : seuls les correctifs
+    # (3.14.x) sont proposés automatiquement. Passer à une version mineure est une décision, avec la CI mise à jour.
+    ignore:
+      - dependency-name: python
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:

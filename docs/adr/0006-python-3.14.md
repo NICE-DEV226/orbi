@@ -35,3 +35,7 @@ Sur Python 3.14, **`pip install` échoue** (pip applique la borne `<3.14` de Bea
 ## Condition de sortie
 
 Supprimer le bloc `dependency-metadata` dès qu'une version de Beanie déclare officiellement 3.14. À réexaminer si un défaut spécifique à 3.14 est observé en production.
+
+## Garde-fou sur l'image Docker
+
+Le 2026-10-26, Dependabot a proposé de passer l'image à `python:3.15.0-slim` ; fusionnée, elle a fait tourner la production sur une version que la CI ne teste pas (la CI exécute la suite sur 3.12, 3.13 et 3.14, et le job Docker construit seulement l'image). L'image est revenue sur `python:3.14.x-slim`, et `.github/dependabot.yml` ne propose plus que des correctifs pour Python. Pour adopter 3.15 : l'ajouter à la matrice de la CI, constater que la suite passe, puis changer l'image dans la même PR.
