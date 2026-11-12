@@ -35,3 +35,8 @@ Sur Python 3.14, **`pip install` échoue** (pip applique la borne `<3.14` de Bea
 ## Condition de sortie
 
 Supprimer le bloc `dependency-metadata` dès qu'une version de Beanie déclare officiellement 3.14. À réexaminer si un défaut spécifique à 3.14 est observé en production.
+
+## Piège : les PR Dependabot qui touchent `uv.lock`
+
+Dependabot régénère `uv.lock` avec son propre `uv`, qui n'applique pas notre bloc `dependency-metadata` : le lockfile qu'il propose perd la section `[manifest]` (le correctif Beanie) et change de révision, donc l'étape `uv lock --check` de la CI échoue (constaté sur la PR #38, mise à jour de FastAPI). Le code n'est pas en cause. Pour une telle PR : refaire la mise à jour en local avec `uv lock --upgrade-package <paquet>==<version>`, vérifier que le diff ne contient que ce paquet, lancer la suite et ouvrir une PR ; la PR Dependabot se ferme d'elle-même une fois la version fusionnée.
+
